@@ -1,5 +1,5 @@
 # Created: 2025-07-15 11:54:13
-# Last Modified: 2025-07-15 12:10:37
+# Last Modified: 2025-07-15 12:14:47
 
 # endpoints/backoffice/get_cases_by_status.py
 from fastapi import APIRouter, HTTPException, Query
@@ -41,8 +41,8 @@ async def get_cases_by_status(user_id: str = Query(..., description="The user ID
 
             result = []
             for case_data in cases:
-                # Convert datetime to ISO format
-                if case_data["case_date"]:
+                # Convert datetime to ISO format if it's a datetime object
+                if case_data["case_date"] and hasattr(case_data["case_date"], 'isoformat'):
                     case_data["case_date"] = case_data["case_date"].isoformat()
                 # fetch procedure codes for each case
                 cursor.execute("SELECT procedure_code FROM case_procedure_codes WHERE case_id = %s", (case_data["case_id"],))
