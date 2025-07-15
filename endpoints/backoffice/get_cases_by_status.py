@@ -1,5 +1,5 @@
 # Created: 2025-07-15 11:54:13
-# Last Modified: 2025-07-15 11:57:01
+# Last Modified: 2025-07-15 12:06:05
 
 # endpoints/backoffice/get_cases_by_status.py
 from fastapi import APIRouter, HTTPException, Query
@@ -24,7 +24,7 @@ async def get_cases_by_status(user_id: str = Query(..., description="The user ID
         conn = get_db_connection()
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
             # Check user_type for the requesting user
-            cursor.execute("SELECT user_type FROM users WHERE user_id = %s", (user_id,))
+            cursor.execute("SELECT user_type FROM user_profile WHERE user_id = %s", (user_id,))
             user_row = cursor.fetchone()
             if not user_row or user_row.get("user_type", 0) < 10:
                 raise HTTPException(status_code=403, detail="User does not have permission to access all cases.")
