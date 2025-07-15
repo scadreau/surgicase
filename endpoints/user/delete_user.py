@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 11:16:46
+# Last Modified: 2025-07-15 14:24:33
 
 # endpoints/user/delete_user.py
 from fastapi import APIRouter, HTTPException, Query
@@ -7,11 +7,13 @@ from fastapi.responses import JSONResponse
 import pymysql.cursors
 import json
 import datetime as dt
-from core.database import get_db_connection
+from core.database import get_db_connection, close_db_connection
+from utils.monitoring import track_business_operation, business_metrics
 
 router = APIRouter()
 
 @router.delete("/user")
+@track_business_operation("delete", "user")
 async def delete_user(user_id: str = Query(..., description="The user ID to delete")):
     """
     Delete (deactivate) user by user_id
@@ -24,17 +26,20 @@ async def delete_user(user_id: str = Query(..., description="The user ID to dele
         conn = get_db_connection()
         print("INFO: Database connection established successfully")
 
-        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-            # First check if user exists and get current status
-            cursor.execute("""SELECT user_id, active FROM user_profile WHERE user_id = %s""", (user_id,))
-            user_data = cursor.fetchone()
+        try:
+            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                # First check if user exists and get current status
+                cursor.execute("""SELECT user_id, active FROM user_profile WHERE user_id = %s""", (user_id,))
+                user_data = cursor.fetchone()
 
-            if not user_data:
-                print(f"ERROR: User not found - user_id: {user_id}")
-                return {
-                    "statusCode": 404,
-                    "body": {"error": "User not found", "user_id":  user_id}
-                }
+                if not user_data:
+                    print(f"ERROR: User not found - user_id: {user_id}")
+                    # Record failed user deletion (not found)
+                    business_metrics.record_user_operation("delete", "not_found", user_id)
+                    return {
+                        "statusCode": 404,
+                        "body": {"error": "User not found", "user_id":  user_id}
+                    }
 
             current_active_status = user_data.get('active')
             print(f"INFO: User found - user_id: {user_id}, current active status: {current_active_status}")
@@ -42,6 +47,8 @@ async def delete_user(user_id: str = Query(..., description="The user ID to dele
             # Check if user is already inactive
             if current_active_status == 0:
                 print(f"WARNING: User already inactive - user_id: {user_id}")
+                # Record user deletion (already inactive)
+                business_metrics.record_user_operation("delete", "already_inactive", user_id)
                 return {
                     "statusCode": 200,
                     "body": {
@@ -57,6 +64,8 @@ async def delete_user(user_id: str = Query(..., description="The user ID to dele
             # Check if update was successful
             if cursor.rowcount == 0:
                 print(f"ERROR: Failed to update user active status - user_id: {user_id}")
+                # Record failed user deletion
+                business_metrics.record_user_operation("delete", "update_failed", user_id)
                 return {
                     "statusCode": 500,
                     "body": {"error": "Failed to deactivate user", "user_id": user_id}
@@ -66,6 +75,9 @@ async def delete_user(user_id: str = Query(..., description="The user ID to dele
 
             # Commit the transaction
             conn.commit()
+            
+            # Record successful user deletion
+            business_metrics.record_user_operation("delete", "success", user_id)
 
             return {
                 "statusCode": 200,
@@ -76,10 +88,15 @@ async def delete_user(user_id: str = Query(..., description="The user ID to dele
                     "deactivated_at": dt.datetime.now(dt.timezone.utc).isoformat() 
                 }
             }
+        finally:
+            close_db_connection(conn)
 
     except Exception as e:
         error_msg = f"ERROR: Exception occurred during user soft delete - user_id: {user_id if 'user_id' in locals() else 'unknown'}, error: {str(e)}"
         print(error_msg)
+        
+        # Record failed user deletion
+        business_metrics.record_user_operation("delete", "error", user_id if 'user_id' in locals() else 'unknown')
 
         # Rollback in case of error
         if 'conn' in locals():
@@ -90,10 +107,3 @@ async def delete_user(user_id: str = Query(..., description="The user ID to dele
             "statusCode": 500,
             "body": json.dumps({"error": str(e)})
         }
-
-    finally:
-        # Close connection if it exists
-        if 'conn' in locals():
-            print("INFO: Closing database connection")
-            conn.close()
-            print("INFO: Database connection closed successfully")

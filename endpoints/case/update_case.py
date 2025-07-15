@@ -1,16 +1,18 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 11:15:36
+# Last Modified: 2025-07-15 14:16:33
 
 # endpoints/case/update_case.py
 from fastapi import APIRouter, HTTPException, Body
 import pymysql.cursors
-from core.database import get_db_connection
+from core.database import get_db_connection, close_db_connection
 from core.models import CaseUpdate
 from utils.case_status import update_case_status
+from utils.monitoring import track_business_operation, business_metrics
 
 router = APIRouter()
 
 @router.patch("/case")
+@track_business_operation("update", "case")
 async def update_case(case: CaseUpdate = Body(...)):
     """
     Update fields in cases and replace procedure codes if provided. Only case_id is required.
@@ -23,11 +25,15 @@ async def update_case(case: CaseUpdate = Body(...)):
             raise HTTPException(status_code=400, detail="No fields to update")
 
         conn = get_db_connection()
-        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-            # Check if case exists
-            cursor.execute("SELECT case_id FROM cases WHERE case_id = %s", (case.case_id,))
-            if not cursor.fetchone():
-                raise HTTPException(status_code=404, detail={"error": "Case not found", "case_id": case.case_id})
+        
+        try:
+            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                # Check if case exists
+                cursor.execute("SELECT case_id FROM cases WHERE case_id = %s", (case.case_id,))
+                if not cursor.fetchone():
+                    # Record failed case update (not found)
+                    business_metrics.record_case_operation("update", "not_found", case.case_id)
+                    raise HTTPException(status_code=404, detail={"error": "Case not found", "case_id": case.case_id})
 
             updated_fields = []
             # Update cases table if needed
@@ -53,14 +59,20 @@ async def update_case(case: CaseUpdate = Body(...)):
                 updated_fields.append("procedure_codes")
 
             if not updated_fields:
+                # Record failed case update (no changes)
+                business_metrics.record_case_operation("update", "no_changes", case.case_id)
                 raise HTTPException(status_code=400, detail="No changes made to case")
 
             conn.commit()
 
             # Update case status if conditions are met
             status_update_result = update_case_status(case.case_id, conn)
+            
+            # Record successful case update
+            business_metrics.record_case_operation("update", "success", case.case_id)
 
-        conn.close()
+        finally:
+            close_db_connection(conn)
         return {
             "statusCode": 200,
             "body": {
@@ -74,7 +86,10 @@ async def update_case(case: CaseUpdate = Body(...)):
     except HTTPException:
         raise
     except Exception as e:
+        # Record failed case update
+        business_metrics.record_case_operation("update", "error", case.case_id)
+        
         if 'conn' in locals():
             conn.rollback()
-            conn.close()
+            close_db_connection(conn)
         raise HTTPException(status_code=500, detail={"error": str(e)})
