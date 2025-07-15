@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 12:56:57
+# Last Modified: 2025-07-15 13:19:53
 
 # main.py
 from fastapi import FastAPI
@@ -27,7 +27,7 @@ from endpoints.surgeon.get_surgeons import router as get_surgeons_router
 
 from endpoints.utility.get_doctypes import router as get_doctypes_router
 from endpoints.utility.get_cpt_codes import router as get_cpt_codes_router
-#from endpoints.utility.log_request import router as log_request_router
+from endpoints.utility.log_request import router as log_request_router
 
 from endpoints.health import router as health_router
 
@@ -76,4 +76,4 @@ app.include_router(get_cases_by_status_router, tags=["backoffice"])
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000) 

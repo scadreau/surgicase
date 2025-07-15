@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 12:49:45
+# Last Modified: 2025-07-15 13:08:59
 
 # core/models.py
 from typing import Optional, List
@@ -116,3 +116,6 @@ class LogRequestModel(BaseModel):
     query_params: str | None = None
     response_status: int
     response_payload: str | None = None
+    execution_time_ms: int
+    error_message: str | None = None
+    client_ip: str | None = None

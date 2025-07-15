@@ -127,4 +127,7 @@ venv.bak/
 .pytype/
 
 # Cython debug symbols
-cython_debug/ 
+cython_debug/
+
+# Monitoring documentation
+monitoring.md 
