@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 11:17:19
+# Last Modified: 2025-07-15 12:03:23
 
 # main.py
 from fastapi import FastAPI
@@ -29,6 +29,8 @@ from endpoints.utility.get_doctypes import router as get_doctypes_router
 from endpoints.utility.get_cpt_codes import router as get_cpt_codes_router
 
 from endpoints.health import router as health_router
+
+from endpoints.backoffice.get_cases_by_status import router as get_cases_by_status_router
 
 # Create FastAPI instance
 app = FastAPI()
@@ -66,6 +68,9 @@ app.include_router(get_cpt_codes_router, tags=["utility"])
 
 # Health check
 app.include_router(health_router, tags=["health"])
+
+# Backoffice endpoints
+app.include_router(get_cases_by_status_router, tags=["backoffice"])
 
 if __name__ == "__main__":
     import uvicorn
