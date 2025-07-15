@@ -29,15 +29,15 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
 
-  # Optional: Log aggregation (commented out for now)
-  # loki:
-  #   image: grafana/loki:latest
-  #   container_name: surgicase-loki
-  #   ports:
-  #     - "3100:3100"
-  #   volumes:
-  #     - ./loki/loki-config.yml:/etc/loki/local-config.yaml
-  #   command: -config.file=/etc/loki/local-config.yaml
+  loki:
+    image: grafana/loki:latest
+    container_name: surgicase-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/local-config.yaml
+    command: 
+      -config.file=/etc/loki/local-config.yaml
 
 volumes:
   prometheus_data:
