@@ -1,5 +1,6 @@
 # utils/case_status.py
 import pymysql.cursors
+import pymysql
 
 def update_case_status(case_id: str, conn) -> dict:
     """
@@ -81,9 +82,7 @@ def update_case_status(case_id: str, conn) -> dict:
                     "case_id": case_id
                 }
             
-            # Commit the transaction
-            conn.commit()
-            
+            # Note: No commit here - the calling function will handle the transaction
             return {
                 "success": True,
                 "message": "Case status updated successfully from 0 to 1",
@@ -93,8 +92,7 @@ def update_case_status(case_id: str, conn) -> dict:
             }
             
     except Exception as e:
-        # Rollback in case of error
-        conn.rollback()
+        # Don't rollback here - let the calling function handle transaction management
         return {
             "success": False,
             "message": f"Error updating case status: {str(e)}",

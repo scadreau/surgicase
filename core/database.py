@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 14:09:41
+# Last Modified: 2025-07-15 16:01:37
 
 # core/database.py
 import boto3
@@ -44,8 +44,16 @@ def get_db_connection():
         db_user = secretdb["username"]
         db_pass = secretdb["password"]
         
-        # Create connection
-        connection = pymysql.connect(host=rds_host, user=db_user, password=db_pass, db=db_name)
+        # Create connection with autocommit=False for transaction control
+        connection = pymysql.connect(
+            host=rds_host, 
+            user=db_user, 
+            password=db_pass, 
+            db=db_name,
+            autocommit=False,  # Explicitly disable autocommit
+            charset='utf8mb4',
+            cursorclass=pymysql.cursors.DictCursor
+        )
         
         # Track connection creation if monitoring is available
         if db_monitor:
@@ -67,11 +75,25 @@ def get_db_connection():
         
         raise
 
+def is_connection_valid(connection: Optional[pymysql.Connection]) -> bool:
+    """
+    Check if a database connection is valid and open
+    """
+    if not connection:
+        return False
+    
+    try:
+        # Try to ping the connection
+        connection.ping(reconnect=False)
+        return connection.open
+    except Exception:
+        return False
+
 def close_db_connection(connection: Optional[pymysql.Connection]):
     """
     Helper function to close database connection with monitoring
     """
-    if connection:
+    if connection and is_connection_valid(connection):
         try:
             connection.close()
             
@@ -84,4 +106,5 @@ def close_db_connection(connection: Optional[pymysql.Connection]):
         except Exception as e:
             if logger:
                 logger.error("database_connection_close_failed", error=str(e))
-            raise
+            # Don't raise the exception for connection close failures
+            pass
