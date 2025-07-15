@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 12:03:23
+# Last Modified: 2025-07-15 12:42:15
 
 # main.py
 from fastapi import FastAPI
@@ -27,6 +27,7 @@ from endpoints.surgeon.get_surgeons import router as get_surgeons_router
 
 from endpoints.utility.get_doctypes import router as get_doctypes_router
 from endpoints.utility.get_cpt_codes import router as get_cpt_codes_router
+from endpoints.utility.log_request import router as log_request_router
 
 from endpoints.health import router as health_router
 
@@ -65,6 +66,7 @@ app.include_router(get_surgeons_router, tags=["surgeons"])
 # Utility endpoints
 app.include_router(get_doctypes_router, tags=["utility"])
 app.include_router(get_cpt_codes_router, tags=["utility"])
+app.include_router(log_request_router)
 
 # Health check
 app.include_router(health_router, tags=["health"])

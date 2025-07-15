@@ -1,9 +1,10 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 11:11:06
+# Last Modified: 2025-07-15 12:49:45
 
 # core/models.py
 from typing import Optional, List
 from pydantic import BaseModel, EmailStr, Field
+from datetime import datetime
 
 # User Models
 class UserDocument(BaseModel):
@@ -104,3 +105,14 @@ class SurgeonRequest(BaseModel):
 
 class SurgeonsRequest(BaseModel):
     user_id: str
+
+# Log Request Models
+class LogRequestModel(BaseModel):
+    timestamp: datetime = Field(default_factory=datetime.now)
+    user_id: str | None = None
+    endpoint: str
+    method: str
+    request_payload: str | None = None
+    query_params: str | None = None
+    response_status: int
+    response_payload: str | None = None
