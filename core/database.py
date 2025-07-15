@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 11:10:30
+# Last Modified: 2025-07-15 14:09:41
 
 # core/database.py
 import boto3
@@ -7,6 +7,17 @@ import json
 import pymysql
 import pymysql.cursors
 import os
+import time
+from typing import Optional
+
+# Import monitoring utilities
+try:
+    from utils.monitoring import db_monitor, logger, track_database_operation
+except ImportError:
+    # Fallback if monitoring is not available
+    db_monitor = None
+    logger = None
+    track_database_operation = lambda operation, table="unknown": lambda func: func
 
 def get_db_credentials(secret_name):
     """
@@ -20,14 +31,57 @@ def get_db_credentials(secret_name):
 
 def get_db_connection():
     """
-    Helper function to establish database connection
+    Helper function to establish database connection with monitoring
     """
-    # Fetch DB info from Secrets Manager
-    secretdb = get_db_credentials("arn:aws:secretsmanager:us-east-1:002118831669:secret:prod/rds/serverinfo-MyhF8S")
-    rds_host = secretdb["rds_address"]
-    db_name = secretdb["db_name"]    
-    secretdb = get_db_credentials("arn:aws:secretsmanager:us-east-1:002118831669:secret:rds!cluster-9376049b-abee-46d9-9cdb-95b95d6cdda0-fjhTNH")
-    db_user = secretdb["username"]
-    db_pass = secretdb["password"]
+    start_time = time.time()
     
-    return pymysql.connect(host=rds_host, user=db_user, password=db_pass, db=db_name)
+    try:
+        # Fetch DB info from Secrets Manager
+        secretdb = get_db_credentials("arn:aws:secretsmanager:us-east-1:002118831669:secret:prod/rds/serverinfo-MyhF8S")
+        rds_host = secretdb["rds_address"]
+        db_name = secretdb["db_name"]    
+        secretdb = get_db_credentials("arn:aws:secretsmanager:us-east-1:002118831669:secret:rds!cluster-9376049b-abee-46d9-9cdb-95b95d6cdda0-fjhTNH")
+        db_user = secretdb["username"]
+        db_pass = secretdb["password"]
+        
+        # Create connection
+        connection = pymysql.connect(host=rds_host, user=db_user, password=db_pass, db=db_name)
+        
+        # Track connection creation if monitoring is available
+        if db_monitor:
+            db_monitor.connection_created()
+            duration = time.time() - start_time
+            if logger:
+                logger.debug("database_connection_established", duration=duration, host=rds_host)
+        
+        return connection
+        
+    except Exception as e:
+        duration = time.time() - start_time
+        
+        # Track connection errors if monitoring is available
+        if db_monitor:
+            db_monitor.connection_created()  # This will increment the error counter
+            if logger:
+                logger.error("database_connection_failed", duration=duration, error=str(e))
+        
+        raise
+
+def close_db_connection(connection: Optional[pymysql.Connection]):
+    """
+    Helper function to close database connection with monitoring
+    """
+    if connection:
+        try:
+            connection.close()
+            
+            # Track connection closure if monitoring is available
+            if db_monitor:
+                db_monitor.connection_closed()
+                if logger:
+                    logger.debug("database_connection_closed")
+                
+        except Exception as e:
+            if logger:
+                logger.error("database_connection_close_failed", error=str(e))
+            raise

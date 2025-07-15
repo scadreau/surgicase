@@ -1,9 +1,9 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 13:19:53
+# Last Modified: 2025-07-15 13:52:26
 
 # main.py
-from fastapi import FastAPI
-#from prometheus_fastapi_instrumentator import Instrumentator
+from fastapi import FastAPI, Request
+from prometheus_fastapi_instrumentator import Instrumentator
 
 # Import all routers
 from endpoints.case.get_case import router as get_case_router
@@ -30,14 +30,27 @@ from endpoints.utility.get_cpt_codes import router as get_cpt_codes_router
 from endpoints.utility.log_request import router as log_request_router
 
 from endpoints.health import router as health_router
+from endpoints.metrics import router as metrics_router
 
 from endpoints.backoffice.get_cases_by_status import router as get_cases_by_status_router
 
+# Import monitoring utilities
+from utils.monitoring import monitor_request, system_monitor, db_monitor, logger
+
 # Create FastAPI instance
-app = FastAPI()
+app = FastAPI(
+    title="SurgiCase API",
+    description="API for surgical case management with comprehensive monitoring",
+    version="1.0.0"
+)
+
+# Add request monitoring middleware
+@app.middleware("http")
+async def monitoring_middleware(request: Request, call_next):
+    return await monitor_request(request, call_next)
 
 # Prometheus monitoring setup
-#Instrumentator().instrument(app).expose(app)
+Instrumentator().instrument(app).expose(app)
 
 # Include all routers
 # Case endpoints
@@ -71,9 +84,12 @@ app.include_router(log_request_router)
 # Health check
 app.include_router(health_router, tags=["health"])
 
+# Metrics endpoints
+app.include_router(metrics_router, tags=["monitoring"])
+
 # Backoffice endpoints
 app.include_router(get_cases_by_status_router, tags=["backoffice"])
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+    uvicorn.run(app, host="0.0.0.0", port=8000)
