@@ -1,5 +1,5 @@
 # Created: 2025-01-27
-# Last Modified: 2025-07-15 13:50:35
+# Last Modified: 2025-07-15 14:46:56
 
 # utils/monitoring.py
 import time
@@ -359,6 +359,37 @@ class BusinessMetrics:
             operation=operation,
             status=status,
             user_id=user_id
+        )
+    
+    @staticmethod
+    def record_surgeon_operation(operation: str, status: str, surgeon_id: Optional[int] = None):
+        """Record a surgeon operation"""
+        SURGEON_OPERATIONS.labels(operation=operation, status=status).inc()
+        logger.info(
+            "surgeon_operation_recorded",
+            operation=operation,
+            status=status,
+            surgeon_id=surgeon_id
+        )
+    
+    @staticmethod
+    def record_facility_operation(operation: str, status: str, facility_id: Optional[int] = None):
+        """Record a facility operation"""
+        FACILITY_OPERATIONS.labels(operation=operation, status=status).inc()
+        logger.info(
+            "facility_operation_recorded",
+            operation=operation,
+            status=status,
+            facility_id=facility_id
+        )
+    
+    @staticmethod
+    def record_utility_operation(operation: str, status: str):
+        """Record a utility operation"""
+        logger.info(
+            "utility_operation_recorded",
+            operation=operation,
+            status=status
         )
 
 # Request/Response monitoring middleware
