@@ -1,11 +1,12 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 14:15:51
+# Last Modified: 2025-07-15 14:41:03
 
 # endpoints/case/create_case.py
 from fastapi import APIRouter, HTTPException
 import pymysql.cursors
 from core.database import get_db_connection, close_db_connection
 from core.models import CaseCreate
+from utils.case_status import update_case_status
 from utils.monitoring import track_business_operation, business_metrics
 
 router = APIRouter()
@@ -42,7 +43,9 @@ async def add_case(case: CaseCreate):
                         """, (case.case_id, code))
 
                 conn.commit()
-                
+                # Update case status if conditions are met
+                status_update_result = update_case_status(case.case_id, conn)                
+
                 # Record successful case creation
                 business_metrics.record_case_operation("create", "success", case.case_id)
                 
