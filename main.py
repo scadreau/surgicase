@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 12:42:15
+# Last Modified: 2025-07-15 12:56:57
 
 # main.py
 from fastapi import FastAPI
@@ -27,7 +27,7 @@ from endpoints.surgeon.get_surgeons import router as get_surgeons_router
 
 from endpoints.utility.get_doctypes import router as get_doctypes_router
 from endpoints.utility.get_cpt_codes import router as get_cpt_codes_router
-from endpoints.utility.log_request import router as log_request_router
+#from endpoints.utility.log_request import router as log_request_router
 
 from endpoints.health import router as health_router
 

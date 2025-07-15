@@ -1,30 +1,19 @@
 # Created: 2025-07-15 11:54:13
-# Last Modified: 2025-07-15 12:46:37
+# Last Modified: 2025-07-15 12:56:03
 
 # endpoints/backoffice/get_cases_by_status.py
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Query
 import pymysql.cursors
 from core.database import get_db_connection
-import time
-import requests
 
 router = APIRouter()
 
 @router.get("/casesbystatus")
-async def get_cases_by_status(
-    request: Request,  # <-- Move this before default arguments
-    user_id: str = Query(..., description="The user ID making the request (must be user_type >= 10)"),
-    filter: str = Query("", description="Comma-separated list of case_status values (e.g. 0,1,2)")
-):
-    start_time = time.time()
-    log_data = {
-        "user_id": user_id,
-        "endpoint": str(request.url.path),
-        "method": request.method,
-        "request_payload": "",
-        "query_params": dict(request.query_params),
-        "client_ip": request.client.host if request.client else None,
-    }
+async def get_cases_by_status(user_id: str = Query(..., description="The user ID making the request (must be user_type >= 10)"), filter: str = Query("", description="Comma-separated list of case_status values (e.g. 0,1,2)")):
+    """
+    Retrieve all cases filtered by case_status values, only if the calling user has user_type >= 10.
+    Returns a list of cases in the same format as get_case.
+    """
     try:
         # Parse filter string into a list of integers
         if filter:
@@ -62,52 +51,16 @@ async def get_cases_by_status(
                 result.append(case_data)
 
         conn.close()
-        execution_time_ms = int((time.time() - start_time) * 1000)
-        log_data.update({
-            "timestamp": None,
-            "response_status": 200,
-            "response_payload": str({"cases": result, "filter": status_list}),
-            "execution_time_ms": execution_time_ms,
-            "error_message": None,
-        })
-        try:
-            requests.post("http://localhost:8000/log_request", json=log_data)
-        except Exception as log_exc:
-            pass
         return {
             "cases": result,
             "filter": status_list
         }
 
-    except HTTPException as http_exc:
+    except HTTPException:
         if 'conn' in locals():
             conn.close()
-        execution_time_ms = int((time.time() - start_time) * 1000)
-        log_data.update({
-            "timestamp": None,
-            "response_status": http_exc.status_code if hasattr(http_exc, 'status_code') else 403,
-            "response_payload": None,
-            "execution_time_ms": execution_time_ms,
-            "error_message": str(http_exc.detail) if hasattr(http_exc, 'detail') else "User does not have permission to access all cases.",
-        })
-        try:
-            requests.post("http://localhost:8000/log_request", json=log_data)
-        except Exception as log_exc:
-            pass
         raise
     except Exception as e:
         if 'conn' in locals():
             conn.close()
-        execution_time_ms = int((time.time() - start_time) * 1000)
-        log_data.update({
-            "timestamp": None,
-            "response_status": 500,
-            "response_payload": None,
-            "execution_time_ms": execution_time_ms,
-            "error_message": str(e),
-        })
-        try:
-            requests.post("http://localhost:8000/log_request", json=log_data)
-        except Exception as log_exc:
-            pass
         raise HTTPException(status_code=500, detail={"error": str(e)}) 
