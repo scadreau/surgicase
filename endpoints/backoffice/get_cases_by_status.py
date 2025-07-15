@@ -1,5 +1,5 @@
 # Created: 2025-07-15 11:54:13
-# Last Modified: 2025-07-15 12:06:05
+# Last Modified: 2025-07-15 12:10:37
 
 # endpoints/backoffice/get_cases_by_status.py
 from fastapi import APIRouter, HTTPException, Query
@@ -33,8 +33,9 @@ async def get_cases_by_status(user_id: str = Query(..., description="The user ID
             sql = "SELECT user_id, case_id, case_date, patient_first, patient_last, ins_provider, surgeon_id, facility_id, case_status, demo_file, note_file, misc_file, pay_amount FROM cases WHERE active = 1"
             params = []
             if status_list:
-                sql += " AND case_status IN (%s)" % (",".join(["%s"] * len(status_list)))
-                params.extend([str(s) for s in status_list])
+                placeholders = ",".join(["%s"] * len(status_list))
+                sql += f" AND case_status IN ({placeholders})"
+                params.extend(status_list)
             cursor.execute(sql, params)
             cases = cursor.fetchall()
 
