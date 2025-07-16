@@ -1,10 +1,13 @@
 # Created: 2025-07-16 12:20:00
-# Last Modified: 2025-07-16 14:26:03
+# Last Modified: 2025-07-16 14:31:41
 
 #!/usr/bin/env python3
 """
 Script to fetch all CREATE TABLE statements from the database.
 This will provide a complete view of the current table structures.
+Usage: python get_table_structures.py --save <filename>
+Example: python get_table_structures.py --save my_tables.sql
+If no filename is provided, the script will save to a file named table_structures_<timestamp>.sql
 """
 
 import sys
@@ -69,19 +72,29 @@ def get_all_table_structures():
                     default = col['Default']
                     extra = col['Extra']
                     
-                    print(f"  {field:<20} {field_type:<20} {null:<4} {key:<4} {default:<10} {extra}")
+                    # Handle None values for formatting
+                    field_str = str(field) if field is not None else "NULL"
+                    field_type_str = str(field_type) if field_type is not None else "NULL"
+                    null_str = str(null) if null is not None else "NULL"
+                    key_str = str(key) if key is not None else "NULL"
+                    default_str = str(default) if default is not None else "NULL"
+                    extra_str = str(extra) if extra is not None else "NULL"
+                    
+                    print(f"  {field_str:<20} {field_type_str:<20} {null_str:<4} {key_str:<4} {default_str:<10} {extra_str}")
                 
                 print("\n" + "=" * 80)
             
             # Get database information
             cursor.execute("SELECT DATABASE() as current_db")
             db_info = cursor.fetchone()
-            print(f"\n-- Database: {db_info['current_db']}")
+            db_name = db_info['current_db'] if db_info else "unknown"
+            print(f"\n-- Database: {db_name}")
             
             # Get MySQL version
             cursor.execute("SELECT VERSION() as version")
             version_info = cursor.fetchone()
-            print(f"-- MySQL Version: {version_info['version']}")
+            version = version_info['version'] if version_info else "unknown"
+            print(f"-- MySQL Version: {version}")
             
     except Exception as e:
         print(f"Error fetching table structures: {e}")
@@ -108,11 +121,20 @@ def save_table_structures_to_file(filename=None):
             cursor.execute("SHOW TABLES")
             tables = cursor.fetchall()
             
+            # Get database and version info for the header
+            cursor.execute("SELECT DATABASE() as current_db")
+            db_info = cursor.fetchone()
+            db_name = db_info['current_db'] if db_info else "unknown"
+            
+            cursor.execute("SELECT VERSION() as version")
+            version_info = cursor.fetchone()
+            version = version_info['version'] if version_info else "unknown"
+            
             with open(filename, 'w') as f:
                 f.write(f"-- Database Table Structures\n")
                 f.write(f"-- Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-                f.write(f"-- Database: {cursor.execute('SELECT DATABASE()') or 'unknown'}\n")
-                f.write(f"-- MySQL Version: {cursor.execute('SELECT VERSION()') or 'unknown'}\n\n")
+                f.write(f"-- Database: {db_name}\n")
+                f.write(f"-- MySQL Version: {version}\n\n")
                 
                 for table_info in tables:
                     table_name = list(table_info.values())[0]
