@@ -1,5 +1,5 @@
 # Created: 2025-07-16 15:00:00
-# Last Modified: 2025-07-16 14:59:59
+# Last Modified: 2025-07-16 15:40:23
 
 # tests/test_pay_amount_calculator.py
 import sys
@@ -109,10 +109,71 @@ class TestPayAmountCalculator(unittest.TestCase):
                     self.assertEqual(result["procedure_codes_found"], expected_code_count)
                     self.assertGreaterEqual(result["pay_amount"], Decimal('0.00'))
                 else:
-                    # If it failed, it should be because no matching procedure codes in procedure_codes table
+                    # If it failed, it should be because no matching procedure codes in procedure_codes table for the user's tier
                     self.assertIn("No matching procedure codes found", result["message"])
             else:
                 # Skip this test if no cases with procedure codes exist
+                self.skipTest("No cases with procedure codes found in database")
+    
+    def test_calculate_case_pay_amount_user_not_found(self):
+        """Test pay amount calculation when user is not found."""
+        case_id = "TEST_CASE"
+        user_id = "NONEXISTENT_USER"
+        
+        result = calculate_case_pay_amount(case_id, user_id, self.conn)
+        
+        self.assertFalse(result["success"])
+        self.assertEqual(result["pay_amount"], Decimal('0.00'))
+        self.assertEqual(result["procedure_codes_found"], 0)
+        self.assertIn("User not found or inactive", result["message"])
+    
+    def test_calculate_case_pay_amount_different_tiers(self):
+        """Test pay amount calculation with different user tiers."""
+        # First, let's find a case with procedure codes
+        with self.conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT c.case_id, c.user_id, COUNT(cpc.procedure_code) as code_count
+                FROM cases c
+                LEFT JOIN case_procedure_codes cpc ON c.case_id = cpc.case_id
+                WHERE c.active = 1
+                GROUP BY c.case_id, c.user_id
+                HAVING code_count > 0
+                LIMIT 1
+            """)
+            case_data = cursor.fetchone()
+            
+            if case_data:
+                case_id = case_data['case_id']
+                user_id = case_data['user_id']
+                
+                # Get the user's current tier
+                cursor.execute("SELECT user_tier FROM user_profile WHERE user_id = %s", (user_id,))
+                user_info = cursor.fetchone()
+                if not user_info:
+                    self.skipTest(f"User {user_id} not found in database")
+                original_tier = user_info['user_tier']
+                
+                # Test with tier 1
+                cursor.execute("UPDATE user_profile SET user_tier = 1 WHERE user_id = %s", (user_id,))
+                result_tier1 = calculate_case_pay_amount(case_id, user_id, self.conn)
+                
+                # Test with tier 2 (if it exists in procedure_codes table)
+                cursor.execute("UPDATE user_profile SET user_tier = 2 WHERE user_id = %s", (user_id,))
+                result_tier2 = calculate_case_pay_amount(case_id, user_id, self.conn)
+                
+                # Restore original tier
+                cursor.execute("UPDATE user_profile SET user_tier = %s WHERE user_id = %s", (original_tier, user_id))
+                
+                # Both should return valid results (though pay amounts might differ)
+                if result_tier1["success"] and result_tier2["success"]:
+                    self.assertGreaterEqual(result_tier1["pay_amount"], Decimal('0.00'))
+                    self.assertGreaterEqual(result_tier2["pay_amount"], Decimal('0.00'))
+                    print(f"Tier 1 pay amount: {result_tier1['pay_amount']}")
+                    print(f"Tier 2 pay amount: {result_tier2['pay_amount']}")
+                else:
+                    # At least one tier should work
+                    self.assertTrue(result_tier1["success"] or result_tier2["success"])
+            else:
                 self.skipTest("No cases with procedure codes found in database")
 
 def run_tests():

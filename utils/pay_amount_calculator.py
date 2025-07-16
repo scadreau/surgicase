@@ -1,5 +1,5 @@
 # Created: 2025-07-16 14:50:43
-# Last Modified: 2025-07-16 14:52:54
+# Last Modified: 2025-07-16 15:40:21
 
 # utils/pay_amount_calculator.py
 import pymysql.cursors
@@ -11,10 +11,11 @@ logger = logging.getLogger(__name__)
 def calculate_case_pay_amount(case_id: str, user_id: str, conn) -> dict:
     """
     Calculate the maximum pay amount for a case based on its procedure codes.
+    Uses the user's tier to determine which procedure codes to use for pay calculation.
     
     Args:
         case_id: The case ID to calculate pay amount for
-        user_id: The user ID for procedure code lookup
+        user_id: The user ID to get the user's tier
         conn: Database connection object
         
     Returns:
@@ -27,7 +28,28 @@ def calculate_case_pay_amount(case_id: str, user_id: str, conn) -> dict:
     """
     try:
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-            # First, check if the case has any procedure codes
+            # First, get the user's tier from user_profile
+            cursor.execute("""
+                SELECT user_tier 
+                FROM user_profile 
+                WHERE user_id = %s AND active = 1
+            """, (user_id,))
+            
+            user_data = cursor.fetchone()
+            if not user_data:
+                error_msg = f"User not found or inactive: {user_id}"
+                logger.error(error_msg)
+                return {
+                    "success": False,
+                    "pay_amount": Decimal('0.00'),
+                    "procedure_codes_found": 0,
+                    "message": error_msg
+                }
+            
+            user_tier = user_data['user_tier']
+            logger.info(f"User {user_id} has tier {user_tier}")
+            
+            # Check if the case has any procedure codes
             cursor.execute("""
                 SELECT procedure_code 
                 FROM case_procedure_codes 
@@ -49,25 +71,25 @@ def calculate_case_pay_amount(case_id: str, user_id: str, conn) -> dict:
             codes = [row['procedure_code'] for row in procedure_codes]
             logger.info(f"Found {len(codes)} procedure codes for case {case_id}: {codes}")
             
-            # Query procedure_codes table for the maximum pay amount
+            # Query procedure_codes table for the maximum pay amount using tier
             # Use placeholders for the IN clause
             placeholders = ','.join(['%s'] * len(codes))
             query = f"""
                 SELECT MAX(code_pay_amount) as max_pay_amount
                 FROM procedure_codes 
-                WHERE user_id = %s AND procedure_code IN ({placeholders})
+                WHERE tier = %s AND procedure_code IN ({placeholders})
             """
             
-            # Build parameters: user_id first, then all procedure codes
-            params = [user_id] + codes
+            # Build parameters: tier first, then all procedure codes
+            params = [user_tier] + codes
             cursor.execute(query, params)
             
             result = cursor.fetchone()
             max_pay_amount = result['max_pay_amount']
             
             if max_pay_amount is None:
-                # Procedure codes exist but no matching records found in procedure_codes table
-                error_msg = f"No matching procedure codes found in procedure_codes table for case {case_id}, user {user_id}, codes: {codes}"
+                # Procedure codes exist but no matching records found in procedure_codes table for this tier
+                error_msg = f"No matching procedure codes found in procedure_codes table for case {case_id}, user {user_id} (tier {user_tier}), codes: {codes}"
                 logger.error(error_msg)
                 return {
                     "success": False,
@@ -79,13 +101,13 @@ def calculate_case_pay_amount(case_id: str, user_id: str, conn) -> dict:
             # Convert to Decimal for consistency
             pay_amount = Decimal(str(max_pay_amount))
             
-            logger.info(f"Calculated pay amount {pay_amount} for case {case_id} with {len(codes)} procedure codes")
+            logger.info(f"Calculated pay amount {pay_amount} for case {case_id} with {len(codes)} procedure codes (tier {user_tier})")
             
             return {
                 "success": True,
                 "pay_amount": pay_amount,
                 "procedure_codes_found": len(codes),
-                "message": f"Successfully calculated pay amount from {len(codes)} procedure codes"
+                "message": f"Successfully calculated pay amount from {len(codes)} procedure codes (tier {user_tier})"
             }
             
     except Exception as e:
