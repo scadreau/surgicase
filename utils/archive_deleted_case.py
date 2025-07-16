@@ -1,5 +1,5 @@
 # Created: 2025-07-15 20:17:09
-# Last Modified: 2025-07-15 20:26:03
+# Last Modified: 2025-07-16 08:47:31
 
 # utils/archive_deleted_case.py
 
@@ -29,23 +29,17 @@ def archive_deleted_case(case_id: str):
                 if case:
                     # Archive the case
                     cursor.execute("""
-                        INSERT INTO deleted_cases (
-                            case_id, user_id, case_date, patient_first, patient_last,
-                            ins_provider, surgeon_id, facility_id, demo_file, note_file, misc_file
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        case["case_id"], case["user_id"], case["case_date"], case["patient_first"],
-                        case["patient_last"], case["ins_provider"], case["surgeon_id"],
-                        case["facility_id"], case["demo_file"], case["note_file"], case["misc_file"]
-                    ))
+                        INSERT INTO deleted_cases 
+                        SELECT *
+                        FROM cases
+                        WHERE case_id = %s
+                    """, (case_id,))
                     
                     # Archive associated procedure codes
                     cursor.execute("""
-                        INSERT INTO deleted_case_procedure_codes (
-                            case_id, cpt_code, description, units, created_at
-                        ) 
-                        SELECT case_id, cpt_code, description, units, created_at
-                        FROM procedure_codes 
+                        INSERT INTO deleted_case_procedure_codes 
+                        SELECT *
+                        FROM case_procedure_codes 
                         WHERE case_id = %s
                     """, (case_id,))
                     
