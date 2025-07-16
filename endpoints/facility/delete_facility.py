@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 16:08:19
+# Last Modified: 2025-07-15 20:45:12
 
 # endpoints/facility/delete_facility.py
 from fastapi import APIRouter, HTTPException, Query
@@ -12,7 +12,7 @@ router = APIRouter()
 
 @router.delete("/facility")
 @track_business_operation("delete", "facility")
-async def delete_facility(facility_id: int = Query(..., description="The facility ID to delete")):
+def delete_facility(facility_id: int = Query(..., description="The facility ID to delete")):
     """
     Delete a facility by facility_id.
     """

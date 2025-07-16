@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 14:46:48
+# Last Modified: 2025-07-15 20:44:13
 
 # endpoints/utility/get_cpt_codes.py
 from fastapi import APIRouter, HTTPException
@@ -11,7 +11,7 @@ router = APIRouter()
 
 @router.get("/cpt_codes")
 @track_business_operation("get", "cpt_codes")
-async def get_cpt_codes():
+def get_cpt_codes():
     """
     Get all CPT codes.
     """

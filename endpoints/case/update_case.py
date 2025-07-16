@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 16:01:55
+# Last Modified: 2025-07-15 20:45:03
 
 # endpoints/case/update_case.py
 from fastapi import APIRouter, HTTPException, Body
@@ -14,7 +14,7 @@ router = APIRouter()
 
 @router.patch("/case")
 @track_business_operation("update", "case")
-async def update_case(case: CaseUpdate = Body(...)):
+def update_case(case: CaseUpdate = Body(...)):
     """
     Update fields in cases and replace procedure codes if provided. Only case_id is required.
     """

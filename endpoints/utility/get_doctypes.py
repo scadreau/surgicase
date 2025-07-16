@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 14:47:18
+# Last Modified: 2025-07-15 20:44:08
 
 # endpoints/utility/get_doctypes.py
 from fastapi import APIRouter, HTTPException
@@ -11,7 +11,7 @@ router = APIRouter()
 
 @router.get("/doctypes")
 @track_business_operation("get", "doctypes")
-async def get_doc_types():
+def get_doc_types():
     """
     Get all document types.
     """

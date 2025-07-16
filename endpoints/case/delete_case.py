@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 20:34:36
+# Last Modified: 2025-07-15 20:44:26
 
 # endpoints/case/delete_case.py
 from fastapi import APIRouter, HTTPException, Query
@@ -16,7 +16,7 @@ router = APIRouter()
 
 @router.delete("/case")
 @track_business_operation("delete", "case")
-async def delete_case(case_id: str = Query(..., description="The case ID to delete")):
+def delete_case(case_id: str = Query(..., description="The case ID to delete")):
     """
     Delete (deactivate) case by case_id
     """

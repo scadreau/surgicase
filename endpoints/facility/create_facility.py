@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 16:08:00
+# Last Modified: 2025-07-15 20:45:08
 
 # endpoints/facility/create_facility.py
 from fastapi import APIRouter, HTTPException
@@ -13,7 +13,7 @@ router = APIRouter()
 
 @router.post("/facility")
 @track_business_operation("create", "facility")
-async def add_facility(facility: FacilityCreate):
+def add_facility(facility: FacilityCreate):
     """
     Add a new facility for a user.
     """

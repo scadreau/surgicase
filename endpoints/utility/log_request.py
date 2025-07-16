@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 14:47:31
+# Last Modified: 2025-07-15 20:45:27
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -13,7 +13,7 @@ router = APIRouter()
 
 @router.post("/log_request")
 @track_business_operation("log", "request")
-async def log_request(log: LogRequestModel):
+def log_request(log: LogRequestModel):
     try:
         conn = get_db_connection()
         

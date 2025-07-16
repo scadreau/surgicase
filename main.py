@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 13:52:26
+# Last Modified: 2025-07-15 20:46:49
 
 # main.py
 from fastapi import FastAPI, Request
@@ -46,8 +46,8 @@ app = FastAPI(
 
 # Add request monitoring middleware
 @app.middleware("http")
-async def monitoring_middleware(request: Request, call_next):
-    return await monitor_request(request, call_next)
+def monitoring_middleware(request: Request, call_next):
+    return monitor_request(request, call_next)
 
 # Prometheus monitoring setup
 Instrumentator().instrument(app).expose(app)

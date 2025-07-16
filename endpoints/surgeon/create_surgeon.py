@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 16:07:33
+# Last Modified: 2025-07-15 20:45:17
 
 # endpoints/surgeon/create_surgeon.py
 from fastapi import APIRouter, HTTPException
@@ -13,7 +13,7 @@ router = APIRouter()
 
 @router.post("/surgeon")
 @track_business_operation("create", "surgeon")
-async def add_surgeon(surgeon: SurgeonCreate):
+def add_surgeon(surgeon: SurgeonCreate):
     """
     Add a new surgeon for a user.
     """

@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 18:34:18
+# Last Modified: 2025-07-15 20:44:58
 
 # endpoints/case/create_case.py
 from fastapi import APIRouter, HTTPException
@@ -64,13 +64,16 @@ def create_case_with_procedures(case: CaseCreate, conn) -> dict:
 
 @router.post("/case")
 @track_business_operation("create", "case")
-def add_case(case: CaseCreate, conn=Depends(get_db)):
+def add_case(case: CaseCreate):
     """
-    Add a new case and its procedure codes.
+    Add a new case to the cases table and its procedure codes to case_procedure_codes table.
     """
+    conn = None
     try:
         logger.info(f"Creating case with ID: {case.case_id}")
         logger.info(f"Case data: {case}")
+        
+        conn = get_db_connection()
         
         # Check if case already exists before starting transaction
         if case_exists(case.case_id, conn):

@@ -1,5 +1,5 @@
 # Created: 2025-07-15 11:54:13
-# Last Modified: 2025-07-15 14:51:50
+# Last Modified: 2025-07-15 20:45:35
 
 # endpoints/backoffice/get_cases_by_status.py
 from fastapi import APIRouter, HTTPException, Query
@@ -11,7 +11,7 @@ router = APIRouter()
 
 @router.get("/casesbystatus")
 @track_business_operation("get", "cases_by_status")
-async def get_cases_by_status(user_id: str = Query(..., description="The user ID making the request (must be user_type >= 10)"), filter: str = Query("", description="Comma-separated list of case_status values (e.g. 0,1,2)")):
+def get_cases_by_status(user_id: str = Query(..., description="The user ID making the request (must be user_type >= 10)"), filter: str = Query("", description="Comma-separated list of case_status values (e.g. 0,1,2)")):
     """
     Retrieve all cases filtered by case_status values, only if the calling user has user_type >= 10.
     Returns a list of cases in the same format as get_case.

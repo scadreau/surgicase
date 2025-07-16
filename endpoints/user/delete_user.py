@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 20:34:45
+# Last Modified: 2025-07-15 20:44:31
 
 # endpoints/user/delete_user.py
 from fastapi import APIRouter, HTTPException, Query
@@ -16,7 +16,7 @@ router = APIRouter()
 
 @router.delete("/user")
 @track_business_operation("delete", "user")
-async def delete_user(user_id: str = Query(..., description="The user ID to delete")):
+def delete_user(user_id: str = Query(..., description="The user ID to delete")):
     """
     Delete (deactivate) user by user_id
     """

@@ -1,5 +1,5 @@
 # Created: 2025-01-27
-# Last Modified: 2025-07-15 13:51:22
+# Last Modified: 2025-07-15 20:46:44
 
 # endpoints/metrics.py
 from fastapi import APIRouter, Response, HTTPException
@@ -20,7 +20,7 @@ from utils.monitoring import (
 router = APIRouter()
 
 @router.get("/metrics")
-async def prometheus_metrics():
+def prometheus_metrics():
     """
     Expose Prometheus metrics for scraping
     Returns metrics in Prometheus text format
@@ -48,7 +48,7 @@ async def prometheus_metrics():
         raise HTTPException(status_code=500, detail=f"Failed to generate metrics: {str(e)}")
 
 @router.get("/metrics/summary")
-async def metrics_summary():
+def metrics_summary():
     """
     Get a human-readable summary of all metrics
     Useful for debugging and monitoring dashboard
@@ -67,7 +67,7 @@ async def metrics_summary():
         raise HTTPException(status_code=500, detail=f"Failed to generate metrics summary: {str(e)}")
 
 @router.get("/metrics/health")
-async def metrics_health():
+def metrics_health():
     """
     Health check specifically for metrics collection
     Verifies that metrics can be generated successfully
@@ -105,7 +105,7 @@ async def metrics_health():
         raise HTTPException(status_code=503, detail=health_status)
 
 @router.get("/metrics/system")
-async def system_metrics():
+def system_metrics():
     """
     Get detailed system metrics in JSON format
     Useful for monitoring dashboards
@@ -124,7 +124,7 @@ async def system_metrics():
         raise HTTPException(status_code=500, detail=f"Failed to collect system metrics: {str(e)}")
 
 @router.get("/metrics/database")
-async def database_metrics():
+def database_metrics():
     """
     Get detailed database metrics in JSON format
     Useful for database monitoring
@@ -143,7 +143,7 @@ async def database_metrics():
         raise HTTPException(status_code=500, detail=f"Failed to collect database metrics: {str(e)}")
 
 @router.get("/metrics/business")
-async def business_metrics():
+def business_metrics():
     """
     Get business-specific metrics in JSON format
     Useful for business intelligence dashboards
@@ -171,7 +171,7 @@ async def business_metrics():
         raise HTTPException(status_code=500, detail=f"Failed to collect business metrics: {str(e)}")
 
 @router.get("/metrics/endpoints")
-async def endpoint_metrics():
+def endpoint_metrics():
     """
     Get endpoint-specific metrics in JSON format
     Useful for API performance monitoring
@@ -201,7 +201,7 @@ async def endpoint_metrics():
 
 # Optional: Add metrics for the metrics endpoint itself
 @router.get("/metrics/self")
-async def metrics_self_monitoring():
+def metrics_self_monitoring():
     """
     Self-monitoring for the metrics collection system
     Tracks metrics about metrics collection itself

@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 16:06:40
+# Last Modified: 2025-07-15 20:44:35
 
 # endpoints/user/create_user.py
 from fastapi import APIRouter, HTTPException
@@ -13,7 +13,7 @@ router = APIRouter()
 
 @router.post("/user")
 @track_business_operation("create", "user")
-async def add_user(user: UserCreate):
+def add_user(user: UserCreate):
     """
     Add a new user to the user_profile table.
     """

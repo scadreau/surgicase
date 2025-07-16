@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 14:46:03
+# Last Modified: 2025-07-15 20:44:04
 
 # endpoints/surgeon/get_surgeons.py
 from fastapi import APIRouter, HTTPException, Query
@@ -11,7 +11,7 @@ router = APIRouter()
 
 @router.get("/surgeons")
 @track_business_operation("get", "surgeon")
-async def get_surgeons(user_id: str = Query(..., description="The user ID to retrieve surgeons for")):
+def get_surgeons(user_id: str = Query(..., description="The user ID to retrieve surgeons for")):
     """
     Get all surgeons for a user_id.
     """

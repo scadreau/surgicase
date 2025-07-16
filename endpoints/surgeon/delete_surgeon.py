@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 16:07:49
+# Last Modified: 2025-07-15 20:45:22
 
 # endpoints/surgeon/delete_surgeon.py
 from fastapi import APIRouter, HTTPException, Query
@@ -12,7 +12,7 @@ router = APIRouter()
 
 @router.delete("/surgeon")
 @track_business_operation("delete", "surgeon")
-async def delete_surgeon(surgeon_id: int = Query(..., description="The surgeon ID to delete")):
+def delete_surgeon(surgeon_id: int = Query(..., description="The surgeon ID to delete")):
     """
     Delete a surgeon by surgeon_id.
     """

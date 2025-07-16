@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 14:46:36
+# Last Modified: 2025-07-15 20:43:58
 
 # endpoints/facility/get_facilities.py
 from fastapi import APIRouter, HTTPException, Query
@@ -11,7 +11,7 @@ router = APIRouter()
 
 @router.get("/facilities")
 @track_business_operation("get", "facility")
-async def get_facilities(user_id: str = Query(..., description="The user ID to retrieve facilities for")):
+def get_facilities(user_id: str = Query(..., description="The user ID to retrieve facilities for")):
     """
     Get all facilities for a user_id.
     """

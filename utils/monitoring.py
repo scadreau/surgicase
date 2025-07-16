@@ -1,5 +1,5 @@
 # Created: 2025-01-27
-# Last Modified: 2025-07-15 14:46:56
+# Last Modified: 2025-07-15 20:47:23
 
 # utils/monitoring.py
 import time
@@ -131,12 +131,12 @@ CASE_CREATION_RATE = Summary(
 def track_request_metrics(func: Callable) -> Callable:
     """Decorator to track HTTP request metrics"""
     @functools.wraps(func)
-    async def wrapper(*args, **kwargs):
+    def wrapper(*args, **kwargs):
         start_time = time.time()
         status = "success"
         
         try:
-            result = await func(*args, **kwargs)
+            result = func(*args, **kwargs)
             return result
         except Exception as e:
             status = "error"
@@ -165,12 +165,12 @@ def track_business_operation(operation_type: str, entity: str):
     """Decorator to track business operation metrics"""
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
-        async def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs):
             start_time = time.time()
             status = "success"
             
             try:
-                result = await func(*args, **kwargs)
+                result = func(*args, **kwargs)
                 return result
             except Exception as e:
                 status = "error"
@@ -212,14 +212,15 @@ def track_database_operation(operation: str, table: str = "unknown"):
     """Decorator to track database operation metrics"""
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
-        async def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs):
             start_time = time.time()
+            status = "success"
             
             try:
-                result = await func(*args, **kwargs)
+                result = func(*args, **kwargs)
                 return result
             except Exception as e:
-                DB_CONNECTION_ERRORS.inc()
+                status = "error"
                 logger.error(
                     "database_operation_failed",
                     operation=operation,
@@ -229,13 +230,17 @@ def track_database_operation(operation: str, table: str = "unknown"):
                 raise
             finally:
                 duration = time.time() - start_time
+                
+                # Record database metrics
                 DB_QUERY_DURATION.labels(operation=operation, table=table).observe(duration)
                 
-                logger.debug(
+                # Log operation
+                logger.info(
                     "database_operation_completed",
                     operation=operation,
                     table=table,
-                    duration=duration
+                    duration=duration,
+                    status=status
                 )
         
         return wrapper
@@ -394,7 +399,7 @@ class BusinessMetrics:
 
 # Request/Response monitoring middleware
 
-async def monitor_request(request: Request, call_next):
+def monitor_request(request: Request, call_next):
     """FastAPI middleware for request monitoring"""
     start_time = time.time()
     
@@ -414,7 +419,7 @@ async def monitor_request(request: Request, call_next):
     )
     
     try:
-        response = await call_next(request)
+        response = call_next(request)
         status = "success"
         
         # Record metrics

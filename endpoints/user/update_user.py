@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 20:37:51
+# Last Modified: 2025-07-15 20:44:40
 
 # endpoints/user/update_user.py
 from fastapi import APIRouter, HTTPException, Body
@@ -13,7 +13,7 @@ router = APIRouter()
 
 @router.patch("/user")
 @track_business_operation("update", "user")
-async def update_user(user: UserUpdate = Body(...)):
+def update_user(user: UserUpdate = Body(...)):
     """
     Update user fields in user_profile. Only user_id is required; any other provided fields will be updated.
     If documents are provided, replace all user documents with the new list.

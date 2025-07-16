@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 14:22:28
+# Last Modified: 2025-07-15 20:43:51
 
 # endpoints/user/get_user.py
 from fastapi import APIRouter, HTTPException, Query
@@ -11,7 +11,7 @@ router = APIRouter()
 
 @router.get("/user")
 @track_business_operation("read", "user")
-async def get_user(user_id: str = Query(..., description="The user ID to retrieve")):
+def get_user(user_id: str = Query(..., description="The user ID to retrieve")):
     """
     Retrieve user information by user_id
     """

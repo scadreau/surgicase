@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 14:15:20
+# Last Modified: 2025-07-15 20:43:47
 
 # endpoints/case/get_case.py
 from fastapi import APIRouter, HTTPException, Query
@@ -11,7 +11,7 @@ router = APIRouter()
 
 @router.get("/case")
 @track_business_operation("read", "case")
-async def get_case(case_id: str = Query(..., description="The case ID to retrieve")):
+def get_case(case_id: str = Query(..., description="The case ID to retrieve")):
     """
     Retrieve case information by case_id
     """

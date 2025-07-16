@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 13:37:58
+# Last Modified: 2025-07-15 20:45:52
 
 # endpoints/health.py
 from fastapi import APIRouter, HTTPException
@@ -137,7 +137,7 @@ def check_system_resources() -> Dict[str, Any]:
         }
 
 @router.get("/health")
-async def health_check():
+def health_check():
     """
     Comprehensive health check endpoint with detailed component status
     """
@@ -188,12 +188,12 @@ async def health_check():
     return health_response
 
 @router.get("/health/ready")
-async def readiness_check():
+def readiness_check():
     """
     Kubernetes readiness check - indicates if the service is ready to receive traffic
     """
     try:
-        health = await health_check()
+        health = health_check()
         
         # For readiness, we only care about critical components
         critical_components = [
@@ -201,46 +201,30 @@ async def readiness_check():
             health["components"]["aws_secrets_manager"]["status"]
         ]
         
-        if all(status == "healthy" for status in critical_components):
-            return {
-                "status": "ready",
-                "timestamp": datetime.utcnow().isoformat() + "Z"
-            }
-        else:
-            raise HTTPException(
-                status_code=503, 
-                detail={
-                    "status": "not_ready",
-                    "reason": "Critical components unhealthy",
-                    "components": {
-                        "database": health["components"]["database"]["status"],
-                        "aws_secrets_manager": health["components"]["aws_secrets_manager"]["status"]
-                    }
-                }
-            )
+        if any(status == "unhealthy" for status in critical_components):
+            raise HTTPException(status_code=503, detail="Service not ready")
+        
+        return {"status": "ready"}
+        
     except Exception as e:
         logger.error(f"Readiness check failed: {str(e)}")
-        raise HTTPException(status_code=503, detail={"status": "not_ready", "error": str(e)})
+        raise HTTPException(status_code=503, detail="Service not ready")
 
 @router.get("/health/live")
-async def liveness_check():
+def liveness_check():
     """
     Kubernetes liveness check - indicates if the service is alive and should not be restarted
     """
     try:
-        # Liveness check is simpler - just verify the application is responding
-        return {
-            "status": "alive",
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-            "service": "surgicase-api"
-        }
+        # Simple check - just verify the service is responding
+        return {"status": "alive", "timestamp": datetime.utcnow().isoformat() + "Z"}
     except Exception as e:
         logger.error(f"Liveness check failed: {str(e)}")
-        raise HTTPException(status_code=503, detail={"status": "dead", "error": str(e)})
+        raise HTTPException(status_code=503, detail="Service not alive")
 
 @router.get("/health/simple")
-async def simple_health_check():
+def simple_health_check():
     """
-    Simple health check for basic monitoring - minimal overhead
+    Simple health check for load balancers and basic monitoring
     """
     return {"status": "healthy"}
