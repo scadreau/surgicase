@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 17:47:26
+# Last Modified: 2025-07-15 20:34:36
 
 # endpoints/case/delete_case.py
 from fastapi import APIRouter, HTTPException, Query
@@ -10,6 +10,7 @@ import json
 import datetime as dt
 from core.database import get_db_connection, close_db_connection, is_connection_valid
 from utils.monitoring import track_business_operation, business_metrics
+from utils.archive_deleted_case import archive_deleted_case
 
 router = APIRouter()
 
@@ -79,6 +80,9 @@ async def delete_case(case_id: str = Query(..., description="The case ID to dele
             
             # Record successful case deletion
             business_metrics.record_case_operation("delete", "success", case_id)
+
+            # Archive the deleted case (runs in background thread)
+            archive_deleted_case(case_id)
 
         return {
             "statusCode": 200,

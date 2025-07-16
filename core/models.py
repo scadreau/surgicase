@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 13:08:59
+# Last Modified: 2025-07-15 20:37:51
 
 # core/models.py
 from typing import Optional, List
@@ -44,6 +44,7 @@ class UserUpdate(BaseModel):
     message_pref: Optional[str] = None
     states_licensed: Optional[str] = None
     documents: Optional[List[UserDocument]] = None
+    last_login_dt: Optional[datetime] = None
 
 class UserRequest(BaseModel):
     user_id: str

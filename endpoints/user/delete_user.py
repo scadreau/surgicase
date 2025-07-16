@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 17:47:09
+# Last Modified: 2025-07-15 20:34:45
 
 # endpoints/user/delete_user.py
 from fastapi import APIRouter, HTTPException, Query
@@ -10,6 +10,7 @@ import json
 import datetime as dt
 from core.database import get_db_connection, close_db_connection, is_connection_valid
 from utils.monitoring import track_business_operation, business_metrics
+from utils.archive_deleted_user import archive_deleted_user
 
 router = APIRouter()
 
@@ -79,6 +80,9 @@ async def delete_user(user_id: str = Query(..., description="The user ID to dele
             
             # Record successful user deletion
             business_metrics.record_user_operation("delete", "success", user_id)
+
+            # Archive the deleted user (runs in background thread)
+            archive_deleted_user(user_id)
 
         return {
             "statusCode": 200,

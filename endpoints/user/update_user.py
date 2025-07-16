@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 16:06:22
+# Last Modified: 2025-07-15 20:37:51
 
 # endpoints/user/update_user.py
 from fastapi import APIRouter, HTTPException, Body
@@ -49,10 +49,10 @@ async def update_user(user: UserUpdate = Body(...)):
                     updated_fields.extend(update_fields.keys())
             # Replace user documents if provided
             if user.documents is not None:
-                # Delete existing documents for user
-                cursor.execute("DELETE FROM user_documents WHERE user_id = %s", (user.user_id,))
                 # Insert new documents
                 for doc in user.documents:
+                    # Delete existing documents for user
+                    cursor.execute("DELETE FROM user_documents WHERE user_id = %s and document_type = %s", (user.user_id, doc.document_type))
                     cursor.execute(
                         """
                         INSERT INTO user_documents (user_id, document_type, document_name)
