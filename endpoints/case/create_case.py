@@ -1,16 +1,27 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 18:03:33
+# Last Modified: 2025-07-15 18:34:18
 
 # endpoints/case/create_case.py
 from fastapi import APIRouter, HTTPException
+from fastapi import Depends
 import pymysql.cursors
 import pymysql
 from core.database import get_db_connection, close_db_connection, is_connection_valid
 from core.models import CaseCreate
 from utils.case_status import update_case_status
 from utils.monitoring import track_business_operation, business_metrics
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+def get_db():
+    conn = get_db_connection()
+    try:
+        yield conn
+    finally:
+        close_db_connection(conn)
 
 def case_exists(case_id: str, conn) -> bool:
     """Check if a case already exists in the database"""
@@ -23,6 +34,9 @@ def create_case_with_procedures(case: CaseCreate, conn) -> dict:
     Handles the actual database operations for case creation.
     This function assumes it's running within a transaction.
     """
+    logger.info(f"Creating case with ID: {case.case_id}")
+    logger.info(f"Case data: {case}")
+    
     with conn.cursor(pymysql.cursors.DictCursor) as cursor:
         # Insert into cases table
         cursor.execute("""
@@ -50,13 +64,13 @@ def create_case_with_procedures(case: CaseCreate, conn) -> dict:
 
 @router.post("/case")
 @track_business_operation("create", "case")
-async def add_case(case: CaseCreate):
+def add_case(case: CaseCreate, conn=Depends(get_db)):
     """
     Add a new case and its procedure codes.
     """
-    conn = None
     try:
-        conn = get_db_connection()
+        logger.info(f"Creating case with ID: {case.case_id}")
+        logger.info(f"Case data: {case}")
         
         # Check if case already exists before starting transaction
         if case_exists(case.case_id, conn):
@@ -93,15 +107,13 @@ async def add_case(case: CaseCreate):
     except Exception as e:
         # Record failed case creation
         business_metrics.record_case_operation("create", "error", case.case_id)
-        
-        # Safe rollback with connection state check
         if conn and is_connection_valid(conn):
             try:
                 conn.rollback()
             except (pymysql.err.InterfaceError, pymysql.err.OperationalError) as rollback_error:
-                # Log rollback error but don't raise it
-                print(f"Rollback failed: {rollback_error}")
+                logger.error(f"Rollback failed for case {case.case_id}: {rollback_error}", exc_info=True)
                 
+        logger.error(f"Error creating case {case.case_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail={"error": str(e)})
         
     finally:
