@@ -1,5 +1,5 @@
 # Created: 2025-07-15 20:26:30
-# Last Modified: 2025-07-16 08:31:25
+# Last Modified: 2025-07-16 08:41:02
 
 # utils/archive_deleted_user.py
 
@@ -32,65 +32,52 @@ def archive_deleted_user(user_id: str):
                         INSERT INTO deleted_users (
                             user_id, user_email, first_name, last_name, addr1, addr2,
                             city, state, zipcode, telephone, user_npi, referred_by_user,
-                            user_type, message_pref, states_licensed, create_ts, last_updated_ts
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            user_type, message_pref, create_ts, last_login_dt, active, states_licensed, last_updated_ts
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
                         user["user_id"], user["user_email"], user["first_name"], user["last_name"],
                         user["addr1"], user["addr2"], user["city"], user["state"], user["zipcode"],
                         user["telephone"], user["user_npi"], user["referred_by_user"], user["user_type"],
-                        user["message_pref"], user["states_licensed"], user.get("create_ts"), user.get("last_updated_ts")
+                        user["message_pref"], user.get("create_ts"), user.get("last_login_dt"), user.get("active"), user["states_licensed"], user.get("last_updated_ts")
                     ))
                     
                     # Archive associated user documents
                     cursor.execute("""
-                        INSERT INTO deleted_user_documents (
-                            user_id, document_type, document_name, created_at
-                        ) 
-                        SELECT user_id, document_type, document_name, created_at
+                        INSERT INTO deleted_user_documents 
+                        SELECT *
                         FROM user_documents 
                         WHERE user_id = %s
                     """, (user_id,))
                     
                     # Archive associated surgeons
                     cursor.execute("""
-                        INSERT INTO deleted_surgeons (
-                            surgeon_id, user_id, first_name, last_name, created_at
-                        ) 
-                        SELECT surgeon_id, user_id, first_name, last_name, created_at
+                        INSERT INTO deleted_surgeons 
+                        SELECT *
                         FROM surgeon_list 
                         WHERE user_id = %s
                     """, (user_id,))
                     
                     # Archive associated facilities
                     cursor.execute("""
-                        INSERT INTO deleted_facilities (
-                            facility_id, user_id, facility_name, created_at
-                        ) 
-                        SELECT facility_id, user_id, facility_name, created_at
+                        INSERT INTO deleted_facilities 
+                        SELECT *
                         FROM facility_list 
                         WHERE user_id = %s
                     """, (user_id,))
                     
                     # Archive associated cases
-                    cursor.execute("""
-                        INSERT INTO deleted_cases (
-                            case_id, user_id, case_date, patient_first, patient_last,
-                            ins_provider, surgeon_id, facility_id, demo_file, note_file, misc_file,
-                            case_status, pay_amount, created_at, updated_at
-                        ) 
-                        SELECT case_id, user_id, case_date, patient_first, patient_last,
-                               ins_provider, surgeon_id, facility_id, demo_file, note_file, misc_file,
-                               case_status, pay_amount, created_at, updated_at
+                    cursor.execute("""INSERT INTO deleted_cases 
+                        SELECT * 
                         FROM cases 
                         WHERE user_id = %s
-                    """, (user_id,))
+                        """, (user_id,))
                     
                     # Archive associated case procedure codes
                     cursor.execute("""
                         INSERT INTO deleted_case_procedure_codes (
-                            case_id, cpt_code, description, units, created_at
+                            case_id, procedure_code
                         ) 
-                        SELECT cpc.case_id, cpc.cpt_code, cpc.description, cpc.units, cpc.created_at
+                        SELECT cpc.case_id, cpc.procedure_code
                         FROM case_procedure_codes cpc
                         INNER JOIN cases c ON cpc.case_id = c.case_id
                         WHERE c.user_id = %s
