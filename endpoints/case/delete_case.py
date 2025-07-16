@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 16:07:05
+# Last Modified: 2025-07-15 17:47:26
 
 # endpoints/case/delete_case.py
 from fastapi import APIRouter, HTTPException, Query
@@ -42,43 +42,43 @@ async def delete_case(case_id: str = Query(..., description="The case ID to dele
                     "body": {"error": "Case not found", "case_id": case_id}
                 }
 
-        current_active_status = case_data.get('active')
-        print(f"INFO: Case found - case_id: {case_id}, current active status: {current_active_status}")
+            current_active_status = case_data.get('active')
+            print(f"INFO: Case found - case_id: {case_id}, current active status: {current_active_status}")
 
-        # Check if case is already inactive
-        if current_active_status == 0:
-            print(f"WARNING: Case already inactive - case_id: {case_id}")
-            # Record case deletion (already inactive)
-            business_metrics.record_case_operation("delete", "already_inactive", case_id)
-            return {
-                "statusCode": 200,
-                "body": {
-                    "message": "Case already inactive",
-                    "case_id": case_id,
-                    "active": 0
+            # Check if case is already inactive
+            if current_active_status == 0:
+                print(f"WARNING: Case already inactive - case_id: {case_id}")
+                # Record case deletion (already inactive)
+                business_metrics.record_case_operation("delete", "already_inactive", case_id)
+                return {
+                    "statusCode": 200,
+                    "body": {
+                        "message": "Case already inactive",
+                        "case_id": case_id,
+                        "active": 0
+                    }
                 }
-            }
 
-        # Soft delete: set active = 0
-        cursor.execute("""UPDATE cases SET active = 0 WHERE case_id = %s""", (case_id,))
+            # Soft delete: set active = 0
+            cursor.execute("""UPDATE cases SET active = 0 WHERE case_id = %s""", (case_id,))
 
-        # Check if update was successful
-        if cursor.rowcount == 0:
-            print(f"ERROR: Failed to update case active status - case_id: {case_id}")
-            # Record failed case deletion
-            business_metrics.record_case_operation("delete", "update_failed", case_id)
-            return {
-                "statusCode": 500,
-                "body": {"error": "Failed to deactivate case", "case_id": case_id}
-            }
+            # Check if update was successful
+            if cursor.rowcount == 0:
+                print(f"ERROR: Failed to update case active status - case_id: {case_id}")
+                # Record failed case deletion
+                business_metrics.record_case_operation("delete", "update_failed", case_id)
+                return {
+                    "statusCode": 500,
+                    "body": {"error": "Failed to deactivate case", "case_id": case_id}
+                }
 
-        print(f"SUCCESS: Case soft deleted (deactivated) - case_id: {case_id}, rows affected: {cursor.rowcount}")
+            print(f"SUCCESS: Case soft deleted (deactivated) - case_id: {case_id}, rows affected: {cursor.rowcount}")
 
-        # Commit the transaction
-        conn.commit()
-        
-        # Record successful case deletion
-        business_metrics.record_case_operation("delete", "success", case_id)
+            # Commit the transaction
+            conn.commit()
+            
+            # Record successful case deletion
+            business_metrics.record_case_operation("delete", "success", case_id)
 
         return {
             "statusCode": 200,

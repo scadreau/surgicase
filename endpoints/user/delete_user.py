@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 16:05:35
+# Last Modified: 2025-07-15 17:47:09
 
 # endpoints/user/delete_user.py
 from fastapi import APIRouter, HTTPException, Query
@@ -42,43 +42,43 @@ async def delete_user(user_id: str = Query(..., description="The user ID to dele
                     "body": {"error": "User not found", "user_id":  user_id}
                 }
 
-        current_active_status = user_data.get('active')
-        print(f"INFO: User found - user_id: {user_id}, current active status: {current_active_status}")
+            current_active_status = user_data.get('active')
+            print(f"INFO: User found - user_id: {user_id}, current active status: {current_active_status}")
 
-        # Check if user is already inactive
-        if current_active_status == 0:
-            print(f"WARNING: User already inactive - user_id: {user_id}")
-            # Record user deletion (already inactive)
-            business_metrics.record_user_operation("delete", "already_inactive", user_id)
-            return {
-                "statusCode": 200,
-                "body": {
-                    "message": "User already inactive",
-                    "user_id": user_id,
-                    "active": 0
+            # Check if user is already inactive
+            if current_active_status == 0:
+                print(f"WARNING: User already inactive - user_id: {user_id}")
+                # Record user deletion (already inactive)
+                business_metrics.record_user_operation("delete", "already_inactive", user_id)
+                return {
+                    "statusCode": 200,
+                    "body": {
+                        "message": "User already inactive",
+                        "user_id": user_id,
+                        "active": 0
+                    }
                 }
-            }
 
-        # Soft delete: set active = 0
-        cursor.execute("""UPDATE user_profile SET active = 0 WHERE user_id = %s""", (user_id,))
+            # Soft delete: set active = 0
+            cursor.execute("""UPDATE user_profile SET active = 0 WHERE user_id = %s""", (user_id,))
 
-        # Check if update was successful
-        if cursor.rowcount == 0:
-            print(f"ERROR: Failed to update user active status - user_id: {user_id}")
-            # Record failed user deletion
-            business_metrics.record_user_operation("delete", "update_failed", user_id)
-            return {
-                "statusCode": 500,
-                "body": {"error": "Failed to deactivate user", "user_id": user_id}
-            }
+            # Check if update was successful
+            if cursor.rowcount == 0:
+                print(f"ERROR: Failed to update user active status - user_id: {user_id}")
+                # Record failed user deletion
+                business_metrics.record_user_operation("delete", "update_failed", user_id)
+                return {
+                    "statusCode": 500,
+                    "body": {"error": "Failed to deactivate user", "user_id": user_id}
+                }
 
-        print(f"SUCCESS: User soft deleted (deactivated) - user_id: {user_id}, rows affected: {cursor.rowcount}")
+            print(f"SUCCESS: User soft deleted (deactivated) - user_id: {user_id}, rows affected: {cursor.rowcount}")
 
-        # Commit the transaction
-        conn.commit()
-        
-        # Record successful user deletion
-        business_metrics.record_user_operation("delete", "success", user_id)
+            # Commit the transaction
+            conn.commit()
+            
+            # Record successful user deletion
+            business_metrics.record_user_operation("delete", "success", user_id)
 
         return {
             "statusCode": 200,
