@@ -1,5 +1,5 @@
 # Created: 2025-07-16 15:00:00
-# Last Modified: 2025-07-16 15:40:23
+# Last Modified: 2025-07-16 15:43:31
 
 # tests/test_pay_amount_calculator.py
 import sys
@@ -28,21 +28,45 @@ class TestPayAmountCalculator(unittest.TestCase):
     
     def test_calculate_case_pay_amount_no_procedure_codes(self):
         """Test pay amount calculation for case with no procedure codes."""
-        # Use a case that exists but has no procedure codes
-        # You may need to create a test case first or use an existing one
-        case_id = "TEST_CASE_NO_CODES"
-        user_id = "TEST_USER"
+        # First, find a case that exists but has no procedure codes
+        with self.conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT c.case_id, c.user_id
+                FROM cases c
+                LEFT JOIN case_procedure_codes cpc ON c.case_id = cpc.case_id
+                WHERE c.active = 1 AND cpc.procedure_code IS NULL
+                LIMIT 1
+            """)
+            case_data = cursor.fetchone()
+            
+            if case_data:
+                case_id = case_data['case_id']
+                user_id = case_data['user_id']
+            else:
+                # If no case exists without procedure codes, create a test case
+                # First find an existing user
+                cursor.execute("SELECT user_id FROM user_profile WHERE active = 1 LIMIT 1")
+                user_data = cursor.fetchone()
+                if not user_data:
+                    self.skipTest("No active users found in database")
+                
+                user_id = user_data['user_id']
+                case_id = f"TEST_CASE_NO_CODES_{user_id}"
+                
+                # Create a test case with no procedure codes
+                cursor.execute("""
+                    INSERT INTO cases (case_id, user_id, case_date, patient_first, patient_last, ins_provider)
+                    VALUES (%s, %s, NOW(), 'Test', 'Patient', 'Test Insurance')
+                """, (case_id, user_id))
+                self.conn.commit()
         
         result = calculate_case_pay_amount(case_id, user_id, self.conn)
         
-        # If the test case doesn't exist, we expect 0 procedure codes
-        if result["success"]:
-            self.assertEqual(result["pay_amount"], Decimal('0.00'))
-            self.assertEqual(result["procedure_codes_found"], 0)
-            self.assertIn("No procedure codes found", result["message"])
-        else:
-            # If case doesn't exist, that's also acceptable for this test
-            self.assertIn("No procedure codes found", result["message"])
+        # The result should be successful and show no procedure codes
+        self.assertTrue(result["success"])
+        self.assertEqual(result["pay_amount"], Decimal('0.00'))
+        self.assertEqual(result["procedure_codes_found"], 0)
+        self.assertIn("No procedure codes found", result["message"])
     
     def test_calculate_case_pay_amount_with_procedure_codes(self):
         """Test pay amount calculation for case with procedure codes."""
