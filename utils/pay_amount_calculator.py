@@ -1,0 +1,153 @@
+# Created: 2025-07-16 14:50:43
+# Last Modified: 2025-07-16 14:52:54
+
+# utils/pay_amount_calculator.py
+import pymysql.cursors
+import logging
+from decimal import Decimal
+
+logger = logging.getLogger(__name__)
+
+def calculate_case_pay_amount(case_id: str, user_id: str, conn) -> dict:
+    """
+    Calculate the maximum pay amount for a case based on its procedure codes.
+    
+    Args:
+        case_id: The case ID to calculate pay amount for
+        user_id: The user ID for procedure code lookup
+        conn: Database connection object
+        
+    Returns:
+        dict: {
+            "success": bool,
+            "pay_amount": Decimal,
+            "procedure_codes_found": int,
+            "message": str
+        }
+    """
+    try:
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            # First, check if the case has any procedure codes
+            cursor.execute("""
+                SELECT procedure_code 
+                FROM case_procedure_codes 
+                WHERE case_id = %s
+            """, (case_id,))
+            
+            procedure_codes = cursor.fetchall()
+            
+            if not procedure_codes:
+                # No procedure codes found, return 0.00
+                return {
+                    "success": True,
+                    "pay_amount": Decimal('0.00'),
+                    "procedure_codes_found": 0,
+                    "message": "No procedure codes found for case"
+                }
+            
+            # Extract procedure codes from the result
+            codes = [row['procedure_code'] for row in procedure_codes]
+            logger.info(f"Found {len(codes)} procedure codes for case {case_id}: {codes}")
+            
+            # Query procedure_codes table for the maximum pay amount
+            # Use placeholders for the IN clause
+            placeholders = ','.join(['%s'] * len(codes))
+            query = f"""
+                SELECT MAX(code_pay_amount) as max_pay_amount
+                FROM procedure_codes 
+                WHERE user_id = %s AND procedure_code IN ({placeholders})
+            """
+            
+            # Build parameters: user_id first, then all procedure codes
+            params = [user_id] + codes
+            cursor.execute(query, params)
+            
+            result = cursor.fetchone()
+            max_pay_amount = result['max_pay_amount']
+            
+            if max_pay_amount is None:
+                # Procedure codes exist but no matching records found in procedure_codes table
+                error_msg = f"No matching procedure codes found in procedure_codes table for case {case_id}, user {user_id}, codes: {codes}"
+                logger.error(error_msg)
+                return {
+                    "success": False,
+                    "pay_amount": Decimal('0.00'),
+                    "procedure_codes_found": len(codes),
+                    "message": error_msg
+                }
+            
+            # Convert to Decimal for consistency
+            pay_amount = Decimal(str(max_pay_amount))
+            
+            logger.info(f"Calculated pay amount {pay_amount} for case {case_id} with {len(codes)} procedure codes")
+            
+            return {
+                "success": True,
+                "pay_amount": pay_amount,
+                "procedure_codes_found": len(codes),
+                "message": f"Successfully calculated pay amount from {len(codes)} procedure codes"
+            }
+            
+    except Exception as e:
+        error_msg = f"Error calculating pay amount for case {case_id}: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        return {
+            "success": False,
+            "pay_amount": Decimal('0.00'),
+            "procedure_codes_found": 0,
+            "message": error_msg
+        }
+
+def update_case_pay_amount(case_id: str, user_id: str, conn) -> dict:
+    """
+    Calculate and update the pay_amount field for a case.
+    
+    Args:
+        case_id: The case ID to update
+        user_id: The user ID for procedure code lookup
+        conn: Database connection object
+        
+    Returns:
+        dict: Result from calculate_case_pay_amount plus update status
+    """
+    try:
+        # Calculate the pay amount
+        calc_result = calculate_case_pay_amount(case_id, user_id, conn)
+        
+        if not calc_result["success"]:
+            return calc_result
+        
+        # Update the case with the calculated pay amount
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("""
+                UPDATE cases 
+                SET pay_amount = %s 
+                WHERE case_id = %s
+            """, (calc_result["pay_amount"], case_id))
+            
+            if cursor.rowcount == 0:
+                return {
+                    "success": False,
+                    "pay_amount": calc_result["pay_amount"],
+                    "procedure_codes_found": calc_result["procedure_codes_found"],
+                    "message": f"Failed to update pay_amount for case {case_id} - case not found"
+                }
+            
+            logger.info(f"Updated pay_amount to {calc_result['pay_amount']} for case {case_id}")
+            
+            return {
+                "success": True,
+                "pay_amount": calc_result["pay_amount"],
+                "procedure_codes_found": calc_result["procedure_codes_found"],
+                "message": f"Successfully updated pay_amount to {calc_result['pay_amount']} for case {case_id}"
+            }
+            
+    except Exception as e:
+        error_msg = f"Error updating pay amount for case {case_id}: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        return {
+            "success": False,
+            "pay_amount": Decimal('0.00'),
+            "procedure_codes_found": 0,
+            "message": error_msg
+        } 

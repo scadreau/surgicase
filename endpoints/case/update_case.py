@@ -1,14 +1,18 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 20:45:03
+# Last Modified: 2025-07-16 14:53:53
 
 # endpoints/case/update_case.py
 from fastapi import APIRouter, HTTPException, Body
 import pymysql.cursors
 import pymysql
+import logging
 from core.database import get_db_connection, close_db_connection, is_connection_valid
 from core.models import CaseUpdate
 from utils.case_status import update_case_status
+from utils.pay_amount_calculator import update_case_pay_amount
 from utils.monitoring import track_business_operation, business_metrics
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -64,6 +68,28 @@ def update_case(case: CaseUpdate = Body(...)):
                 business_metrics.record_case_operation("update", "no_changes", case.case_id)
                 raise HTTPException(status_code=400, detail="No changes made to case")
 
+            # Calculate and update pay amount if procedure codes were updated or if we need to recalculate
+            pay_amount_result = None
+            if case.procedure_codes is not None:
+                # Get user_id for the case if not provided in update
+                if not case.user_id:
+                    cursor.execute("SELECT user_id FROM cases WHERE case_id = %s", (case.case_id,))
+                    case_user = cursor.fetchone()
+                    if case_user:
+                        user_id = case_user['user_id']
+                    else:
+                        user_id = None
+                else:
+                    user_id = case.user_id
+                
+                if user_id:
+                    pay_amount_result = update_case_pay_amount(case.case_id, user_id, conn)
+                    if not pay_amount_result["success"]:
+                        logger.error(f"Pay amount calculation failed for case {case.case_id}: {pay_amount_result['message']}")
+                        # Don't fail the entire operation, but log the error
+                    else:
+                        updated_fields.append("pay_amount")
+
             # Update case status if conditions are met (within the same transaction)
             status_update_result = update_case_status(case.case_id, conn)
             
@@ -79,7 +105,8 @@ def update_case(case: CaseUpdate = Body(...)):
                 "message": "Case updated successfully",
                 "case_id": case.case_id,
                 "updated_fields": updated_fields,
-                "status_update": status_update_result
+                "status_update": status_update_result,
+                "pay_amount_update": pay_amount_result
             }
         }
 

@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 20:44:58
+# Last Modified: 2025-07-16 14:53:41
 
 # endpoints/case/create_case.py
 from fastapi import APIRouter, HTTPException
@@ -9,6 +9,7 @@ import pymysql
 from core.database import get_db_connection, close_db_connection, is_connection_valid
 from core.models import CaseCreate
 from utils.case_status import update_case_status
+from utils.pay_amount_calculator import update_case_pay_amount
 from utils.monitoring import track_business_operation, business_metrics
 import logging
 
@@ -57,10 +58,19 @@ def create_case_with_procedures(case: CaseCreate, conn) -> dict:
                 VALUES (%s, %s)
             """, [(case.case_id, code) for code in case.procedure_codes])
 
+        # Calculate and update pay amount if procedure codes exist
+        pay_amount_result = update_case_pay_amount(case.case_id, case.user_id, conn)
+        if not pay_amount_result["success"]:
+            logger.error(f"Pay amount calculation failed for case {case.case_id}: {pay_amount_result['message']}")
+            # Don't fail the entire operation, but log the error
+        
         # Update case status if conditions are met (within the same transaction)
         status_update_result = update_case_status(case.case_id, conn)
         
-        return status_update_result
+        return {
+            "status_update": status_update_result,
+            "pay_amount_update": pay_amount_result
+        }
 
 @router.post("/case")
 @track_business_operation("create", "case")
@@ -100,7 +110,8 @@ def add_case(case: CaseCreate):
             "user_id": case.user_id,
             "case_id": case.case_id,
             "procedure_codes": case.procedure_codes,
-            "status_update": status_update_result
+            "status_update": status_update_result["status_update"],
+            "pay_amount_update": status_update_result["pay_amount_update"]
         }
 
     except HTTPException:
