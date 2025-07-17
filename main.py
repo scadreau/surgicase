@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-17 09:26:55
+# Last Modified: 2025-07-17 11:51:59
 
 # main.py
 from fastapi import FastAPI, Request
@@ -43,8 +43,8 @@ from utils.monitoring import monitor_request, system_monitor, db_monitor, logger
 # Create FastAPI instance
 app = FastAPI(
     title="SurgiCase API",
-    description="API for surgical case management with comprehensive monitoring",
-    version="0.7.0"
+    description="API for surgical case management",
+    version="0.8.0"
 )
 
 # Add request monitoring middleware

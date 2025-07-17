@@ -3,4 +3,5 @@ pymysql
 fastapi
 uvicorn
 fpdf
+Pillow
 prometheus-fastapi-instrumentator 

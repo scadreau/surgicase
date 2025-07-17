@@ -130,4 +130,7 @@ venv.bak/
 cython_debug/
 
 # Monitoring documentation
-monitoring.md 
+monitoring.md
+
+# Generated database table structures
+table_structures_*.sql 

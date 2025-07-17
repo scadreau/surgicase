@@ -1,5 +1,5 @@
 # Created: 2025-07-16 12:20:00
-# Last Modified: 2025-07-16 14:31:41
+# Last Modified: 2025-07-17 11:51:24
 
 #!/usr/bin/env python3
 """
@@ -15,7 +15,8 @@ import os
 from datetime import datetime
 
 # Add the project root to the Python path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(project_root)
 
 from core.database import get_db_connection, close_db_connection
 import pymysql.cursors

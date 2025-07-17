@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-07-17 09:47:20
+# Last Modified: 2025-07-17 11:41:55
 
 # endpoints/reports/provider_payment_report.py
 from fastapi import APIRouter, HTTPException, Query
@@ -8,6 +8,8 @@ import pymysql.cursors
 from core.database import get_db_connection, close_db_connection
 from utils.monitoring import track_business_operation, business_metrics
 from utils.report_cleanup import cleanup_old_reports, get_reports_directory_size
+from utils.s3_storage import upload_file_to_s3, generate_s3_key
+from utils.logo_manager import LogoManager
 from fpdf import FPDF
 from datetime import datetime
 import os
@@ -17,7 +19,64 @@ from typing import Optional
 router = APIRouter()
 
 class ProviderPaymentReportPDF(FPDF):
+    def __init__(self, logo_path: Optional[str] = None, logo_width: int = 30, logo_height: int = 15):
+        super().__init__()
+        self.logo_path = logo_path
+        self.logo_width = logo_width
+        self.logo_height = logo_height
+        self.logo_x = 10  # Default X position
+        self.logo_y = 10  # Default Y position
+        
+    def add_logo(self, x: Optional[float] = None, y: Optional[float] = None, 
+                 width: Optional[float] = None, height: Optional[float] = None):
+        """
+        Add a logo to the current page.
+        
+        Args:
+            x: X position (default: self.logo_x)
+            y: Y position (default: self.logo_y)
+            width: Logo width (default: self.logo_width)
+            height: Logo height (default: self.logo_height)
+        """
+        if not self.logo_path or not os.path.exists(self.logo_path):
+            return False
+            
+        try:
+            x = x if x is not None else self.logo_x
+            y = y if y is not None else self.logo_y
+            width = width if width is not None else self.logo_width
+            height = height if height is not None else self.logo_height
+            
+            # Add image to current page
+            self.image(self.logo_path, x, y, width, height)
+            return True
+        except Exception as e:
+            print(f"Error adding logo: {e}")
+            return False
+    
+    def set_logo_position(self, x: float, y: float):
+        """Set the default logo position"""
+        self.logo_x = x
+        self.logo_y = y
+    
+    def set_logo_size(self, width: float, height: float):
+        """Set the default logo size"""
+        self.logo_width = width
+        self.logo_height = height
+
     def header(self):
+        # Add logo if available
+        if self.logo_path and os.path.exists(self.logo_path):
+            self.add_logo()
+            # Adjust text position to account for logo
+            logo_right_edge = self.logo_x + self.logo_width
+            text_start_x = logo_right_edge + 10
+        else:
+            text_start_x = 10
+        
+        # Set position for header text
+        self.set_x(text_start_x)
+        
         self.set_font("Arial", 'B', 13)
         header_height = self.font_size + 2
         self.cell(0, header_height, "Provider Payment Report", ln=True, align="C")
@@ -202,8 +261,14 @@ def generate_provider_payment_report(
                         }
                     providers[user_id]['cases'].append(case)
                 
-                # Generate PDF
-                pdf = ProviderPaymentReportPDF()
+                # Generate PDF with optional logo
+                logo_config = LogoManager.get_logo_config('provider_payment')
+                pdf = ProviderPaymentReportPDF(
+                    logo_path=logo_config['path'],
+                    logo_width=logo_config['width'],
+                    logo_height=logo_config['height']
+                )
+                pdf.set_logo_position(logo_config['x'], logo_config['y'])
                 pdf.alias_nb_pages()
                 pdf.add_page()
                 
@@ -239,10 +304,38 @@ def generate_provider_payment_report(
                 
                 pdf.output(filepath)
                 
+                # Prepare metadata for S3
+                metadata = {
+                    'report_type': 'provider_payment',
+                    'generated_by': 'surgicase_api',
+                    'total_providers': str(len(providers)),
+                    'total_cases': str(total_cases),
+                    'total_amount': f"{total_amount:.2f}",
+                    'start_date': start_date or 'all',
+                    'end_date': end_date or 'all',
+                    'user_filter': user_id or 'all'
+                }
+                
+                # Upload to S3
+                s3_key = generate_s3_key('provider-payment', filename)
+                s3_result = upload_file_to_s3(
+                    file_path=filepath,
+                    s3_key=s3_key,
+                    content_type='application/pdf',
+                    metadata=metadata
+                )
+                
                 # Record successful report generation
                 business_metrics.record_utility_operation("provider_report", "success")
                 
-                # Return file for download with proper headers
+                # Prepare response with S3 information
+                response_data = {
+                    "local_file": filepath,
+                    "filename": filename,
+                    "s3_upload": s3_result
+                }
+                
+                # Return file for download with proper headers and S3 info
                 return FileResponse(
                     path=filepath,
                     filename=filename,
@@ -250,7 +343,10 @@ def generate_provider_payment_report(
                     headers={
                         'Content-Disposition': f'attachment; filename="{filename}"',
                         'Cache-Control': 'no-cache',
-                        'Content-Length': str(os.path.getsize(filepath))
+                        'Content-Length': str(os.path.getsize(filepath)),
+                        'X-S3-URL': s3_result.get('s3_url', ''),
+                        'X-S3-Key': s3_result.get('s3_key', ''),
+                        'X-S3-Upload-Success': str(s3_result.get('success', False))
                     }
                 )
                 
