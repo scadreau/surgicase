@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-07-17 12:24:35
+# Last Modified: 2025-07-17 12:25:44
 
 # endpoints/reports/provider_payment_report.py
 from fastapi import APIRouter, HTTPException, Query
@@ -104,7 +104,7 @@ class ProviderPaymentReportPDF(FPDF):
         # Provider subtotal
         self.set_font("Arial", 'B', 10)
         total_height = self.font_size + 1
-        self.cell(160, total_height, f"Provider Total:", border=1, align="R")
+        self.cell(160, total_height, f"Provider Total:", align="R")
         self.cell(20, total_height, f"${provider_total:.2f}", border=1, ln=True, align="R")
         self.ln(5)
         
