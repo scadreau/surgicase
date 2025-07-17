@@ -1,5 +1,5 @@
 # Created: 2025-07-16 14:50:43
-# Last Modified: 2025-07-16 15:40:21
+# Last Modified: 2025-07-17 10:17:43
 
 # utils/pay_amount_calculator.py
 import pymysql.cursors
@@ -22,6 +22,7 @@ def calculate_case_pay_amount(case_id: str, user_id: str, conn) -> dict:
         dict: {
             "success": bool,
             "pay_amount": Decimal,
+            "pay_category": str,
             "procedure_codes_found": int,
             "message": str
         }
@@ -42,6 +43,7 @@ def calculate_case_pay_amount(case_id: str, user_id: str, conn) -> dict:
                 return {
                     "success": False,
                     "pay_amount": Decimal('0.00'),
+                    "pay_category": None,
                     "procedure_codes_found": 0,
                     "message": error_msg
                 }
@@ -63,6 +65,7 @@ def calculate_case_pay_amount(case_id: str, user_id: str, conn) -> dict:
                 return {
                     "success": True,
                     "pay_amount": Decimal('0.00'),
+                    "pay_category": None,
                     "procedure_codes_found": 0,
                     "message": "No procedure codes found for case"
                 }
@@ -71,13 +74,15 @@ def calculate_case_pay_amount(case_id: str, user_id: str, conn) -> dict:
             codes = [row['procedure_code'] for row in procedure_codes]
             logger.info(f"Found {len(codes)} procedure codes for case {case_id}: {codes}")
             
-            # Query procedure_codes table for the maximum pay amount using tier
+            # Query procedure_codes table for the maximum pay amount and its category using tier
             # Use placeholders for the IN clause
             placeholders = ','.join(['%s'] * len(codes))
             query = f"""
-                SELECT MAX(code_pay_amount) as max_pay_amount
+                SELECT code_pay_amount, code_category
                 FROM procedure_codes 
                 WHERE tier = %s AND procedure_code IN ({placeholders})
+                ORDER BY code_pay_amount DESC, procedure_code ASC
+                LIMIT 1
             """
             
             # Build parameters: tier first, then all procedure codes
@@ -85,29 +90,31 @@ def calculate_case_pay_amount(case_id: str, user_id: str, conn) -> dict:
             cursor.execute(query, params)
             
             result = cursor.fetchone()
-            max_pay_amount = result['max_pay_amount']
             
-            if max_pay_amount is None:
+            if result is None:
                 # Procedure codes exist but no matching records found in procedure_codes table for this tier
                 error_msg = f"No matching procedure codes found in procedure_codes table for case {case_id}, user {user_id} (tier {user_tier}), codes: {codes}"
                 logger.error(error_msg)
                 return {
                     "success": False,
                     "pay_amount": Decimal('0.00'),
+                    "pay_category": None,
                     "procedure_codes_found": len(codes),
                     "message": error_msg
                 }
             
             # Convert to Decimal for consistency
-            pay_amount = Decimal(str(max_pay_amount))
+            pay_amount = Decimal(str(result['code_pay_amount']))
+            pay_category = result['code_category']
             
-            logger.info(f"Calculated pay amount {pay_amount} for case {case_id} with {len(codes)} procedure codes (tier {user_tier})")
+            logger.info(f"Calculated pay amount {pay_amount} with category '{pay_category}' for case {case_id} with {len(codes)} procedure codes (tier {user_tier})")
             
             return {
                 "success": True,
                 "pay_amount": pay_amount,
+                "pay_category": pay_category,
                 "procedure_codes_found": len(codes),
-                "message": f"Successfully calculated pay amount from {len(codes)} procedure codes (tier {user_tier})"
+                "message": f"Successfully calculated pay amount {pay_amount} with category '{pay_category}' from {len(codes)} procedure codes (tier {user_tier})"
             }
             
     except Exception as e:
@@ -116,13 +123,14 @@ def calculate_case_pay_amount(case_id: str, user_id: str, conn) -> dict:
         return {
             "success": False,
             "pay_amount": Decimal('0.00'),
+            "pay_category": None,
             "procedure_codes_found": 0,
             "message": error_msg
         }
 
 def update_case_pay_amount(case_id: str, user_id: str, conn) -> dict:
     """
-    Calculate and update the pay_amount field for a case.
+    Calculate and update the pay_amount and pay_category fields for a case.
     
     Args:
         case_id: The case ID to update
@@ -133,43 +141,46 @@ def update_case_pay_amount(case_id: str, user_id: str, conn) -> dict:
         dict: Result from calculate_case_pay_amount plus update status
     """
     try:
-        # Calculate the pay amount
+        # Calculate the pay amount and category
         calc_result = calculate_case_pay_amount(case_id, user_id, conn)
         
         if not calc_result["success"]:
             return calc_result
         
-        # Update the case with the calculated pay amount
+        # Update the case with the calculated pay amount and category
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
             cursor.execute("""
                 UPDATE cases 
-                SET pay_amount = %s 
+                SET pay_amount = %s, pay_category = %s
                 WHERE case_id = %s
-            """, (calc_result["pay_amount"], case_id))
+            """, (calc_result["pay_amount"], calc_result["pay_category"], case_id))
             
             if cursor.rowcount == 0:
                 return {
                     "success": False,
                     "pay_amount": calc_result["pay_amount"],
+                    "pay_category": calc_result["pay_category"],
                     "procedure_codes_found": calc_result["procedure_codes_found"],
-                    "message": f"Failed to update pay_amount for case {case_id} - case not found"
+                    "message": f"Failed to update pay_amount and pay_category for case {case_id} - case not found"
                 }
             
-            logger.info(f"Updated pay_amount to {calc_result['pay_amount']} for case {case_id}")
+            logger.info(f"Updated pay_amount to {calc_result['pay_amount']} and pay_category to '{calc_result['pay_category']}' for case {case_id}")
             
             return {
                 "success": True,
                 "pay_amount": calc_result["pay_amount"],
+                "pay_category": calc_result["pay_category"],
                 "procedure_codes_found": calc_result["procedure_codes_found"],
-                "message": f"Successfully updated pay_amount to {calc_result['pay_amount']} for case {case_id}"
+                "message": f"Successfully updated pay_amount to {calc_result['pay_amount']} and pay_category to '{calc_result['pay_category']}' for case {case_id}"
             }
             
     except Exception as e:
-        error_msg = f"Error updating pay amount for case {case_id}: {str(e)}"
+        error_msg = f"Error updating pay amount and category for case {case_id}: {str(e)}"
         logger.error(error_msg, exc_info=True)
         return {
             "success": False,
             "pay_amount": Decimal('0.00'),
+            "pay_category": None,
             "procedure_codes_found": 0,
             "message": error_msg
         } 
