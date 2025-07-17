@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-07-17 12:12:25
+# Last Modified: 2025-07-17 12:15:04
 
 # endpoints/reports/provider_payment_report.py
 from fastapi import APIRouter, HTTPException, Query
@@ -24,7 +24,7 @@ class ProviderPaymentReportPDF(FPDF):
     def header(self):
         self.set_font("Arial", 'B', 13)
         header_height = self.font_size + 2
-        self.cell(0, header_height, "Provider Payment Report", ln=True, align="L")
+        self.cell(0, header_height, "Provider Payment Report", ln=True, align="C")
         self.ln(1)
         
         self.set_font("Arial", '', 11)
@@ -46,7 +46,7 @@ class ProviderPaymentReportPDF(FPDF):
             self.add_page()
         
         # Provider header
-        self.set_font("Arial", 'B', 12)
+        self.set_font("Arial", '', 11)
         provider_height = self.font_size + 2
         first_name = provider_data.get('first_name', '') or ''
         last_name = provider_data.get('last_name', '') or ''
