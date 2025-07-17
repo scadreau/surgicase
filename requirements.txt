@@ -1,4 +1,6 @@
 boto3
 pymysql
 fastapi
-uvicorn 
+uvicorn
+fpdf
+prometheus-fastapi-instrumentator 

@@ -1,5 +1,5 @@
 -- Database Table Structures
--- Generated on: 2025-07-16 15:25:46
+-- Generated on: 2025-07-16 15:47:19
 -- Database: allstars
 -- MySQL Version: 8.0.39
 
@@ -1018,8 +1018,9 @@ CREATE TABLE `procedure_codes` (
   `code_category` varchar(20) DEFAULT NULL,
   `code_status` varchar(20) DEFAULT NULL,
   `code_pay_amount` decimal(10,2) DEFAULT '0.00',
-  `tier` int unsigned DEFAULT '1',
-  KEY `idx_procedure_code` (`procedure_code`)
+  `tier` int NOT NULL DEFAULT '1',
+  PRIMARY KEY (`procedure_code`,`tier`),
+  KEY `idx_tier_procedure` (`tier`,`procedure_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Table: procedure_codes_tier1

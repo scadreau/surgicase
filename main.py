@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-16 11:24:34
+# Last Modified: 2025-07-17 09:26:55
 
 # main.py
 from fastapi import FastAPI, Request
@@ -35,6 +35,8 @@ from endpoints.metrics import router as metrics_router
 
 from endpoints.backoffice.get_cases_by_status import router as get_cases_by_status_router
 
+from endpoints.reports.provider_payment_report import router as provider_payment_report_router
+
 # Import monitoring utilities
 from utils.monitoring import monitor_request, system_monitor, db_monitor, logger
 
@@ -42,7 +44,7 @@ from utils.monitoring import monitor_request, system_monitor, db_monitor, logger
 app = FastAPI(
     title="SurgiCase API",
     description="API for surgical case management with comprehensive monitoring",
-    version="1.0.0"
+    version="0.7.0"
 )
 
 # Add request monitoring middleware
@@ -91,6 +93,9 @@ app.include_router(metrics_router, tags=["monitoring"])
 
 # Backoffice endpoints
 app.include_router(get_cases_by_status_router, tags=["backoffice"])
+
+# Report endpoints
+app.include_router(provider_payment_report_router, tags=["reports"])
 
 if __name__ == "__main__":
     import uvicorn

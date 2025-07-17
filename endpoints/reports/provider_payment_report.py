@@ -1,0 +1,262 @@
+# Created: 2025-01-27 10:00:00
+# Last Modified: 2025-07-17 09:38:04
+
+# endpoints/reports/provider_payment_report.py
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import FileResponse
+import pymysql.cursors
+from core.database import get_db_connection, close_db_connection
+from utils.monitoring import track_business_operation, business_metrics
+from utils.report_cleanup import cleanup_old_reports, get_reports_directory_size
+from fpdf import FPDF
+from datetime import datetime
+import os
+import tempfile
+from typing import Optional
+
+router = APIRouter()
+
+class ProviderPaymentReportPDF(FPDF):
+    def header(self):
+        self.set_font("Arial", 'B', 13)
+        header_height = self.font_size + 2
+        self.cell(0, header_height, "Provider Payment Report", ln=True, align="C")
+        self.ln(1)
+        self.set_font("Arial", '', 11)
+        info_height = self.font_size + 1
+        self.cell(0, info_height, f"Report Date: {datetime.now().strftime('%B %d, %Y')}", ln=True, align="L")
+        self.ln(1)
+
+    def footer(self):
+        self.set_y(-20)
+        self.set_font("Arial", 'I', 8)
+        footer_height = self.font_size + 1
+        self.cell(0, footer_height, f"Report generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", align="L")
+        self.cell(0, footer_height, f"Page {self.page_no()} of {{nb}}", align="R")
+
+    def add_provider_section(self, provider_data, cases_data, is_first_provider=False):
+        """Add a section for each provider with their cases"""
+        # Start new page for each provider (except the first one)
+        if not is_first_provider:
+            self.add_page()
+        
+        # Provider header
+        self.set_font("Arial", 'B', 12)
+        provider_height = self.font_size + 2
+        provider_name = f"Provider: Dr. {provider_data['first_name']} {provider_data['last_name']}"
+        if provider_data.get('user_npi'):
+            provider_name += f" (NPI: {provider_data['user_npi']})"
+        self.cell(0, provider_height, provider_name, ln=True, align="L")
+        self.ln(2)
+
+        # Table header
+        self.set_font("Arial", 'B', 10)
+        header_height = self.font_size + 2
+        self.cell(25, header_height, "Date", border=1)
+        self.cell(50, header_height, "Patient Name", border=1)
+        self.cell(45, header_height, "Procedure(s)", border=1)
+        self.cell(30, header_height, "Category", border=1)
+        self.cell(20, header_height, "Amount", border=1, ln=True)
+
+        # Table data
+        self.set_font("Arial", '', 9)
+        data_height = self.font_size + 1
+        provider_total = 0
+        
+        for case in cases_data:
+            # Format date
+            case_date = case['case_date']
+            if hasattr(case_date, 'strftime'):
+                formatted_date = case_date.strftime('%Y-%m-%d')
+            else:
+                formatted_date = str(case_date)[:10]  # Take first 10 chars if it's a string
+            
+            # Format patient name
+            patient_name = f"{case['patient_first']} {case['patient_last']}"
+            
+            # Format procedures
+            procedures = case.get('procedures', '')
+            if isinstance(procedures, list):
+                procedures = ', '.join(procedures)
+            
+            # Format amount
+            amount = case.get('pay_amount', 0) or 0
+            
+            self.cell(25, data_height, formatted_date, border=1)
+            self.cell(50, data_height, patient_name, border=1)
+            self.cell(45, data_height, procedures, border=1)
+            self.cell(30, data_height, case.get('pay_category', ''), border=1)
+            self.cell(20, data_height, f"${amount:.2f}", border=1, ln=True, align="R")
+            provider_total += amount
+
+        # Provider subtotal
+        self.set_font("Arial", 'B', 10)
+        total_height = self.font_size + 1
+        self.cell(150, total_height, f"Provider Total:", border=1, align="R")
+        self.cell(20, total_height, f"${provider_total:.2f}", border=1, ln=True, align="R")
+        self.ln(5)
+        
+        return provider_total
+
+    def add_summary(self, total_amount, provider_count, case_count):
+        """Add summary section at the end"""
+        self.add_page()
+        self.set_font("Arial", 'B', 14)
+        self.cell(0, 10, "Report Summary", ln=True, align="C")
+        self.ln(5)
+        
+        self.set_font("Arial", '', 12)
+        self.cell(0, 8, f"Total Providers: {provider_count}", ln=True)
+        self.cell(0, 8, f"Total Cases: {case_count}", ln=True)
+        self.cell(0, 8, f"Total Amount: ${total_amount:.2f}", ln=True)
+
+@router.get("/provider_payment_report")
+@track_business_operation("generate", "provider_report")
+def generate_provider_payment_report(
+    start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    user_id: Optional[str] = Query(None, description="Filter by specific provider user_id")
+):
+    """
+    Generate a provider payment report as a PDF file.
+    Returns cases with case_status=1 grouped by provider.
+    """
+    try:
+        conn = get_db_connection()
+        
+        try:
+            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                # Build the main query
+                sql = """
+                    SELECT 
+                        c.user_id,
+                        c.case_id,
+                        c.case_date,
+                        c.patient_first,
+                        c.patient_last,
+                        c.pay_amount,
+                        c.pay_category,
+                        up.first_name,
+                        up.last_name,
+                        up.user_npi
+                    FROM cases c
+                    INNER JOIN user_profile up ON c.user_id = up.user_id
+                    WHERE c.case_status = 1 
+                    AND c.active = 1 
+                    AND up.active = 1
+                """
+                params = []
+                
+                # Add date filters if provided
+                if start_date:
+                    sql += " AND c.case_date >= %s"
+                    params.append(start_date)
+                if end_date:
+                    sql += " AND c.case_date <= %s"
+                    params.append(end_date)
+                
+                # Add user filter if provided
+                if user_id:
+                    sql += " AND c.user_id = %s"
+                    params.append(user_id)
+                
+                # Order by user_id and case_date
+                sql += " ORDER BY c.user_id, c.case_date"
+                
+                cursor.execute(sql, params)
+                cases = cursor.fetchall()
+                
+                if not cases:
+                    raise HTTPException(
+                        status_code=404, 
+                        detail="No cases found matching the criteria"
+                    )
+                
+                # Get procedure codes for each case
+                for case in cases:
+                    cursor.execute(
+                        "SELECT procedure_code FROM case_procedure_codes WHERE case_id = %s",
+                        (case['case_id'],)
+                    )
+                    procedure_codes = [row['procedure_code'] for row in cursor.fetchall()]
+                    case['procedures'] = procedure_codes
+                
+                # Group cases by provider
+                providers = {}
+                for case in cases:
+                    user_id = case['user_id']
+                    if user_id not in providers:
+                        providers[user_id] = {
+                            'provider_data': {
+                                'first_name': case['first_name'],
+                                'last_name': case['last_name'],
+                                'user_npi': case['user_npi']
+                            },
+                            'cases': []
+                        }
+                    providers[user_id]['cases'].append(case)
+                
+                # Generate PDF
+                pdf = ProviderPaymentReportPDF()
+                pdf.alias_nb_pages()
+                pdf.add_page()
+                
+                total_amount = 0
+                total_cases = 0
+                
+                # Add each provider's section
+                first_provider = True
+                for user_id, provider_info in providers.items():
+                    provider_total = pdf.add_provider_section(
+                        provider_info['provider_data'], 
+                        provider_info['cases'],
+                        is_first_provider=first_provider
+                    )
+                    total_amount += provider_total
+                    total_cases += len(provider_info['cases'])
+                    first_provider = False
+                
+                # Add summary
+                pdf.add_summary(total_amount, len(providers), total_cases)
+                
+                # Create reports directory if it doesn't exist
+                reports_dir = os.path.join(os.getcwd(), "reports")
+                os.makedirs(reports_dir, exist_ok=True)
+                
+                # Clean up old reports before generating new one
+                cleanup_old_reports(reports_dir, days_to_keep=7)
+                
+                # Save to reports directory
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"provider_payment_report_{timestamp}.pdf"
+                filepath = os.path.join(reports_dir, filename)
+                
+                pdf.output(filepath)
+                
+                # Record successful report generation
+                business_metrics.record_utility_operation("provider_report", "success")
+                
+                # Return file for download with proper headers
+                return FileResponse(
+                    path=filepath,
+                    filename=filename,
+                    media_type='application/pdf',
+                    headers={
+                        'Content-Disposition': f'attachment; filename="{filename}"',
+                        'Cache-Control': 'no-cache',
+                        'Content-Length': str(os.path.getsize(filepath))
+                    }
+                )
+                
+        finally:
+            close_db_connection(conn)
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Record failed report generation
+        business_metrics.record_utility_operation("provider_report", "error")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating report: {str(e)}"
+        ) 
