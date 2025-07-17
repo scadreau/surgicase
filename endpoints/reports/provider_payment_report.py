@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-07-17 12:15:04
+# Last Modified: 2025-07-17 12:16:34
 
 # endpoints/reports/provider_payment_report.py
 from fastapi import APIRouter, HTTPException, Query
@@ -64,7 +64,7 @@ class ProviderPaymentReportPDF(FPDF):
         self.cell(50, header_height, "Patient Name", border=1)
         self.cell(45, header_height, "Procedure(s)", border=1)
         self.cell(30, header_height, "Category", border=1)
-        self.cell(20, header_height, "Amount", border=1, ln=True)
+        self.cell(20, header_height, "Amount", border=1, ln=True, align="R")
 
         # Table data
         self.set_font("Arial", '', 9)
