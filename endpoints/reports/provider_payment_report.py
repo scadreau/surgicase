@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-07-17 12:20:41
+# Last Modified: 2025-07-17 12:24:35
 
 # endpoints/reports/provider_payment_report.py
 from fastapi import APIRouter, HTTPException, Query
@@ -62,13 +62,13 @@ class ProviderPaymentReportPDF(FPDF):
         header_height = self.font_size + 2
         self.cell(25, header_height, "Date", border=1)
         self.cell(50, header_height, "Patient Name", border=1)
-        self.cell(45, header_height, "Procedure(s)", border=1)
+        self.cell(55, header_height, "Procedure(s)", border=1)
         self.cell(30, header_height, "Category", border=1)
         self.cell(20, header_height, "Amount", border=1, ln=True, align="R")
 
         # Table data
         self.set_font("Arial", '', 10)
-        data_height = self.font_size + 1
+        data_height = self.font_size + 2
         provider_total = 0
         
         for case in cases_data:
@@ -96,7 +96,7 @@ class ProviderPaymentReportPDF(FPDF):
             
             self.cell(25, data_height, formatted_date, border=1)
             self.cell(50, data_height, patient_name, border=1)
-            self.cell(45, data_height, procedures, border=1)
+            self.cell(55, data_height, procedures, border=1)
             self.cell(30, data_height, case.get('pay_category', '') or '', border=1)
             self.cell(20, data_height, f"${amount:.2f}", border=1, ln=True, align="R")
             provider_total += amount
@@ -104,7 +104,7 @@ class ProviderPaymentReportPDF(FPDF):
         # Provider subtotal
         self.set_font("Arial", 'B', 10)
         total_height = self.font_size + 1
-        self.cell(150, total_height, f"Provider Total:", border=1, align="R")
+        self.cell(160, total_height, f"Provider Total:", border=1, align="R")
         self.cell(20, total_height, f"${provider_total:.2f}", border=1, ln=True, align="R")
         self.ln(5)
         
