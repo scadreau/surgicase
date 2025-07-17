@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-07-17 11:41:55
+# Last Modified: 2025-07-17 12:00:50
 
 # endpoints/reports/provider_payment_report.py
 from fastapi import APIRouter, HTTPException, Query
@@ -206,7 +206,7 @@ def generate_provider_payment_report(
                         up.user_npi
                     FROM cases c
                     INNER JOIN user_profile up ON c.user_id = up.user_id
-                    WHERE c.case_status = 1 
+                    WHERE c.case_status = 10
                     AND c.active = 1 
                     AND up.active = 1
                 """
