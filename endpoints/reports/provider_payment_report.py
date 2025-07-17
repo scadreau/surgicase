@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-07-17 09:38:04
+# Last Modified: 2025-07-17 09:47:20
 
 # endpoints/reports/provider_payment_report.py
 from fastapi import APIRouter, HTTPException, Query
@@ -43,7 +43,9 @@ class ProviderPaymentReportPDF(FPDF):
         # Provider header
         self.set_font("Arial", 'B', 12)
         provider_height = self.font_size + 2
-        provider_name = f"Provider: Dr. {provider_data['first_name']} {provider_data['last_name']}"
+        first_name = provider_data.get('first_name', '') or ''
+        last_name = provider_data.get('last_name', '') or ''
+        provider_name = f"Provider: Dr. {first_name} {last_name}".strip()
         if provider_data.get('user_npi'):
             provider_name += f" (NPI: {provider_data['user_npi']})"
         self.cell(0, provider_height, provider_name, ln=True, align="L")
@@ -72,12 +74,16 @@ class ProviderPaymentReportPDF(FPDF):
                 formatted_date = str(case_date)[:10]  # Take first 10 chars if it's a string
             
             # Format patient name
-            patient_name = f"{case['patient_first']} {case['patient_last']}"
+            patient_first = case.get('patient_first', '') or ''
+            patient_last = case.get('patient_last', '') or ''
+            patient_name = f"{patient_first} {patient_last}".strip()
             
             # Format procedures
             procedures = case.get('procedures', '')
             if isinstance(procedures, list):
-                procedures = ', '.join(procedures)
+                procedures = ', '.join(procedures) if procedures else ''
+            elif procedures is None:
+                procedures = ''
             
             # Format amount
             amount = case.get('pay_amount', 0) or 0
@@ -85,7 +91,7 @@ class ProviderPaymentReportPDF(FPDF):
             self.cell(25, data_height, formatted_date, border=1)
             self.cell(50, data_height, patient_name, border=1)
             self.cell(45, data_height, procedures, border=1)
-            self.cell(30, data_height, case.get('pay_category', ''), border=1)
+            self.cell(30, data_height, case.get('pay_category', '') or '', border=1)
             self.cell(20, data_height, f"${amount:.2f}", border=1, ln=True, align="R")
             provider_total += amount
 
