@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-07-17 12:00:50
+# Last Modified: 2025-07-17 12:05:33
 
 # endpoints/reports/provider_payment_report.py
 from fastapi import APIRouter, HTTPException, Query
@@ -65,25 +65,29 @@ class ProviderPaymentReportPDF(FPDF):
         self.logo_height = height
 
     def header(self):
+        # Calculate logo space first
+        logo_space = 0
+        if self.logo_path and os.path.exists(self.logo_path):
+            logo_space = self.logo_x + self.logo_width + 10  # Logo width + padding
+        
         # Add logo if available
         if self.logo_path and os.path.exists(self.logo_path):
             self.add_logo()
-            # Adjust text position to account for logo
-            logo_right_edge = self.logo_x + self.logo_width
-            text_start_x = logo_right_edge + 10
-        else:
-            text_start_x = 10
         
-        # Set position for header text
-        self.set_x(text_start_x)
+        # Set position for header text (accounting for logo space)
+        self.set_x(logo_space)
         
         self.set_font("Arial", 'B', 13)
         header_height = self.font_size + 2
-        self.cell(0, header_height, "Provider Payment Report", ln=True, align="C")
+        
+        # Calculate available width for text (total page width minus logo space)
+        available_width = self.w - logo_space - 10  # 10 for right margin
+        self.cell(available_width, header_height, "Provider Payment Report", ln=True, align="L")
         self.ln(1)
+        
         self.set_font("Arial", '', 11)
         info_height = self.font_size + 1
-        self.cell(0, info_height, f"Report Date: {datetime.now().strftime('%B %d, %Y')}", ln=True, align="L")
+        self.cell(available_width, info_height, f"Report Date: {datetime.now().strftime('%B %d, %Y')}", ln=True, align="L")
         self.ln(1)
 
     def footer(self):
@@ -99,18 +103,28 @@ class ProviderPaymentReportPDF(FPDF):
         if not is_first_provider:
             self.add_page()
         
+        # Calculate logo space for consistent positioning
+        logo_space = 0
+        if self.logo_path and os.path.exists(self.logo_path):
+            logo_space = self.logo_x + self.logo_width + 10  # Logo width + padding
+        
         # Provider header
         self.set_font("Arial", 'B', 12)
         provider_height = self.font_size + 2
         first_name = provider_data.get('first_name', '') or ''
         last_name = provider_data.get('last_name', '') or ''
-        provider_name = f"Provider: Dr. {first_name} {last_name}".strip()
+        provider_name = f"Provider: {first_name} {last_name}".strip()
         if provider_data.get('user_npi'):
             provider_name += f" (NPI: {provider_data['user_npi']})"
-        self.cell(0, provider_height, provider_name, ln=True, align="L")
+        
+        # Set position accounting for logo space
+        self.set_x(logo_space)
+        available_width = self.w - logo_space - 10  # 10 for right margin
+        self.cell(available_width, provider_height, provider_name, ln=True, align="L")
         self.ln(2)
 
-        # Table header
+        # Table header - start from logo space
+        self.set_x(logo_space)
         self.set_font("Arial", 'B', 10)
         header_height = self.font_size + 2
         self.cell(25, header_height, "Date", border=1)
@@ -147,6 +161,8 @@ class ProviderPaymentReportPDF(FPDF):
             # Format amount
             amount = case.get('pay_amount', 0) or 0
             
+            # Set position for each row to account for logo space
+            self.set_x(logo_space)
             self.cell(25, data_height, formatted_date, border=1)
             self.cell(50, data_height, patient_name, border=1)
             self.cell(45, data_height, procedures, border=1)
@@ -157,6 +173,7 @@ class ProviderPaymentReportPDF(FPDF):
         # Provider subtotal
         self.set_font("Arial", 'B', 10)
         total_height = self.font_size + 1
+        self.set_x(logo_space)
         self.cell(150, total_height, f"Provider Total:", border=1, align="R")
         self.cell(20, total_height, f"${provider_total:.2f}", border=1, ln=True, align="R")
         self.ln(5)
@@ -166,14 +183,25 @@ class ProviderPaymentReportPDF(FPDF):
     def add_summary(self, total_amount, provider_count, case_count):
         """Add summary section at the end"""
         self.add_page()
+        
+        # Calculate logo space for consistent positioning
+        logo_space = 0
+        if self.logo_path and os.path.exists(self.logo_path):
+            logo_space = self.logo_x + self.logo_width + 10  # Logo width + padding
+        
         self.set_font("Arial", 'B', 14)
-        self.cell(0, 10, "Report Summary", ln=True, align="C")
+        available_width = self.w - logo_space - 10  # 10 for right margin
+        self.set_x(logo_space)
+        self.cell(available_width, 10, "Report Summary", ln=True, align="C")
         self.ln(5)
         
         self.set_font("Arial", '', 12)
-        self.cell(0, 8, f"Total Providers: {provider_count}", ln=True)
-        self.cell(0, 8, f"Total Cases: {case_count}", ln=True)
-        self.cell(0, 8, f"Total Amount: ${total_amount:.2f}", ln=True)
+        self.set_x(logo_space)
+        self.cell(available_width, 8, f"Total Providers: {provider_count}", ln=True)
+        self.set_x(logo_space)
+        self.cell(available_width, 8, f"Total Cases: {case_count}", ln=True)
+        self.set_x(logo_space)
+        self.cell(available_width, 8, f"Total Amount: ${total_amount:.2f}", ln=True)
 
 @router.get("/provider_payment_report")
 @track_business_operation("generate", "provider_report")
