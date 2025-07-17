@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-07-17 12:26:35
+# Last Modified: 2025-07-17 13:19:03
 
 # endpoints/reports/provider_payment_report.py
 from fastapi import APIRouter, HTTPException, Query
@@ -124,7 +124,7 @@ class ProviderPaymentReportPDF(FPDF):
         self.cell(0, 8, f"Total Amount: ${total_amount:.2f}", ln=True)
 
 @router.get("/provider_payment_report")
-@track_business_operation("generate", "provider_report")
+@track_business_operation("generate", "provider_payment_report")
 def generate_provider_payment_report(
     start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
