@@ -1,5 +1,5 @@
 # Created: 2025-07-16 12:20:00
-# Last Modified: 2025-07-17 11:51:24
+# Last Modified: 2025-07-17 13:20:01
 
 #!/usr/bin/env python3
 """
@@ -162,7 +162,7 @@ if __name__ == "__main__":
     print("SurgiCase Database Table Structure Extractor")
     print("=" * 50)
     
-    # Check command line arguments
+    # Check command line arguments  
     if len(sys.argv) > 1 and sys.argv[1] == "--save":
         # Save to file
         filename = sys.argv[2] if len(sys.argv) > 2 else None

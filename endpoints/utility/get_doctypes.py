@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 20:44:08
+# Last Modified: 2025-07-17 15:04:53
 
 # endpoints/utility/get_doctypes.py
 from fastapi import APIRouter, HTTPException
@@ -21,7 +21,7 @@ def get_doc_types():
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                 cursor.execute(
-                    "SELECT doc_type FROM doc_type_list"
+                    "SELECT doc_type FROM user_doc_type_list"
                 )
                 doc_types = cursor.fetchall()
 
