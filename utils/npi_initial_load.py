@@ -1,5 +1,5 @@
 # Created: 2025-07-21
-# Last Modified: 2025-07-21 14:57:52
+# Last Modified: 2025-07-21 14:59:16
 
 import os
 import sys
@@ -76,6 +76,10 @@ def load_initial_npi_data():
                 # Replace NaN values with None for MySQL compatibility
                 df_filtered = df_filtered.where(pd.notnull(df_filtered), None)
                 
+                # Additional NaN handling - convert any remaining NaN values
+                for col in df_filtered.columns:
+                    df_filtered[col] = df_filtered[col].apply(lambda x: None if pd.isna(x) or (isinstance(x, float) and pd.isna(x)) else x)
+                
                 # Prepare batch data for each table
                 batch_data = {
                     'npi_data_0': [],
@@ -108,7 +112,14 @@ def load_initial_npi_data():
 
                     # Get values in the same order as filtered columns
                     filtered_columns = list(df_filtered.columns)
-                    values = [row[col] for col in filtered_columns]
+                    values = []
+                    for col in filtered_columns:
+                        val = row[col]
+                        # Comprehensive NaN checking
+                        if pd.isna(val) or (isinstance(val, float) and pd.isna(val)) or str(val).lower() == 'nan':
+                            values.append(None)
+                        else:
+                            values.append(val)
                     batch_data[target_table].append(tuple(values))
                     
                     chunk_processed += 1
