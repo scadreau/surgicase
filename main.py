@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-17 11:51:59
+# Last Modified: 2025-07-21 15:08:25
 
 # main.py
 from fastapi import FastAPI, Request
@@ -24,6 +24,7 @@ from endpoints.facility.get_facilities import router as get_facilities_router
 from endpoints.surgeon.create_surgeon import router as create_surgeon_router
 from endpoints.surgeon.delete_surgeon import router as delete_surgeon_router
 from endpoints.surgeon.get_surgeons import router as get_surgeons_router
+from endpoints.surgeon.search_surgeon import router as search_surgeon_router
 
 from endpoints.utility.get_doctypes import router as get_doctypes_router
 from endpoints.utility.get_cpt_codes import router as get_cpt_codes_router
@@ -78,6 +79,7 @@ app.include_router(get_facilities_router, tags=["facilities"])
 app.include_router(create_surgeon_router, tags=["surgeons"])
 app.include_router(delete_surgeon_router, tags=["surgeons"])
 app.include_router(get_surgeons_router, tags=["surgeons"])
+app.include_router(search_surgeon_router, tags=["surgeons"])
 
 # Utility endpoints
 app.include_router(get_doctypes_router, tags=["utility"])
