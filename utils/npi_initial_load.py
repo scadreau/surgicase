@@ -1,5 +1,5 @@
 # Created: 2025-07-21
-# Last Modified: 2025-07-21 14:47:04
+# Last Modified: 2025-07-21 14:54:09
 
 import os
 import pandas as pd
@@ -106,6 +106,10 @@ def load_initial_npi_data():
                     
                     chunk_processed += 1
                     total_processed += 1
+                    
+                    # Progress update every 5000 rows
+                    if total_processed % 10000 == 0:
+                        print(f"Processed {total_processed:,} rows (Type 0: {entity_counts['total_0_rows']:,}, Type 1: {entity_counts['total_1_rows']:,}, Type 2: {entity_counts['total_2_rows']:,})")
                     
                     # Process batch when it reaches batch_size
                     if chunk_processed % batch_size == 0:
