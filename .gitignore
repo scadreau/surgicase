@@ -134,3 +134,6 @@ monitoring.md
 
 # Generated database table structures
 table_structures_*.sql 
+
+# NPI data
+npi_data/
