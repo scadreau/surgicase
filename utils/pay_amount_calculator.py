@@ -1,5 +1,5 @@
 # Created: 2025-07-16 14:50:43
-# Last Modified: 2025-07-17 10:17:43
+# Last Modified: 2025-07-20 23:58:10
 
 # utils/pay_amount_calculator.py
 import pymysql.cursors
@@ -84,7 +84,6 @@ def calculate_case_pay_amount(case_id: str, user_id: str, conn) -> dict:
                 ORDER BY code_pay_amount DESC, procedure_code ASC
                 LIMIT 1
             """
-            
             # Build parameters: tier first, then all procedure codes
             params = [user_tier] + codes
             cursor.execute(query, params)
