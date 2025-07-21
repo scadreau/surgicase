@@ -1,5 +1,5 @@
 # Created: 2025-07-21
-# Last Modified: 2025-07-21 14:54:09
+# Last Modified: 2025-07-21 14:55:52
 
 import os
 import pandas as pd
@@ -40,6 +40,7 @@ def load_initial_npi_data():
     
     # Record execution timestamp
     execution_ts = datetime.now()
+    start_time = datetime.now()
     
     # Connect to the database
     conn = get_db_connection()
@@ -108,8 +109,29 @@ def load_initial_npi_data():
                     total_processed += 1
                     
                     # Progress update every 5000 rows
-                    if total_processed % 10000 == 0:
-                        print(f"Processed {total_processed:,} rows (Type 0: {entity_counts['total_0_rows']:,}, Type 1: {entity_counts['total_1_rows']:,}, Type 2: {entity_counts['total_2_rows']:,})")
+                    if total_processed % 5000 == 0:
+                        elapsed_time = datetime.now() - start_time
+                        elapsed_seconds = elapsed_time.total_seconds()
+                        rows_per_second = total_processed / elapsed_seconds if elapsed_seconds > 0 else 0
+                        
+                        # Format elapsed time
+                        hours, remainder = divmod(int(elapsed_seconds), 3600)
+                        minutes, seconds = divmod(remainder, 60)
+                        elapsed_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+                        
+                        # Estimate remaining time (assuming 10M total rows)
+                        estimated_total_rows = 10000000
+                        remaining_rows = estimated_total_rows - total_processed
+                        estimated_remaining_seconds = remaining_rows / rows_per_second if rows_per_second > 0 else 0
+                        
+                        if estimated_remaining_seconds > 0:
+                            rem_hours, rem_remainder = divmod(int(estimated_remaining_seconds), 3600)
+                            rem_minutes, rem_seconds = divmod(rem_remainder, 60)
+                            remaining_str = f"{rem_hours:02d}:{rem_minutes:02d}:{rem_seconds:02d}"
+                            
+                            print(f"Processed {total_processed:,} rows (Type 0: {entity_counts['total_0_rows']:,}, Type 1: {entity_counts['total_1_rows']:,}, Type 2: {entity_counts['total_2_rows']:,}) | Elapsed: {elapsed_str} | Est. Remaining: {remaining_str} | Rate: {rows_per_second:.1f} rows/sec")
+                        else:
+                            print(f"Processed {total_processed:,} rows (Type 0: {entity_counts['total_0_rows']:,}, Type 1: {entity_counts['total_1_rows']:,}, Type 2: {entity_counts['total_2_rows']:,}) | Elapsed: {elapsed_str} | Rate: {rows_per_second:.1f} rows/sec")
                     
                     # Process batch when it reaches batch_size
                     if chunk_processed % batch_size == 0:
