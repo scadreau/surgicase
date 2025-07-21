@@ -1,10 +1,16 @@
 # Created: 2025-07-21
-# Last Modified: 2025-07-21 14:55:52
+# Last Modified: 2025-07-21 14:57:52
 
 import os
+import sys
 import pandas as pd
 import pymysql.cursors
 from datetime import datetime
+
+# Add the project root to the Python path
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
+
 from core.database import get_db_connection, close_db_connection
 
 # Constants
