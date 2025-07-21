@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-21 15:08:25
+# Last Modified: 2025-07-21 16:41:05
 
 # main.py
 from fastapi import FastAPI, Request
@@ -20,6 +20,7 @@ from endpoints.user.delete_user import router as delete_user_router
 from endpoints.facility.create_facility import router as create_facility_router
 from endpoints.facility.delete_facility import router as delete_facility_router
 from endpoints.facility.get_facilities import router as get_facilities_router
+from endpoints.facility.search_facility import router as search_facility_router
 
 from endpoints.surgeon.create_surgeon import router as create_surgeon_router
 from endpoints.surgeon.delete_surgeon import router as delete_surgeon_router
@@ -74,6 +75,7 @@ app.include_router(delete_user_router, tags=["users"])
 app.include_router(create_facility_router, tags=["facilities"])
 app.include_router(delete_facility_router, tags=["facilities"])
 app.include_router(get_facilities_router, tags=["facilities"])
+app.include_router(search_facility_router, tags=["facilities"])
 
 # Surgeon endpoints
 app.include_router(create_surgeon_router, tags=["surgeons"])
