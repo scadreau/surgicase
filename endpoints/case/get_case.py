@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 20:43:47
+# Last Modified: 2025-07-21 03:55:59
 
 # endpoints/case/get_case.py
 from fastapi import APIRouter, HTTPException, Query
@@ -43,10 +43,15 @@ def get_case(case_id: str = Query(..., description="The case ID to retrieve")):
                 if case_data["case_date"]:
                     case_data["case_date"] = case_data["case_date"].isoformat()
 
-                # fetch procedure codes - these are in a separate table and there can be multiple procedure codes for a case
-                cursor.execute("""SELECT procedure_code FROM case_procedure_codes WHERE case_id = %s""", (case_id,))
-                codes = [row['procedure_code'] for row in cursor.fetchall()]
-                case_data['procedure_codes'] = codes
+                # fetch procedure codes with descriptions - JOIN with procedure_codes table
+                cursor.execute("""
+                    SELECT cpc.procedure_code, pc.procedure_desc 
+                    FROM case_procedure_codes cpc 
+                    LEFT JOIN procedure_codes pc ON cpc.procedure_code = pc.procedure_code 
+                    WHERE cpc.case_id = %s
+                """, (case_id,))
+                procedure_data = [{'procedure_code': row['procedure_code'], 'procedure_desc': row['procedure_desc']} for row in cursor.fetchall()]
+                case_data['procedure_codes'] = procedure_data
 
             # Record successful case read operation
             business_metrics.record_case_operation("read", "success", case_id)
