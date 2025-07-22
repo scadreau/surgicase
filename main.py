@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-21 16:41:05
+# Last Modified: 2025-07-22 12:21:16
 
 # main.py
 from fastapi import FastAPI, Request
@@ -36,6 +36,7 @@ from endpoints.health import router as health_router
 from endpoints.metrics import router as metrics_router
 
 from endpoints.backoffice.get_cases_by_status import router as get_cases_by_status_router
+from endpoints.backoffice.get_users import router as get_users_router
 
 from endpoints.reports.provider_payment_report import router as provider_payment_report_router
 
@@ -97,6 +98,7 @@ app.include_router(metrics_router, tags=["monitoring"])
 
 # Backoffice endpoints
 app.include_router(get_cases_by_status_router, tags=["backoffice"])
+app.include_router(get_users_router, tags=["backoffice"])
 
 # Report endpoints
 app.include_router(provider_payment_report_router, tags=["reports"])
