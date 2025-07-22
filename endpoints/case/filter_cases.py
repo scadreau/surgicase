@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 20:44:18
+# Last Modified: 2025-07-22 12:12:40
 
 # endpoints/case/filter_cases.py
 from fastapi import APIRouter, HTTPException, Query
@@ -27,6 +27,20 @@ def get_cases(user_id: str = Query(..., description="The user ID to retrieve cas
         
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                # Get user's max_case_status from user_profile
+                cursor.execute("""
+                    SELECT max_case_status 
+                    FROM user_profile 
+                    WHERE user_id = %s AND active = 1
+                """, (user_id,))
+                user_profile = cursor.fetchone()
+                
+                if not user_profile:
+                    # If user profile not found, use default max_case_status of 20
+                    max_case_status = 20
+                else:
+                    max_case_status = user_profile["max_case_status"] or 20
+                
                 # Build query
                 sql = "SELECT user_id, case_id, case_date, patient_first, patient_last, ins_provider, surgeon_id, facility_id, case_status, demo_file, note_file, misc_file, pay_amount FROM cases WHERE user_id = %s and active = 1"
                 params = [user_id]
@@ -38,6 +52,11 @@ def get_cases(user_id: str = Query(..., description="The user ID to retrieve cas
 
                 result = []
                 for case_data in cases:
+                    # Apply case status visibility restriction
+                    original_case_status = case_data["case_status"]
+                    if original_case_status > max_case_status:
+                        case_data["case_status"] = max_case_status
+                    
                     # Convert datetime to ISO format
                     if case_data["case_date"]:
                         case_data["case_date"] = case_data["case_date"].isoformat()
@@ -58,10 +77,8 @@ def get_cases(user_id: str = Query(..., description="The user ID to retrieve cas
             "filter": status_list
         }
 
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
-        # Record failed case filtering
-        business_metrics.record_case_operation("filter", "error", f"user_{user_id}")
-        
-        if 'conn' in locals():
-            close_db_connection(conn)
         raise HTTPException(status_code=500, detail={"error": str(e)})

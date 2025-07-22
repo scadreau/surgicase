@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-21 03:55:59
+# Last Modified: 2025-07-22 12:11:06
 
 # endpoints/case/get_case.py
 from fastapi import APIRouter, HTTPException, Query
@@ -38,6 +38,26 @@ def get_case(case_id: str = Query(..., description="The case ID to retrieve")):
                         status_code=404,
                         detail={"error": "Case not found", "case_id": case_id}
                     )
+                
+                # Get user's max_case_status from user_profile
+                user_id = case_data["user_id"]
+                cursor.execute("""
+                    SELECT max_case_status 
+                    FROM user_profile 
+                    WHERE user_id = %s AND active = 1
+                """, (user_id,))
+                user_profile = cursor.fetchone()
+                
+                if not user_profile:
+                    # If user profile not found, use default max_case_status of 20
+                    max_case_status = 20
+                else:
+                    max_case_status = user_profile["max_case_status"] or 20
+                
+                # Apply case status visibility restriction
+                original_case_status = case_data["case_status"]
+                if original_case_status > max_case_status:
+                    case_data["case_status"] = max_case_status
                 
                 # Convert datetime to ISO format
                 if case_data["case_date"]:
