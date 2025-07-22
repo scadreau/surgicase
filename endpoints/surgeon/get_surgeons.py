@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 20:44:04
+# Last Modified: 2025-07-22 11:42:33
 
 # endpoints/surgeon/get_surgeons.py
 from fastapi import APIRouter, HTTPException, Query
@@ -21,7 +21,7 @@ def get_surgeons(user_id: str = Query(..., description="The user ID to retrieve 
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                 cursor.execute(
-                    "SELECT surgeon_id, first_name, last_name FROM surgeon_list WHERE user_id = %s",
+                    "SELECT surgeon_id, first_name, last_name, surgeon_npi, surgeon_addr, surgeon_city, surgeon_state, surgeon_zip FROM surgeon_list WHERE user_id = %s",
                     (user_id,)
                 )
                 surgeons = cursor.fetchall()

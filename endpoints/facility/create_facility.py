@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 20:45:08
+# Last Modified: 2025-07-22 11:39:50
 
 # endpoints/facility/create_facility.py
 from fastapi import APIRouter, HTTPException
@@ -23,8 +23,8 @@ def add_facility(facility: FacilityCreate):
         
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
             cursor.execute(
-                "INSERT INTO facility_list (user_id, facility_name) VALUES (%s, %s)",
-                (facility.user_id, facility.facility_name)
+                "INSERT INTO facility_list (user_id, facility_name, facility_npi, facility_addr, facility_city, facility_state, facility_zip) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                (facility.user_id, facility.facility_name, facility.facility_npi, facility.facility_addr, facility.facility_city, facility.facility_state, facility.facility_zip)
             )
             conn.commit()
             facility_id = cursor.lastrowid
@@ -38,7 +38,12 @@ def add_facility(facility: FacilityCreate):
                 "message": "Facility created successfully",
                 "facility_id": facility_id,
                 "user_id": facility.user_id,
-                "facility_name": facility.facility_name
+                "facility_name": facility.facility_name,
+                "facility_npi": facility.facility_npi,
+                "facility_addr": facility.facility_addr,
+                "facility_city": facility.facility_city,
+                "facility_state": facility.facility_state,
+                "facility_zip": facility.facility_zip
             }
         }
     except HTTPException:

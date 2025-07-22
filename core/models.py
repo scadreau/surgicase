@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 20:37:51
+# Last Modified: 2025-07-22 11:42:13
 
 # core/models.py
 from typing import Optional, List
@@ -88,6 +88,11 @@ class CaseRequest(BaseModel):
 class FacilityCreate(BaseModel):
     user_id: str
     facility_name: str
+    facility_npi: int
+    facility_addr: str
+    facility_city: str
+    facility_state: str
+    facility_zip: str
 
 class FacilityRequest(BaseModel):
     facility_id: int
@@ -100,6 +105,11 @@ class SurgeonCreate(BaseModel):
     user_id: str
     first_name: str
     last_name: str
+    surgeon_npi: int
+    surgeon_addr: str
+    surgeon_city: str
+    surgeon_state: str
+    surgeon_zip: str
 
 class SurgeonRequest(BaseModel):
     surgeon_id: int

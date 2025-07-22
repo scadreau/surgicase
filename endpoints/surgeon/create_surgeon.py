@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 20:45:17
+# Last Modified: 2025-07-22 11:42:25
 
 # endpoints/surgeon/create_surgeon.py
 from fastapi import APIRouter, HTTPException
@@ -23,8 +23,8 @@ def add_surgeon(surgeon: SurgeonCreate):
         
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
             cursor.execute(
-                "INSERT INTO surgeon_list (user_id, first_name, last_name) VALUES (%s, %s, %s)",
-                (surgeon.user_id, surgeon.first_name, surgeon.last_name)
+                "INSERT INTO surgeon_list (user_id, first_name, last_name, surgeon_npi, surgeon_addr, surgeon_city, surgeon_state, surgeon_zip) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                (surgeon.user_id, surgeon.first_name, surgeon.last_name, surgeon.surgeon_npi, surgeon.surgeon_addr, surgeon.surgeon_city, surgeon.surgeon_state, surgeon.surgeon_zip)
             )
             conn.commit()
             surgeon_id = cursor.lastrowid
@@ -39,7 +39,12 @@ def add_surgeon(surgeon: SurgeonCreate):
                 "surgeon_id": surgeon_id,
                 "user_id": surgeon.user_id,
                 "first_name": surgeon.first_name,
-                "last_name": surgeon.last_name
+                "last_name": surgeon.last_name,
+                "surgeon_npi": surgeon.surgeon_npi,
+                "surgeon_addr": surgeon.surgeon_addr,
+                "surgeon_city": surgeon.surgeon_city,
+                "surgeon_state": surgeon.surgeon_state,
+                "surgeon_zip": surgeon.surgeon_zip
             }
         }
     except HTTPException:

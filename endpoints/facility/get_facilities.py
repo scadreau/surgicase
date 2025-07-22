@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 20:43:58
+# Last Modified: 2025-07-22 11:39:58
 
 # endpoints/facility/get_facilities.py
 from fastapi import APIRouter, HTTPException, Query
@@ -21,7 +21,7 @@ def get_facilities(user_id: str = Query(..., description="The user ID to retriev
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                 cursor.execute(
-                    "SELECT facility_id, facility_name FROM facility_list WHERE user_id = %s",
+                    "SELECT facility_id, facility_name, facility_npi, facility_addr, facility_city, facility_state, facility_zip FROM facility_list WHERE user_id = %s",
                     (user_id,)
                 )
                 facilities = cursor.fetchall()
