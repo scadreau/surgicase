@@ -1,5 +1,5 @@
 # Created: 2025-07-21 15:08:09
-# Last Modified: 2025-07-23 14:00:48
+# Last Modified: 2025-07-23 15:55:38
 
 # endpoints/surgeon/search_surgeon.py
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -42,9 +42,9 @@ def search_surgeon(
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                 # Search using LIKE for partial matching on both names
                 cursor.execute("""
-                    SELECT npi, first_name, last_name, address, city, state, zip
-                    FROM search_surgeon 
-                    WHERE last_name LIKE %s AND first_name LIKE %s
+                    SELECT *
+                    FROM search_surgeon
+                    WHERE last_name like %s AND first_name like %s
                 """, (f"%{last_name_upper}%", f"%{first_name_upper}%"))
                 
                 surgeons = cursor.fetchall()
@@ -56,16 +56,16 @@ def search_surgeon(
                     if 'last_name' in row and row['last_name']:
                         # Properly capitalize last name
                         row['last_name'] = capitalize_name_field(row['last_name'])
-                    if 'surgeon_city' in row and row['surgeon_city']:
-                        row['surgeon_city'] = capitalize_name_field(row['surgeon_city'])
-                    if 'surgeon_addr' in row and row['surgeon_addr']:
-                        row['surgeon_addr'] = capitalize_address_field(row['surgeon_addr'])
-                    if 'facility_state' in row and row['facility_state']:
+                    if 'city' in row and row['city']:
+                        row['city'] = capitalize_name_field(row['city'])
+                    if 'address' in row and row['address']:
+                        row['address'] = capitalize_address_field(row['address'])
+                    if 'state' in row and row['state']:
                         # States are usually uppercase abbreviations, but handle full names
-                        if len(row['facility_state']) > 2:
-                            row['facility_state'] = capitalize_name_field(row['facility_state'])
+                        if len(row['state']) > 2:
+                            row['state'] = capitalize_name_field(row['state'])
                         else:
-                            row['facility_state'] = row['facility_state'].upper()
+                            row['state'] = row['state'].upper()
 
                 # Record successful surgeon search
                 business_metrics.record_surgeon_operation("search", "success", None)
