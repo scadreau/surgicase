@@ -1,11 +1,12 @@
 # Created: 2025-07-21 15:08:09
-# Last Modified: 2025-07-23 12:01:37
+# Last Modified: 2025-07-23 14:00:48
 
 # endpoints/surgeon/search_surgeon.py
 from fastapi import APIRouter, HTTPException, Query, Request
 import pymysql.cursors
 from core.database import get_db_connection, close_db_connection
 from utils.monitoring import track_business_operation, business_metrics
+from utils.text_formatting import capitalize_name_field, capitalize_address_field
 import time
 
 router = APIRouter()
@@ -34,17 +35,37 @@ def search_surgeon(
             raise HTTPException(status_code=400, detail={"error": "Both first_name and last_name are required and cannot be empty"})
 
         conn = get_db_connection()
-        
+        first_name_upper = first_name.upper()
+        last_name_upper = last_name.upper()
+
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                 # Search using LIKE for partial matching on both names
                 cursor.execute("""
                     SELECT npi, first_name, last_name, address, city, state, zip
                     FROM search_surgeon 
-                    WHERE first_name LIKE %s AND last_name LIKE %s
-                """, (f"%{first_name}%", f"%{last_name}%"))
+                    WHERE last_name LIKE %s AND first_name LIKE %s
+                """, (f"%{last_name_upper}%", f"%{first_name_upper}%"))
                 
                 surgeons = cursor.fetchall()
+
+                for row in surgeons:
+                    if 'first_name' in row and row['first_name']:
+                        # Properly capitalize first name
+                        row['first_name'] = capitalize_name_field(row['first_name'])
+                    if 'last_name' in row and row['last_name']:
+                        # Properly capitalize last name
+                        row['last_name'] = capitalize_name_field(row['last_name'])
+                    if 'surgeon_city' in row and row['surgeon_city']:
+                        row['surgeon_city'] = capitalize_name_field(row['surgeon_city'])
+                    if 'surgeon_addr' in row and row['surgeon_addr']:
+                        row['surgeon_addr'] = capitalize_address_field(row['surgeon_addr'])
+                    if 'facility_state' in row and row['facility_state']:
+                        # States are usually uppercase abbreviations, but handle full names
+                        if len(row['facility_state']) > 2:
+                            row['facility_state'] = capitalize_name_field(row['facility_state'])
+                        else:
+                            row['facility_state'] = row['facility_state'].upper()
 
                 # Record successful surgeon search
                 business_metrics.record_surgeon_operation("search", "success", None)

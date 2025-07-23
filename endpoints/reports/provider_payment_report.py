@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-07-23 11:15:33
+# Last Modified: 2025-07-23 13:59:09
 
 # endpoints/reports/provider_payment_report.py
 from fastapi import APIRouter, HTTPException, Query
@@ -9,6 +9,7 @@ from core.database import get_db_connection, close_db_connection
 from utils.monitoring import track_business_operation, business_metrics
 from utils.report_cleanup import cleanup_old_reports, get_reports_directory_size
 from utils.s3_storage import upload_file_to_s3, generate_s3_key
+from utils.text_formatting import capitalize_name_field
 from fpdf import FPDF
 from datetime import datetime
 import os
@@ -50,6 +51,11 @@ class ProviderPaymentReportPDF(FPDF):
         provider_height = self.font_size + 2
         first_name = provider_data.get('first_name', '') or ''
         last_name = provider_data.get('last_name', '') or ''
+        # Apply proper capitalization to provider names
+        if first_name:
+            first_name = capitalize_name_field(first_name)
+        if last_name:
+            last_name = capitalize_name_field(last_name)
         provider_name = f"Provider: {first_name} {last_name}".strip()
         if provider_data.get('user_npi'):
             provider_name += f" (NPI: {provider_data['user_npi']})"
@@ -82,6 +88,11 @@ class ProviderPaymentReportPDF(FPDF):
             # Format patient name
             patient_first = case.get('patient_first', '') or ''
             patient_last = case.get('patient_last', '') or ''
+            # Apply proper capitalization to patient names
+            if patient_first:
+                patient_first = capitalize_name_field(patient_first)
+            if patient_last:
+                patient_last = capitalize_name_field(patient_last)
             patient_name = f"{patient_first} {patient_last}".strip()
             
             # Format procedures

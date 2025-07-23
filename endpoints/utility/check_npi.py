@@ -1,9 +1,9 @@
 # Created: 2025-07-16 11:24:30
-# Last Modified: 2025-07-23 12:19:05
+# Last Modified: 2025-07-23 13:57:23
 
 from fastapi import APIRouter, Query, HTTPException, Request
 import requests
-from utils.smart_capitalize import smart_capitalize
+from utils.text_formatting import capitalize_name_field
 from utils.monitoring import track_business_operation, business_metrics
 import time
 
@@ -56,8 +56,8 @@ def check_npi(request: Request, npi: str = Query(..., regex="^\\d{10}$")):
             error_message = "NPI record missing name fields"
             raise HTTPException(status_code=422, detail="NPI record missing name fields.")
 
-        corrected_first = smart_capitalize(first_name)
-        corrected_last = smart_capitalize(last_name)
+        corrected_first = capitalize_name_field(first_name)
+        corrected_last = capitalize_name_field(last_name)
 
         # Record successful NPI validation
         business_metrics.record_utility_operation("npi_validation", "success")
