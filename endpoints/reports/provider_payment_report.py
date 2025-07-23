@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-07-17 13:19:03
+# Last Modified: 2025-07-23 11:15:33
 
 # endpoints/reports/provider_payment_report.py
 from fastapi import APIRouter, HTTPException, Query
@@ -154,7 +154,7 @@ def generate_provider_payment_report(
                         up.user_npi
                     FROM cases c
                     INNER JOIN user_profile up ON c.user_id = up.user_id
-                    WHERE c.case_status = 10
+                    WHERE c.case_status = 15
                     AND c.active = 1 
                     AND up.active = 1
                 """
@@ -259,7 +259,7 @@ def generate_provider_payment_report(
                 }
                 
                 # Upload to S3
-                s3_key = generate_s3_key('provider-payment', filename)
+                s3_key = generate_s3_key('', filename)
                 s3_result = upload_file_to_s3(
                     file_path=filepath,
                     s3_key=s3_key,
