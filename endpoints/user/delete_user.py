@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-22 18:54:41
+# Last Modified: 2025-07-23 09:42:08
 
 # endpoints/user/delete_user.py
 from fastapi import APIRouter, HTTPException, Query
@@ -81,8 +81,8 @@ def delete_user(user_id: str = Query(..., description="The user ID to delete")):
             # Record successful user deletion
             business_metrics.record_user_operation("delete", "success", user_id)
 
-            # Archive the deleted user (runs in background thread)
-            # Note: This now includes S3 user document movement and will raise exceptions on failure
+            # Archive the deleted user
+            # Note: This includes S3 user document movement and will raise exceptions on failure
             try:
                 archive_deleted_user(user_id)
             except Exception as archive_error:

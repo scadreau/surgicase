@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-22 18:43:50
+# Last Modified: 2025-07-23 09:42:11
 
 # endpoints/case/delete_case.py
 from fastapi import APIRouter, HTTPException, Query
@@ -81,8 +81,8 @@ def delete_case(case_id: str = Query(..., description="The case ID to delete")):
             # Record successful case deletion
             business_metrics.record_case_operation("delete", "success", case_id)
 
-            # Archive the deleted case (runs in background thread)
-            # Note: This now includes S3 file movement and will raise exceptions on failure
+            # Archive the deleted case
+            # Note: This includes S3 file movement and will raise exceptions on failure
             try:
                 archive_deleted_case(case_id)
             except Exception as archive_error:
