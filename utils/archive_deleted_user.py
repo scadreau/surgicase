@@ -1,5 +1,5 @@
 # Created: 2025-07-15 20:26:30
-# Last Modified: 2025-07-22 18:54:27
+# Last Modified: 2025-07-22 19:05:22
 
 # utils/archive_deleted_user.py
 
@@ -58,14 +58,14 @@ def archive_deleted_user(user_id: str):
                         INSERT INTO deleted_users (
                             user_id, user_email, first_name, last_name, addr1, addr2,
                             city, state, zipcode, telephone, user_npi, referred_by_user,
-                            user_type, message_pref, create_ts, last_login_dt, active, states_licensed, last_updated_ts, user_tier
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            user_type, message_pref, create_ts, last_login_dt, active, states_licensed, last_updated_ts, user_tier, max_case_status
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
                         user["user_id"], user["user_email"], user["first_name"], user["last_name"],
                         user["addr1"], user["addr2"], user["city"], user["state"], user["zipcode"],
                         user["telephone"], user["user_npi"], user["referred_by_user"], user["user_type"],
                         user["message_pref"], user.get("create_ts"), user.get("last_login_dt"), user.get("active"), 
-                        user["states_licensed"], user.get("last_updated_ts"), user["user_tier"]
+                        user["states_licensed"], user.get("last_updated_ts"), user["user_tier"], user.get("max_case_status")
                     ))
                     
                     # Archive associated user documents
