@@ -1,7 +1,7 @@
 # Created: 2025-07-16 12:20:00
-# Last Modified: 2025-07-17 13:20:01
+# Last Modified: 2025-07-23 11:59:02
 
-#!/usr/bin/env python3
+# utils/get_table_structures.py
 """
 Script to fetch all CREATE TABLE statements from the database.
 This will provide a complete view of the current table structures.

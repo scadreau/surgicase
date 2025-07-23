@@ -1,13 +1,14 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-23 09:42:08
+# Last Modified: 2025-07-23 11:50:37
 
 # endpoints/user/delete_user.py
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 import pymysql.cursors
 import pymysql
 import json
 import datetime as dt
+import time
 from core.database import get_db_connection, close_db_connection, is_connection_valid
 from utils.monitoring import track_business_operation, business_metrics
 from utils.archive_deleted_user import archive_deleted_user
@@ -16,13 +17,20 @@ router = APIRouter()
 
 @router.delete("/user")
 @track_business_operation("delete", "user")
-def delete_user(user_id: str = Query(..., description="The user ID to delete")):
+def delete_user(request: Request, user_id: str = Query(..., description="The user ID to delete")):
     """
     Delete (deactivate) user by user_id
     """
     conn = None
+    start_time = time.time()
+    response_status = 200
+    response_data = None
+    error_message = None
+    
     try:
         if not user_id:
+            response_status = 400
+            error_message = "Missing user_id parameter"
             raise HTTPException(status_code=400, detail="Missing user_id parameter")
 
         print(f"INFO: Connecting to database")
@@ -38,10 +46,13 @@ def delete_user(user_id: str = Query(..., description="The user ID to delete")):
                 print(f"ERROR: User not found - user_id: {user_id}")
                 # Record failed user deletion (not found)
                 business_metrics.record_user_operation("delete", "not_found", user_id)
-                return {
+                response_status = 404
+                error_message = "User not found"
+                response_data = {
                     "statusCode": 404,
                     "body": {"error": "User not found", "user_id":  user_id}
                 }
+                return response_data
 
             current_active_status = user_data.get('active')
             print(f"INFO: User found - user_id: {user_id}, current active status: {current_active_status}")
@@ -51,7 +62,7 @@ def delete_user(user_id: str = Query(..., description="The user ID to delete")):
                 print(f"WARNING: User already inactive - user_id: {user_id}")
                 # Record user deletion (already inactive)
                 business_metrics.record_user_operation("delete", "already_inactive", user_id)
-                return {
+                response_data = {
                     "statusCode": 200,
                     "body": {
                         "message": "User already inactive",
@@ -59,6 +70,7 @@ def delete_user(user_id: str = Query(..., description="The user ID to delete")):
                         "active": 0
                     }
                 }
+                return response_data
 
             # Soft delete: set active = 0
             cursor.execute("""UPDATE user_profile SET active = 0 WHERE user_id = %s""", (user_id,))
@@ -68,10 +80,13 @@ def delete_user(user_id: str = Query(..., description="The user ID to delete")):
                 print(f"ERROR: Failed to update user active status - user_id: {user_id}")
                 # Record failed user deletion
                 business_metrics.record_user_operation("delete", "update_failed", user_id)
-                return {
+                response_status = 500
+                error_message = "Failed to deactivate user"
+                response_data = {
                     "statusCode": 500,
                     "body": {"error": "Failed to deactivate user", "user_id": user_id}
                 }
+                return response_data
 
             print(f"SUCCESS: User soft deleted (deactivated) - user_id: {user_id}, rows affected: {cursor.rowcount}")
 
@@ -96,11 +111,13 @@ def delete_user(user_id: str = Query(..., description="The user ID to delete")):
                     print(f"INFO: Rolled back user soft delete due to archive failure - user_id: {user_id}")
                 except Exception as rollback_error:
                     print(f"CRITICAL: Failed to rollback user soft delete - user_id: {user_id}, error: {str(rollback_error)}")
-                
+             
                 # Record failed user deletion due to archive/S3 failure
                 business_metrics.record_user_operation("delete", "archive_failed", user_id)
                 
-                return {
+                response_status = 500
+                error_message = f"User deletion failed during archive/S3 operations: {str(archive_error)}"
+                response_data = {
                     "statusCode": 500,
                     "body": {
                         "error": f"User deletion failed during archive/S3 operations: {str(archive_error)}",
@@ -108,8 +125,9 @@ def delete_user(user_id: str = Query(..., description="The user ID to delete")):
                         "details": "User has been restored to active status"
                     }
                 }
+                return response_data
 
-        return {
+        response_data = {
             "statusCode": 200,
             "body": {
                 "message": "User deactivated successfully",
@@ -118,31 +136,43 @@ def delete_user(user_id: str = Query(..., description="The user ID to delete")):
                 "deactivated_at": dt.datetime.now(dt.timezone.utc).isoformat() 
             }
         }
+        return response_data
 
-    except HTTPException:
-        # Re-raise HTTP exceptions without rollback
+    except HTTPException as http_error:
+        # Re-raise HTTP exceptions and capture error details
+        response_status = http_error.status_code
+        error_message = str(http_error.detail)
         raise
     except Exception as e:
-        error_msg = f"ERROR: Exception occurred during user soft delete - user_id: {user_id if 'user_id' in locals() else 'unknown'}, error: {str(e)}"
-        print(error_msg)
-        
         # Record failed user deletion
-        business_metrics.record_user_operation("delete", "error", user_id if 'user_id' in locals() else 'unknown')
-
+        response_status = 500
+        error_message = str(e)
+        business_metrics.record_user_operation("delete", "error", user_id)
+        
         # Safe rollback with connection state check
         if conn and is_connection_valid(conn):
             try:
-                print("INFO: Rolling back database transaction due to error")
                 conn.rollback()
             except (pymysql.err.InterfaceError, pymysql.err.OperationalError) as rollback_error:
                 # Log rollback error but don't raise it
                 print(f"Rollback failed: {rollback_error}")
-
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": str(e)})
-        }
+        raise HTTPException(status_code=500, detail={"error": str(e)})
+        
     finally:
+        # Calculate execution time
+        execution_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Log request details for monitoring using the utility function
+        from endpoints.utility.log_request import log_request_from_endpoint
+        log_request_from_endpoint(
+            request=request,
+            execution_time_ms=execution_time_ms,
+            response_status=response_status,
+            user_id=user_id,
+            response_data=response_data,
+            error_message=error_message
+        )
+        
         # Always close the connection
         if conn:
             close_db_connection(conn)

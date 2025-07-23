@@ -52,7 +52,7 @@ The endpoint returns a PDF file with the following structure:
    - Page numbering
 
 2. **Provider Sections** (Each provider gets their own page)
-   - Provider name: "Dr. {first_name} {last_name}"
+   - Provider name: " {first_name} {last_name}"
    - NPI number (if available)
    - Case details table with:
      - Procedure date
@@ -217,7 +217,9 @@ curl -X GET "http://localhost:8000/provider-report?start_date=2025-01-01&end_dat
 
 ## Changelog
 
-- **2025-01-27**: Initial implementation
+- **2025-07-23**: Fixed path duplication
+  - Fixed path duplication in S3
+- **2025-07-17**: Initial implementation
   - Basic PDF generation with provider grouping
   - File storage in reports directory
   - Automatic cleanup of old files

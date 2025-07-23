@@ -1,11 +1,12 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-16 14:53:53
+# Last Modified: 2025-07-23 12:06:02
 
 # endpoints/case/update_case.py
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, HTTPException, Body, Request
 import pymysql.cursors
 import pymysql
 import logging
+import time
 from core.database import get_db_connection, close_db_connection, is_connection_valid
 from core.models import CaseUpdate
 from utils.case_status import update_case_status
@@ -18,16 +19,26 @@ router = APIRouter()
 
 @router.patch("/case")
 @track_business_operation("update", "case")
-def update_case(case: CaseUpdate = Body(...)):
+def update_case(request: Request, case: CaseUpdate = Body(...)):
     """
     Update fields in cases and replace procedure codes if provided. Only case_id is required.
     """
     conn = None
+    start_time = time.time()
+    response_status = 200
+    response_data = None
+    error_message = None
+    user_id = None
+    
     try:
         update_fields = {k: v for k, v in case.dict().items() if k not in ("case_id", "procedure_codes") and v is not None}
         if not case.case_id:
+            response_status = 400
+            error_message = "Missing case_id parameter"
             raise HTTPException(status_code=400, detail="Missing case_id parameter")
         if not update_fields and case.procedure_codes is None:
+            response_status = 400
+            error_message = "No fields to update"
             raise HTTPException(status_code=400, detail="No fields to update")
 
         conn = get_db_connection()
@@ -38,6 +49,8 @@ def update_case(case: CaseUpdate = Body(...)):
             if not cursor.fetchone():
                 # Record failed case update (not found)
                 business_metrics.record_case_operation("update", "not_found", case.case_id)
+                response_status = 404
+                error_message = "Case not found"
                 raise HTTPException(status_code=404, detail={"error": "Case not found", "case_id": case.case_id})
 
             updated_fields = []
@@ -66,6 +79,8 @@ def update_case(case: CaseUpdate = Body(...)):
             if not updated_fields:
                 # Record failed case update (no changes)
                 business_metrics.record_case_operation("update", "no_changes", case.case_id)
+                response_status = 400
+                error_message = "No changes made to case"
                 raise HTTPException(status_code=400, detail="No changes made to case")
 
             # Calculate and update pay amount if procedure codes were updated or if we need to recalculate
@@ -99,7 +114,7 @@ def update_case(case: CaseUpdate = Body(...)):
             # Record successful case update
             business_metrics.record_case_operation("update", "success", case.case_id)
 
-        return {
+        response_data = {
             "statusCode": 200,
             "body": {
                 "message": "Case updated successfully",
@@ -109,12 +124,17 @@ def update_case(case: CaseUpdate = Body(...)):
                 "pay_amount_update": pay_amount_result
             }
         }
+        return response_data
 
-    except HTTPException:
-        # Re-raise HTTP exceptions without rollback
+    except HTTPException as http_error:
+        # Re-raise HTTP exceptions and capture error details
+        response_status = http_error.status_code
+        error_message = str(http_error.detail)
         raise
     except Exception as e:
         # Record failed case update
+        response_status = 500
+        error_message = str(e)
         business_metrics.record_case_operation("update", "error", case.case_id)
         
         # Safe rollback with connection state check
@@ -125,7 +145,22 @@ def update_case(case: CaseUpdate = Body(...)):
                 # Log rollback error but don't raise it
                 print(f"Rollback failed: {rollback_error}")
         raise HTTPException(status_code=500, detail={"error": str(e)})
+        
     finally:
+        # Calculate execution time
+        execution_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Log request details for monitoring using the utility function
+        from endpoints.utility.log_request import log_request_from_endpoint
+        log_request_from_endpoint(
+            request=request,
+            execution_time_ms=execution_time_ms,
+            response_status=response_status,
+            user_id=user_id,
+            response_data=response_data,
+            error_message=error_message
+        )
+        
         # Always close the connection
         if conn:
             close_db_connection(conn)

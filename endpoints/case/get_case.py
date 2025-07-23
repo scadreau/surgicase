@@ -1,22 +1,32 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-22 12:11:06
+# Last Modified: 2025-07-23 12:05:30
 
 # endpoints/case/get_case.py
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 import pymysql.cursors
 from core.database import get_db_connection, close_db_connection
 from utils.monitoring import track_business_operation, business_metrics
+import time
 
 router = APIRouter()
 
 @router.get("/case")
 @track_business_operation("read", "case")
-def get_case(case_id: str = Query(..., description="The case ID to retrieve")):
+def get_case(request: Request, case_id: str = Query(..., description="The case ID to retrieve")):
     """
     Retrieve case information by case_id
     """
+    conn = None
+    start_time = time.time()
+    response_status = 200
+    response_data = None
+    error_message = None
+    user_id = None
+    
     try:
         if not case_id:
+            response_status = 400
+            error_message = "Missing case_id parameter"
             raise HTTPException(status_code=400, detail="Missing case_id parameter")
 
         conn = get_db_connection()
@@ -34,6 +44,8 @@ def get_case(case_id: str = Query(..., description="The case ID to retrieve")):
                 if not case_data:
                     # Record failed case read operation
                     business_metrics.record_case_operation("read", "not_found", case_id)
+                    response_status = 404
+                    error_message = "Case not found"
                     raise HTTPException(
                         status_code=404,
                         detail={"error": "Case not found", "case_id": case_id}
@@ -79,14 +91,34 @@ def get_case(case_id: str = Query(..., description="The case ID to retrieve")):
         finally:
             close_db_connection(conn)
 
-        return {
+        response_data = {
             "case": case_data,
             "user_id": case_data["user_id"],
             "case_id": case_id
         }
+        return response_data
 
-    except HTTPException:
-        # Re-raise HTTP exceptions as-is
+    except HTTPException as http_error:
+        # Re-raise HTTP exceptions and capture error details
+        response_status = http_error.status_code
+        error_message = str(http_error.detail)
         raise
     except Exception as e:
+        response_status = 500
+        error_message = str(e)
         raise HTTPException(status_code=500, detail={"error": str(e)})
+        
+    finally:
+        # Calculate execution time
+        execution_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Log request details for monitoring using the utility function
+        from endpoints.utility.log_request import log_request_from_endpoint
+        log_request_from_endpoint(
+            request=request,
+            execution_time_ms=execution_time_ms,
+            response_status=response_status,
+            user_id=user_id,
+            response_data=response_data,
+            error_message=error_message
+        )

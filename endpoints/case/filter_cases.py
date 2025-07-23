@@ -1,21 +1,28 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-22 12:12:40
+# Last Modified: 2025-07-23 11:59:43
 
 # endpoints/case/filter_cases.py
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 import pymysql.cursors
 from core.database import get_db_connection, close_db_connection
 from utils.monitoring import track_business_operation, business_metrics
+import time
 
 router = APIRouter()
 
 @router.get("/casefilter")
 @track_business_operation("filter", "case")
-def get_cases(user_id: str = Query(..., description="The user ID to retrieve cases for"), filter: str = Query("", description="Comma-separated list of case_status values (e.g. 0,1,2)")):
+def get_cases(request: Request, user_id: str = Query(..., description="The user ID to retrieve cases for"), filter: str = Query("", description="Comma-separated list of case_status values (e.g. 0,1,2)")):
     """
     Retrieve all cases for a user_id, filtered by case_status values.
     Returns a list of cases in the same format as get_case.
     """
+    conn = None
+    start_time = time.time()
+    response_status = 200
+    response_data = None
+    error_message = None
+    
     try:
         # Parse filter string into a list of integers
         if filter:
@@ -71,14 +78,35 @@ def get_cases(user_id: str = Query(..., description="The user ID to retrieve cas
             
         finally:
             close_db_connection(conn)
-        return {
+            
+        response_data = {
             "cases": result,
             "user_id": user_id,
             "filter": status_list
         }
+        return response_data
 
-    except HTTPException:
-        # Re-raise HTTP exceptions as-is
+    except HTTPException as http_error:
+        # Re-raise HTTP exceptions and capture error details
+        response_status = http_error.status_code
+        error_message = str(http_error.detail)
         raise
     except Exception as e:
+        response_status = 500
+        error_message = str(e)
         raise HTTPException(status_code=500, detail={"error": str(e)})
+        
+    finally:
+        # Calculate execution time
+        execution_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Log request details for monitoring using the utility function
+        from endpoints.utility.log_request import log_request_from_endpoint
+        log_request_from_endpoint(
+            request=request,
+            execution_time_ms=execution_time_ms,
+            response_status=response_status,
+            user_id=user_id,
+            response_data=response_data,
+            error_message=error_message
+        )

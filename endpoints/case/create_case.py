@@ -1,8 +1,8 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-16 14:53:41
+# Last Modified: 2025-07-23 11:59:30
 
 # endpoints/case/create_case.py
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi import Depends
 import pymysql.cursors
 import pymysql
@@ -12,6 +12,7 @@ from utils.case_status import update_case_status
 from utils.pay_amount_calculator import update_case_pay_amount
 from utils.monitoring import track_business_operation, business_metrics
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -72,13 +73,20 @@ def create_case_with_procedures(case: CaseCreate, conn) -> dict:
             "pay_amount_update": pay_amount_result
         }
 
+
+
 @router.post("/case")
 @track_business_operation("create", "case")
-def add_case(case: CaseCreate):
+def add_case(case: CaseCreate, request: Request):
     """
     Add a new case to the cases table and its procedure codes to case_procedure_codes table.
     """
     conn = None
+    start_time = time.time()
+    response_status = 200
+    response_data = None
+    error_message = None
+    
     try:
         logger.info(f"Creating case with ID: {case.case_id}")
         logger.info(f"Case data: {case}")
@@ -87,6 +95,8 @@ def add_case(case: CaseCreate):
         
         # Check if case already exists before starting transaction
         if case_exists(case.case_id, conn):
+            response_status = 409
+            error_message = "Case already exists"
             business_metrics.record_case_operation("create", "duplicate", case.case_id)
             raise HTTPException(
                 status_code=409, 
@@ -105,7 +115,8 @@ def add_case(case: CaseCreate):
         # Commit all changes at once
         conn.commit()
         
-        return {
+        response_status = 201
+        response_data = {
             "message": "Case and procedure codes created successfully",
             "user_id": case.user_id,
             "case_id": case.case_id,
@@ -113,13 +124,18 @@ def add_case(case: CaseCreate):
             "status_update": status_update_result["status_update"],
             "pay_amount_update": status_update_result["pay_amount_update"]
         }
+        
+        return response_data
 
-    except HTTPException:
-        # Re-raise HTTP exceptions without rollback (no transaction started yet)
+    except HTTPException as http_error:
+        # Re-raise HTTP exceptions and capture error details
+        error_message = str(http_error.detail)
         raise
         
     except Exception as e:
         # Record failed case creation
+        response_status = 500
+        error_message = str(e)
         business_metrics.record_case_operation("create", "error", case.case_id)
         if conn and is_connection_valid(conn):
             try:
@@ -131,6 +147,20 @@ def add_case(case: CaseCreate):
         raise HTTPException(status_code=500, detail={"error": str(e)})
         
     finally:
+        # Calculate execution time
+        execution_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Log request details for monitoring using the utility function
+        from endpoints.utility.log_request import log_request_from_endpoint
+        log_request_from_endpoint(
+            request=request,
+            execution_time_ms=execution_time_ms,
+            response_status=response_status,
+            user_id=case.user_id,
+            response_data=response_data,
+            error_message=error_message
+        )
+        
         # Always close the connection
         if conn:
             close_db_connection(conn)
