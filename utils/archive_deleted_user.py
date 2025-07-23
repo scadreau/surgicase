@@ -1,5 +1,5 @@
 # Created: 2025-07-15 20:26:30
-# Last Modified: 2025-07-22 17:37:19
+# Last Modified: 2025-07-22 18:54:27
 
 # utils/archive_deleted_user.py
 
@@ -8,12 +8,14 @@ import pymysql
 import pymysql.cursors
 import logging
 from core.database import get_db_connection, close_db_connection
+from utils.s3_user_files import move_user_documents_to_deleted
 
 logger = logging.getLogger(__name__)
 
 def archive_deleted_user(user_id: str):
     def worker():
         conn = None
+        s3_move_result = None
         try:
             conn = get_db_connection()
             # Start transaction
@@ -27,6 +29,30 @@ def archive_deleted_user(user_id: str):
                 user = cursor.fetchone()
 
                 if user:
+                    # Get user documents for S3 operations
+                    cursor.execute("""
+                        SELECT document_type, document_name 
+                        FROM user_documents 
+                        WHERE user_id = %s
+                    """, (user_id,))
+                    user_documents = [(row['document_type'], row['document_name']) for row in cursor.fetchall()]
+                    
+                    # Move S3 user documents before database archiving
+                    logger.info(f"Starting S3 user document movement for user {user_id}")
+                    s3_move_result = move_user_documents_to_deleted(
+                        user_id=user_id,
+                        user_documents=user_documents
+                    )
+                    
+                    # Check if S3 file movement was successful
+                    if not s3_move_result["success"]:
+                        error_msg = f"S3 user document movement failed for user {user_id}: {s3_move_result['message']}"
+                        if s3_move_result["errors"]:
+                            error_msg += f" Errors: {'; '.join(s3_move_result['errors'])}"
+                        logger.error(error_msg)
+                        raise Exception(error_msg)
+                    
+                    logger.info(f"S3 user documents moved successfully for user {user_id}: {s3_move_result['files_moved']} files")
                     # Archive the user
                     cursor.execute("""
                         INSERT INTO deleted_users (
@@ -122,7 +148,7 @@ def archive_deleted_user(user_id: str):
                     """, (user_id,))
                     
                     conn.commit()
-                    logger.info(f"archived_user_success - user_id: {user_id}")
+                    logger.info(f"archived_user_success - user_id: {user_id}, s3_files_moved: {s3_move_result['files_moved']}")
                 else:
                     logger.warning(f"archived_user_not_found_or_active - user_id: {user_id}")
 
@@ -130,8 +156,15 @@ def archive_deleted_user(user_id: str):
             if conn:
                 conn.rollback()
                 logger.error(f"archive_user_failed_rolled_back - user_id: {user_id}, error: {str(e)}")
+                
+                # Log S3 movement details if available
+                if s3_move_result:
+                    logger.error(f"S3 user document movement result: {s3_move_result}")
             else:
                 logger.error(f"archive_user_failed - user_id: {user_id}, error: {str(e)}")
+            
+            # Re-raise the exception so delete_user can handle the failure
+            raise e
         finally:
             if conn:
                 close_db_connection(conn)

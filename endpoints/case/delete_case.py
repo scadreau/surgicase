@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 20:44:26
+# Last Modified: 2025-07-22 18:43:50
 
 # endpoints/case/delete_case.py
 from fastapi import APIRouter, HTTPException, Query
@@ -82,7 +82,32 @@ def delete_case(case_id: str = Query(..., description="The case ID to delete")):
             business_metrics.record_case_operation("delete", "success", case_id)
 
             # Archive the deleted case (runs in background thread)
-            archive_deleted_case(case_id)
+            # Note: This now includes S3 file movement and will raise exceptions on failure
+            try:
+                archive_deleted_case(case_id)
+            except Exception as archive_error:
+                # If archiving (including S3 movement) fails, we need to rollback the soft delete
+                print(f"ERROR: Archive operation failed for case {case_id}: {str(archive_error)}")
+                
+                # Rollback the soft delete by setting active = 1
+                try:
+                    cursor.execute("""UPDATE cases SET active = 1 WHERE case_id = %s""", (case_id,))
+                    conn.commit()
+                    print(f"INFO: Rolled back case soft delete due to archive failure - case_id: {case_id}")
+                except Exception as rollback_error:
+                    print(f"CRITICAL: Failed to rollback case soft delete - case_id: {case_id}, error: {str(rollback_error)}")
+                
+                # Record failed case deletion due to archive/S3 failure
+                business_metrics.record_case_operation("delete", "archive_failed", case_id)
+                
+                return {
+                    "statusCode": 500,
+                    "body": {
+                        "error": f"Case deletion failed during archive/S3 operations: {str(archive_error)}",
+                        "case_id": case_id,
+                        "details": "Case has been restored to active status"
+                    }
+                }
 
         return {
             "statusCode": 200,

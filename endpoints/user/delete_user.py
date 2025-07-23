@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-22 17:36:34
+# Last Modified: 2025-07-22 18:54:41
 
 # endpoints/user/delete_user.py
 from fastapi import APIRouter, HTTPException, Query
@@ -82,7 +82,32 @@ def delete_user(user_id: str = Query(..., description="The user ID to delete")):
             business_metrics.record_user_operation("delete", "success", user_id)
 
             # Archive the deleted user (runs in background thread)
-            archive_deleted_user(user_id)
+            # Note: This now includes S3 user document movement and will raise exceptions on failure
+            try:
+                archive_deleted_user(user_id)
+            except Exception as archive_error:
+                # If archiving (including S3 movement) fails, we need to rollback the soft delete
+                print(f"ERROR: Archive operation failed for user {user_id}: {str(archive_error)}")
+                
+                # Rollback the soft delete by setting active = 1
+                try:
+                    cursor.execute("""UPDATE user_profile SET active = 1 WHERE user_id = %s""", (user_id,))
+                    conn.commit()
+                    print(f"INFO: Rolled back user soft delete due to archive failure - user_id: {user_id}")
+                except Exception as rollback_error:
+                    print(f"CRITICAL: Failed to rollback user soft delete - user_id: {user_id}, error: {str(rollback_error)}")
+                
+                # Record failed user deletion due to archive/S3 failure
+                business_metrics.record_user_operation("delete", "archive_failed", user_id)
+                
+                return {
+                    "statusCode": 500,
+                    "body": {
+                        "error": f"User deletion failed during archive/S3 operations: {str(archive_error)}",
+                        "user_id": user_id,
+                        "details": "User has been restored to active status"
+                    }
+                }
 
         return {
             "statusCode": 200,
