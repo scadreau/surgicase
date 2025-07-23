@@ -1,20 +1,27 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 20:44:13
+# Last Modified: 2025-07-23 12:18:43
 
 # endpoints/utility/get_cpt_codes.py
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 import pymysql.cursors
 from core.database import get_db_connection, close_db_connection
 from utils.monitoring import track_business_operation, business_metrics
+import time
 
 router = APIRouter()
 
 @router.get("/cpt_codes")
 @track_business_operation("get", "cpt_codes")
-def get_cpt_codes():
+def get_cpt_codes(request: Request):
     """
     Get all CPT codes.
     """
+    conn = None
+    start_time = time.time()
+    response_status = 200
+    response_data = None
+    error_message = None
+    
     try:
         conn = get_db_connection()
         
@@ -29,15 +36,37 @@ def get_cpt_codes():
         finally:
             close_db_connection(conn)
             
-        return {
+        response_data = {
             "cpt_codes": cpt_codes
         }
-    except HTTPException:
+        return response_data
+        
+    except HTTPException as http_error:
+        # Re-raise HTTP exceptions and capture error details
+        response_status = http_error.status_code
+        error_message = str(http_error.detail)
         raise
     except Exception as e:
         # Record failed CPT codes retrieval
+        response_status = 500
+        error_message = str(e)
         business_metrics.record_utility_operation("get_cpt_codes", "error")
         
         if 'conn' in locals():
             close_db_connection(conn)
         raise HTTPException(status_code=500, detail={"error": str(e)})
+        
+    finally:
+        # Calculate execution time
+        execution_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Log request details for monitoring using the utility function
+        from endpoints.utility.log_request import log_request_from_endpoint
+        log_request_from_endpoint(
+            request=request,
+            execution_time_ms=execution_time_ms,
+            response_status=response_status,
+            user_id=None,  # No user_id available in utility endpoints
+            response_data=response_data,
+            error_message=error_message
+        )

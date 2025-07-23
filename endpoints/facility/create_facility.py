@@ -1,23 +1,29 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-22 11:39:50
+# Last Modified: 2025-07-23 12:16:38
 
 # endpoints/facility/create_facility.py
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 import pymysql.cursors
 import pymysql
 from core.database import get_db_connection, close_db_connection, is_connection_valid
 from core.models import FacilityCreate
 from utils.monitoring import track_business_operation, business_metrics
+import time
 
 router = APIRouter()
 
 @router.post("/facility")
 @track_business_operation("create", "facility")
-def add_facility(facility: FacilityCreate):
+def add_facility(request: Request, facility: FacilityCreate):
     """
     Add a new facility for a user.
     """
     conn = None
+    start_time = time.time()
+    response_status = 201
+    response_data = None
+    error_message = None
+    
     try:
         conn = get_db_connection()
         
@@ -32,7 +38,7 @@ def add_facility(facility: FacilityCreate):
             # Record successful facility creation
             business_metrics.record_facility_operation("create", "success", facility_id)
             
-        return {
+        response_data = {
             "statusCode": 201,
             "body": {
                 "message": "Facility created successfully",
@@ -46,11 +52,17 @@ def add_facility(facility: FacilityCreate):
                 "facility_zip": facility.facility_zip
             }
         }
-    except HTTPException:
-        # Re-raise HTTP exceptions without rollback
+        return response_data
+        
+    except HTTPException as http_error:
+        # Re-raise HTTP exceptions and capture error details
+        response_status = http_error.status_code
+        error_message = str(http_error.detail)
         raise
     except Exception as e:
         # Record failed facility creation
+        response_status = 500
+        error_message = str(e)
         business_metrics.record_facility_operation("create", "error", None)
         
         # Safe rollback with connection state check
@@ -61,7 +73,22 @@ def add_facility(facility: FacilityCreate):
                 # Log rollback error but don't raise it
                 print(f"Rollback failed: {rollback_error}")
         raise HTTPException(status_code=500, detail={"error": str(e)})
+        
     finally:
+        # Calculate execution time
+        execution_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Log request details for monitoring using the utility function
+        from endpoints.utility.log_request import log_request_from_endpoint
+        log_request_from_endpoint(
+            request=request,
+            execution_time_ms=execution_time_ms,
+            response_status=response_status,
+            user_id=facility.user_id,
+            response_data=response_data,
+            error_message=error_message
+        )
+        
         # Always close the connection
         if conn:
             close_db_connection(conn)

@@ -2,7 +2,17 @@
 
 ## Overview
 
-The SurgiCase API implements a comprehensive request logging system that provides detailed monitoring, analytics, and audit capabilities across all critical endpoints. This system captures request details, performance metrics, error information, and business intelligence data for operational insights and compliance requirements.
+The SurgiCase API implements a comprehensive request logging system that provides detailed monitoring, analytics, and audit capabilities across **22 critical endpoints** covering complete CRUD operations for cases, users, facilities, and surgeons, plus administrative, search, and utility functions. This system captures request details, performance metrics, error information, and business intelligence data for operational insights and compliance requirements.
+
+### Coverage Summary
+- **Complete Case Management**: All CRUD operations (Create, Read, Update, Delete, Filter)
+- **Complete User Management**: All CRUD operations (Create, Read, Update, Delete)
+- **Complete Facility Management**: Create, Read, Delete operations with user context
+- **Complete Surgeon Management**: Create, Read, Delete operations with user context
+- **Administrative Functions**: Backoffice operations with permission tracking
+- **Search Operations**: Facility and surgeon search with pattern analysis
+- **Utility Functions**: Reference data, validation, and external API integration
+- **22 Total Endpoints**: Enterprise-level monitoring across all API functions
 
 ## Architecture
 
@@ -136,21 +146,70 @@ def endpoint_function(request: Request, ...):
 
 ## Monitored Endpoints
 
-### Case Management
+### Case Management (Complete CRUD Coverage)
 - **`POST /case`** - Case creation with comprehensive transaction logging
-- **`GET /casefilter`** - Case filtering with query parameter tracking
+- **`GET /case`** - Individual case retrieval with access pattern tracking
+- **`PATCH /case`** - Case updates with field-level change tracking
 - **`DELETE /case`** - Case deletion with S3 archive operation monitoring
+- **`GET /casefilter`** - Case filtering with query parameter tracking
 
-### User Management
+### User Management (Complete CRUD Coverage)
+- **`POST /user`** - User creation with profile and document logging
+- **`GET /user`** - Individual user retrieval with access pattern tracking
+- **`PATCH /user`** - User updates with field-level change tracking
 - **`DELETE /user`** - User deletion with archive and S3 document tracking
 
 ### Administrative Functions
 - **`GET /casesbystatus`** - Administrative case retrieval with permission tracking
 - **`GET /users`** - User list access with authorization monitoring
 
+### Facility Management (Complete CRD Coverage)
+- **`POST /facility`** - Facility creation with transaction logging and user context
+- **`GET /facilities`** - Facility retrieval with user-specific data access
+- **`DELETE /facility`** - Facility deletion with error tracking and validation
+
+### Surgeon Management (Complete CRD Coverage)
+- **`POST /surgeon`** - Surgeon creation with transaction logging and user context
+- **`GET /surgeons`** - Surgeon retrieval with user-specific data access
+- **`DELETE /surgeon`** - Surgeon deletion with error tracking and validation
+
 ### Search Operations
 - **`GET /search-facility`** - Facility search with query pattern analysis
 - **`GET /search-surgeon`** - Surgeon search with multi-parameter tracking
+
+### Utility Functions
+- **`GET /doctypes`** - Document types retrieval with reference data monitoring
+- **`GET /cpt_codes`** - CPT codes retrieval with database performance tracking
+- **`GET /check_npi`** - NPI validation with external API integration monitoring
+
+## Complete Monitoring Coverage
+
+| Category | Endpoint | Method | Operation | Key Tracking Features |
+|----------|----------|--------|-----------|----------------------|
+| **Case Management** | `/case` | POST | Create | Transaction logging, validation, procedure codes |
+| | `/case` | GET | Read | Access patterns, user context, status filtering |
+| | `/case` | PATCH | Update | Field-level changes, pay calculations, status updates |
+| | `/case` | DELETE | Delete | S3 archival, rollback tracking, file management |
+| | `/casefilter` | GET | Filter | Query parameters, result sets, permission checks |
+| **User Management** | `/user` | POST | Create | Profile creation, document uploads, validation |
+| | `/user` | GET | Read | Profile access, document retrieval, activity tracking |
+| | `/user` | PATCH | Update | Field updates, document management, change tracking |
+| | `/user` | DELETE | Delete | Archive operations, S3 document handling, rollbacks |
+| **Facility Management** | `/facility` | POST | Create | Facility creation, user context, transaction logging |
+| | `/facilities` | GET | Read | User-specific facility retrieval, access patterns |
+| | `/facility` | DELETE | Delete | Facility deletion, error tracking, validation |
+| **Surgeon Management** | `/surgeon` | POST | Create | Surgeon creation, user context, transaction logging |
+| | `/surgeons` | GET | Read | User-specific surgeon retrieval, access patterns |
+| | `/surgeon` | DELETE | Delete | Surgeon deletion, error tracking, validation |
+| **Administrative** | `/casesbystatus` | GET | Admin Read | Permission validation, bulk data access, filtering |
+| | `/users` | GET | Admin Read | User list access, authorization levels, bulk operations |
+| **Search** | `/search-facility` | GET | Search | Search patterns, result analysis, query optimization |
+| | `/search-surgeon` | GET | Search | Multi-parameter search, result tracking, performance |
+| **Utility** | `/doctypes` | GET | Reference | Document types access, reference data monitoring |
+| | `/cpt_codes` | GET | Reference | CPT codes access, database performance tracking |
+| | `/check_npi` | GET | Validation | NPI validation, external API integration, error handling |
+
+**Total: 22 Endpoints** with comprehensive logging coverage across all API operations.
 
 ## Data Storage
 
@@ -253,10 +312,17 @@ LOG_BATCH_SIZE=100
 ## Analytics & Reporting
 
 ### Available Metrics
-- **API Usage**: Request volume by endpoint and time
-- **Performance**: Response time percentiles and trends
-- **Error Analysis**: Error rate trends and failure patterns
-- **User Activity**: User behavior and access patterns
+- **API Usage**: Request volume by endpoint and time across all 22 monitored endpoints
+- **Performance**: Response time percentiles and trends for all CRUD operations
+- **Error Analysis**: Error rate trends and failure patterns by operation type
+- **User Activity**: Complete user behavior and access patterns across all functions
+- **CRUD Analytics**: Create, Read, Update, Delete operation tracking for all entities
+- **Business Intelligence**: Complete lifecycle tracking from creation to deletion
+- **Search Analytics**: Facility and surgeon search pattern analysis
+- **Administrative Monitoring**: Backoffice operation tracking and permission analysis
+- **Resource Management**: Facility and surgeon utilization patterns
+- **Reference Data Usage**: Document types and CPT codes access patterns
+- **External API Monitoring**: NPI validation service performance and reliability
 
 ### Query Examples
 
@@ -287,6 +353,89 @@ SELECT
 FROM request_logs 
 WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)
 GROUP BY endpoint;
+```
+
+#### CRUD Operation Analysis
+```sql
+SELECT 
+    CASE 
+        WHEN method = 'POST' THEN 'CREATE'
+        WHEN method = 'GET' THEN 'READ'
+        WHEN method = 'PATCH' THEN 'UPDATE'
+        WHEN method = 'DELETE' THEN 'DELETE'
+    END as operation_type,
+    COUNT(*) as request_count,
+    AVG(execution_time_ms) as avg_response_time,
+    SUM(CASE WHEN response_status >= 400 THEN 1 ELSE 0 END) as error_count
+FROM request_logs 
+WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+    AND endpoint IN ('/case', '/user')
+GROUP BY operation_type;
+```
+
+#### User Activity Patterns
+```sql
+SELECT 
+    user_id,
+    COUNT(*) as total_requests,
+    COUNT(DISTINCT endpoint) as endpoints_used,
+    MIN(timestamp) as first_activity,
+    MAX(timestamp) as last_activity,
+    AVG(execution_time_ms) as avg_response_time
+FROM request_logs 
+WHERE user_id IS NOT NULL 
+    AND timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+GROUP BY user_id
+ORDER BY total_requests DESC
+LIMIT 20;
+```
+
+#### Search Pattern Analysis
+```sql
+SELECT 
+    endpoint,
+    JSON_EXTRACT(query_params, '$.facility_name') as search_term,
+    COUNT(*) as search_count,
+    AVG(execution_time_ms) as avg_search_time,
+    AVG(JSON_LENGTH(JSON_EXTRACT(response_payload, '$.body.facilities'))) as avg_results
+FROM request_logs 
+WHERE endpoint = '/search-facility' 
+    AND timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+GROUP BY endpoint, search_term
+ORDER BY search_count DESC;
+```
+
+#### Resource Management Analysis
+```sql
+SELECT 
+    CASE 
+        WHEN endpoint LIKE '%facility%' THEN 'facility'
+        WHEN endpoint LIKE '%surgeon%' THEN 'surgeon'
+    END as resource_type,
+    method,
+    COUNT(*) as operation_count,
+    AVG(execution_time_ms) as avg_response_time,
+    COUNT(DISTINCT user_id) as unique_users
+FROM request_logs 
+WHERE endpoint IN ('/facility', '/facilities', '/surgeon', '/surgeons')
+    AND timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+GROUP BY resource_type, method;
+```
+
+#### External API Performance
+```sql
+SELECT 
+    DATE(timestamp) as date,
+    COUNT(*) as total_validations,
+    SUM(CASE WHEN response_status = 200 THEN 1 ELSE 0 END) as successful_validations,
+    SUM(CASE WHEN response_status = 502 THEN 1 ELSE 0 END) as api_errors,
+    AVG(execution_time_ms) as avg_response_time,
+    MAX(execution_time_ms) as max_response_time
+FROM request_logs 
+WHERE endpoint = '/check_npi'
+    AND timestamp >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+GROUP BY DATE(timestamp)
+ORDER BY date DESC;
 ```
 
 ## Best Practices
