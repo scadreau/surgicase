@@ -137,3 +137,6 @@ table_structures_*.sql
 
 # NPI data
 npi_data/*.csv
+
+# Reports
+reports/

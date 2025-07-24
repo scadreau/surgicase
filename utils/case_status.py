@@ -1,5 +1,5 @@
 # Created: 2025-07-15 23:02:51
-# Last Modified: 2025-07-23 11:59:48
+# Last Modified: 2025-07-23 22:11:04
 # utils/case_status.py
 import pymysql.cursors
 import pymysql
@@ -36,10 +36,10 @@ def update_case_status(case_id: str, conn) -> dict:
                 }
             
             # Check if case status is already 1
-            if case_data["case_status"] == 1:
+            if case_data["case_status"] == 10:
                 return {
                     "success": True,
-                    "message": "Case status already updated to 1",
+                    "message": "Case status already updated to 10",
                     "case_id": case_id,
                     "case_status": 1
                 }
@@ -73,7 +73,7 @@ def update_case_status(case_id: str, conn) -> dict:
             # All conditions met, update case status to 1
             cursor.execute("""
                 UPDATE cases 
-                SET case_status = 1 
+                SET case_status = 10 
                 WHERE case_id = %s AND active = 1
             """, (case_id,))
             
@@ -87,9 +87,9 @@ def update_case_status(case_id: str, conn) -> dict:
             # Note: No commit here - the calling function will handle the transaction
             return {
                 "success": True,
-                "message": "Case status updated successfully from 0 to 1",
+                "message": "Case status updated successfully from 0 to 10",
                 "case_id": case_id,
-                "case_status": 1,
+                "case_status": 10,
                 "procedure_count": procedure_count
             }
             
