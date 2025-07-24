@@ -1,5 +1,5 @@
 # Created: 2025-07-24 17:54:30
-# Last Modified: 2025-07-24 19:36:15
+# Last Modified: 2025-07-24 19:46:12
 # Author: Scott Cadreau
 # Assisted by: Claude 4 Sonnet
 
@@ -50,6 +50,22 @@ def get_user_profile_info(user_id: str, conn) -> dict:
         """, (user_id,))
         documents = cursor.fetchall()
         user_data["documents"] = documents
+        
+        # Get user type description
+        user_type = user_data.get("user_type")
+        if user_type is not None:
+            cursor.execute("""
+                SELECT user_type_desc 
+                FROM user_type_list 
+                WHERE user_type = %s
+            """, (user_type,))
+            user_type_result = cursor.fetchone()
+            if user_type_result:
+                user_data["user_type_desc"] = user_type_result["user_type_desc"]
+            else:
+                user_data["user_type_desc"] = None
+        else:
+            user_data["user_type_desc"] = None
         
         return user_data
 
@@ -218,6 +234,13 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
             surgeons = get_user_surgeons(user_id, conn)
             facilities = get_user_facilities(user_id, conn)
             
+            # Find max_case_status_desc from the case_statuses array
+            max_case_status_desc = None
+            for case_status in case_status_info["case_statuses"]:
+                if case_status["case_status"] == max_case_status:
+                    max_case_status_desc = case_status["case_status_desc"]
+                    break
+            
             # Record successful user environment retrieval
             business_metrics.record_utility_operation("get_user_environment", "success")
                 
@@ -231,8 +254,10 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
             "facilities": facilities,
             "permissions": {
                 "user_type": user_type,
+                "user_type_desc": user_profile.get("user_type_desc"),
                 "case_status_access_level": case_status_info["access_level"],
                 "max_case_status": user_profile.get("max_case_status", 20),
+                "max_case_status_desc": max_case_status_desc,
                 "can_access_all_cases": user_type >= 10,
                 "can_access_backoffice": user_type >= 10
             },
