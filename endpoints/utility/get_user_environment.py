@@ -1,5 +1,5 @@
 # Created: 2025-07-24 17:54:30
-# Last Modified: 2025-07-24 18:07:35
+# Last Modified: 2025-07-24 18:15:59
 # Author: Scott Cadreau
 # Assisted by: Claude 4 Sonnet
 
@@ -9,6 +9,7 @@ import pymysql.cursors
 from core.database import get_db_connection, close_db_connection
 from utils.monitoring import track_business_operation, business_metrics
 import time
+from datetime import datetime
 
 router = APIRouter()
 
@@ -51,6 +52,36 @@ def get_user_profile_info(user_id: str, conn) -> dict:
         user_data["documents"] = documents
         
         return user_data
+
+def update_user_last_login(user_id: str, conn) -> bool:
+    """
+    Update the last_login_dt field for a user with current datetime.
+    
+    Args:
+        user_id: The user ID to update
+        conn: Database connection
+        
+    Returns:
+        bool: True if update was successful, False otherwise
+    """
+    try:
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            current_time = datetime.now()
+            
+            cursor.execute("""
+                UPDATE user_profile 
+                SET last_login_dt = %s 
+                WHERE user_id = %s AND active = 1
+            """, (current_time, user_id))
+            
+            # Return True if a row was updated
+            return cursor.rowcount > 0
+    except Exception as e:
+        # Log the error but don't fail the main operation
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to update last_login_dt for user {user_id}: {str(e)}")
+        return False
 
 def get_case_statuses_for_user(user_id: str, user_type: int, conn) -> dict:
     """
@@ -131,6 +162,9 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
 
             user_type = user_profile.get("user_type", 0)
             
+            # Update last login datetime
+            login_updated = update_user_last_login(user_id, conn)
+            
             # Get case statuses based on user permissions
             case_status_info = get_case_statuses_for_user(user_id, user_type, conn)
             
@@ -154,7 +188,8 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
                 "user_id": user_id,
                 "case_statuses_count": case_status_info["total_count"],
                 "has_documents": len(user_profile.get("documents", [])) > 0,
-                "document_count": len(user_profile.get("documents", []))
+                "document_count": len(user_profile.get("documents", [])),
+                "last_login_updated": login_updated
             }
         }
         return response_data
