@@ -1,5 +1,5 @@
 # Created: 2025-07-24 17:54:30
-# Last Modified: 2025-07-24 18:15:59
+# Last Modified: 2025-07-24 19:36:15
 # Author: Scott Cadreau
 # Assisted by: Claude 4 Sonnet
 
@@ -83,13 +83,14 @@ def update_user_last_login(user_id: str, conn) -> bool:
         logger.error(f"Failed to update last_login_dt for user {user_id}: {str(e)}")
         return False
 
-def get_case_statuses_for_user(user_id: str, user_type: int, conn) -> dict:
+def get_case_statuses_for_user(user_id: str, user_type: int, max_case_status: int, conn) -> dict:
     """
     Get case statuses based on user type permissions.
     
     Args:
         user_id: The user ID
         user_type: The user's type level
+        max_case_status: The user's maximum case status level
         conn: Database connection
         
     Returns:
@@ -98,13 +99,13 @@ def get_case_statuses_for_user(user_id: str, user_type: int, conn) -> dict:
     with conn.cursor(pymysql.cursors.DictCursor) as cursor:
         # Build query based on user_type
         if user_type < 10:
-            # User type < 10: return only case_status <= 20
+            # User type < 10: return only case_status <= max_case_status
             cursor.execute("""
                 SELECT case_status, case_status_desc 
                 FROM case_status_list 
-                WHERE case_status <= 20 
+                WHERE case_status <= %s 
                 ORDER BY case_status
-            """)
+            """, (max_case_status,))
             access_level = "limited"
         else:
             # User type >= 10: return all case_status rows
@@ -122,6 +123,50 @@ def get_case_statuses_for_user(user_id: str, user_type: int, conn) -> dict:
             "access_level": access_level,
             "total_count": len(case_statuses)
         }
+
+def get_user_surgeons(user_id: str, conn) -> list:
+    """
+    Get list of surgeons associated with a user.
+    
+    Args:
+        user_id: The user ID to retrieve surgeons for
+        conn: Database connection
+        
+    Returns:
+        list: List of surgeon records
+    """
+    with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+        cursor.execute("""
+            SELECT surgeon_id, first_name, last_name, surgeon_npi 
+            FROM surgeon_list 
+            WHERE user_id = %s
+            ORDER BY last_name, first_name
+        """, (user_id,))
+        
+        surgeons = cursor.fetchall()
+        return surgeons
+
+def get_user_facilities(user_id: str, conn) -> list:
+    """
+    Get list of facilities associated with a user.
+    
+    Args:
+        user_id: The user ID to retrieve facilities for
+        conn: Database connection
+        
+    Returns:
+        list: List of facility records
+    """
+    with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+        cursor.execute("""
+            SELECT facility_id, facility_name, facility_npi 
+            FROM facility_list 
+            WHERE user_id = %s
+            ORDER BY facility_name
+        """, (user_id,))
+        
+        facilities = cursor.fetchall()
+        return facilities
 
 @router.get("/user_environment")
 @track_business_operation("get", "user_environment")
@@ -161,12 +206,17 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
                 raise HTTPException(status_code=404, detail="User not found or inactive")
 
             user_type = user_profile.get("user_type", 0)
+            max_case_status = user_profile.get("max_case_status", 20)
             
             # Update last login datetime
             login_updated = update_user_last_login(user_id, conn)
             
             # Get case statuses based on user permissions
-            case_status_info = get_case_statuses_for_user(user_id, user_type, conn)
+            case_status_info = get_case_statuses_for_user(user_id, user_type, max_case_status, conn)
+            
+            # Get surgeon and facility lists for the user
+            surgeons = get_user_surgeons(user_id, conn)
+            facilities = get_user_facilities(user_id, conn)
             
             # Record successful user environment retrieval
             business_metrics.record_utility_operation("get_user_environment", "success")
@@ -177,6 +227,8 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
         response_data = {
             "user_profile": user_profile,
             "case_statuses": case_status_info["case_statuses"],
+            "surgeons": surgeons,
+            "facilities": facilities,
             "permissions": {
                 "user_type": user_type,
                 "case_status_access_level": case_status_info["access_level"],
@@ -189,6 +241,8 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
                 "case_statuses_count": case_status_info["total_count"],
                 "has_documents": len(user_profile.get("documents", [])) > 0,
                 "document_count": len(user_profile.get("documents", [])),
+                "surgeon_count": len(surgeons),
+                "facility_count": len(facilities),
                 "last_login_updated": login_updated
             }
         }
