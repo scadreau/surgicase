@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-23 12:05:30
+# Last Modified: 2025-07-24 19:08:36
 
 # endpoints/case/get_case.py
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -33,11 +33,18 @@ def get_case(request: Request, case_id: str = Query(..., description="The case I
 
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-                # fetch from cases table
+                # fetch from cases table with surgeon and facility names
                 cursor.execute("""
-                    SELECT user_id, case_id, case_date, patient_first, patient_last, ins_provider, surgeon_id, facility_id, case_status, demo_file, note_file, misc_file, pay_amount
-                    FROM cases 
-                    WHERE case_id = %s and active = 1
+                    SELECT 
+                        c.user_id, c.case_id, c.case_date, c.patient_first, c.patient_last, 
+                        c.ins_provider, c.surgeon_id, c.facility_id, c.case_status, 
+                        c.demo_file, c.note_file, c.misc_file, c.pay_amount,
+                        CONCAT(s.first_name, ' ', s.last_name) as surgeon_name,
+                        f.facility_name
+                    FROM cases c
+                    LEFT JOIN surgeon_list s ON c.surgeon_id = s.surgeon_id
+                    LEFT JOIN facility_list f ON c.facility_id = f.facility_id
+                    WHERE c.case_id = %s and c.active = 1
                 """, (case_id,))
                 case_data = cursor.fetchone()
 
