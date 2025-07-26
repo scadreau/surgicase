@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-24 18:05:08
+# Last Modified: 2025-07-25 23:38:42
 
 # main.py
 from fastapi import FastAPI, Request
@@ -40,6 +40,7 @@ from endpoints.backoffice.get_cases_by_status import router as get_cases_by_stat
 from endpoints.backoffice.get_users import router as get_users_router
 
 from endpoints.reports.provider_payment_report import router as provider_payment_report_router
+from endpoints.exports.quickbooks_export import router as quickbooks_export_router
 
 # Import monitoring utilities
 from utils.monitoring import monitor_request, system_monitor, db_monitor, logger
@@ -104,6 +105,9 @@ app.include_router(get_users_router, tags=["backoffice"])
 
 # Report endpoints
 app.include_router(provider_payment_report_router, tags=["reports"])
+
+# Export endpoints
+app.include_router(quickbooks_export_router, tags=["exports"])
 
 if __name__ == "__main__":
     import uvicorn
