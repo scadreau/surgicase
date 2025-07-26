@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-23 12:06:02
+# Last Modified: 2025-07-26 02:38:44
 
 # endpoints/case/update_case.py
 from fastapi import APIRouter, HTTPException, Body, Request
@@ -66,10 +66,13 @@ def update_case(request: Request, case: CaseUpdate = Body(...)):
 
             # Update procedure codes if provided
             if case.procedure_codes is not None:
+                # Remove duplicates while preserving order
+                unique_procedure_codes = list(dict.fromkeys(case.procedure_codes))
+                
                 # Delete existing codes
                 cursor.execute("DELETE FROM case_procedure_codes WHERE case_id = %s", (case.case_id,))
-                # Insert new codes
-                for code in case.procedure_codes:
+                # Insert new unique codes
+                for code in unique_procedure_codes:
                     cursor.execute(
                         "INSERT INTO case_procedure_codes (case_id, procedure_code) VALUES (%s, %s)",
                         (case.case_id, code)
