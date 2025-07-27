@@ -1,5 +1,5 @@
 # Created: 2025-01-27
-# Last Modified: 2025-07-15 20:47:23
+# Last Modified: 2025-07-27 04:53:16
 
 # utils/monitoring.py
 import time
@@ -395,6 +395,15 @@ class BusinessMetrics:
             "utility_operation_recorded",
             operation=operation,
             status=status
+        )
+    
+    @staticmethod
+    def record_timing(operation: str, duration_ms: float):
+        """Record operation timing metrics"""
+        logger.info(
+            "operation_timing_recorded",
+            operation=operation,
+            duration_ms=duration_ms
         )
 
 # Request/Response monitoring middleware
