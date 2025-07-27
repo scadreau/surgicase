@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-24 19:08:36
+# Last Modified: 2025-07-26 02:50:34
 
 # endpoints/case/get_case.py
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -86,7 +86,7 @@ def get_case(request: Request, case_id: str = Query(..., description="The case I
                 cursor.execute("""
                     SELECT cpc.procedure_code, pc.procedure_desc 
                     FROM case_procedure_codes cpc 
-                    LEFT JOIN procedure_codes pc ON cpc.procedure_code = pc.procedure_code 
+                    LEFT JOIN procedure_codes_desc pc ON cpc.procedure_code = pc.procedure_code 
                     WHERE cpc.case_id = %s
                 """, (case_id,))
                 procedure_data = [{'procedure_code': row['procedure_code'], 'procedure_desc': row['procedure_desc']} for row in cursor.fetchall()]
