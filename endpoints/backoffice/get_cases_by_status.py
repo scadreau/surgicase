@@ -1,5 +1,6 @@
 # Created: 2025-07-15 11:54:13
-# Last Modified: 2025-07-23 11:59:13
+# Last Modified: 2025-07-27 03:02:57
+# Author: Scott Cadreau
 
 # endpoints/backoffice/get_cases_by_status.py
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -7,15 +8,24 @@ import pymysql.cursors
 from core.database import get_db_connection, close_db_connection
 from utils.monitoring import track_business_operation, business_metrics
 import time
+from datetime import datetime
 
 router = APIRouter()
 
 @router.get("/casesbystatus")
 @track_business_operation("get", "cases_by_status")
-def get_cases_by_status(request: Request, user_id: str = Query(..., description="The user ID making the request (must be user_type >= 10)"), filter: str = Query("", description="Comma-separated list of case_status values (e.g. 0,1,2)")):
+def get_cases_by_status(
+    request: Request, 
+    user_id: str = Query(..., description="The user ID making the request (must be user_type >= 10)"), 
+    filter: str = Query("", description="Comma-separated list of case_status values (e.g. 0,1,2) or 'all' to get all cases"),
+    start_date: str = Query(None, description="Start date filter in YYYY-MM-DD format (optional)"),
+    end_date: str = Query(None, description="End date filter in YYYY-MM-DD format (optional)")
+):
     """
-    Retrieve all cases filtered by case_status values, only if the calling user has user_type >= 10.
+    Retrieve all cases filtered by case_status values and optional date range, only if the calling user has user_type >= 10.
     Returns a list of cases in the same format as get_case.
+    Use filter='all' to get all cases regardless of status.
+    Use start_date and end_date to filter by case_date range (format: YYYY-MM-DD).
     """
     conn = None
     start_time = time.time()
@@ -24,11 +34,33 @@ def get_cases_by_status(request: Request, user_id: str = Query(..., description=
     error_message = None
     
     try:
-        # Parse filter string into a list of integers
-        if filter:
+        # Parse filter string - handle "all" as special case
+        if filter.lower() == "all":
+            status_list = "all"
+        elif filter:
             status_list = [int(s) for s in filter.split(",") if s.strip().isdigit()]
         else:
             status_list = []
+
+        # Validate date formats if provided
+        parsed_start_date = None
+        parsed_end_date = None
+        
+        if start_date:
+            try:
+                parsed_start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+            except ValueError:
+                response_status = 400
+                error_message = "Invalid start_date format. Use YYYY-MM-DD format."
+                raise HTTPException(status_code=400, detail="Invalid start_date format. Use YYYY-MM-DD format.")
+        
+        if end_date:
+            try:
+                parsed_end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+            except ValueError:
+                response_status = 400
+                error_message = "Invalid end_date format. Use YYYY-MM-DD format."
+                raise HTTPException(status_code=400, detail="Invalid end_date format. Use YYYY-MM-DD format.")
 
         conn = get_db_connection()
         
@@ -47,10 +79,22 @@ def get_cases_by_status(request: Request, user_id: str = Query(..., description=
                 # Build query for all cases (no user_id filter)
                 sql = "SELECT user_id, case_id, case_date, patient_first, patient_last, ins_provider, surgeon_id, facility_id, case_status, demo_file, note_file, misc_file, pay_amount FROM cases WHERE active = 1"
                 params = []
-                if status_list:
+                
+                # Only add status filter if not "all"
+                if status_list != "all" and status_list:
                     placeholders = ",".join(["%s"] * len(status_list))
                     sql += f" AND case_status IN ({placeholders})"
                     params.extend(status_list)
+                
+                # Add date filters if provided
+                if parsed_start_date:
+                    sql += " AND case_date >= %s"
+                    params.append(parsed_start_date)
+                
+                if parsed_end_date:
+                    sql += " AND case_date <= %s"
+                    params.append(parsed_end_date)
+                    
                 cursor.execute(sql, params)
                 cases = cursor.fetchall()
 
@@ -73,7 +117,9 @@ def get_cases_by_status(request: Request, user_id: str = Query(..., description=
             
         response_data = {
             "cases": result,
-            "filter": status_list
+            "filter": status_list,
+            "start_date": start_date,
+            "end_date": end_date
         }
         return response_data
 
