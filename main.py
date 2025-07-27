@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-27 03:54:23
+# Last Modified: 2025-07-27 03:57:15
 
 # main.py
 from fastapi import FastAPI, Request
@@ -69,7 +69,6 @@ app.include_router(create_case_router, tags=["cases"])
 app.include_router(update_case_router, tags=["cases"])
 app.include_router(delete_case_router, tags=["cases"])
 app.include_router(filter_cases_router, tags=["cases"])
-app.include_router(bulk_update_case_status_router, tags=["cases"])
 
 # User endpoints
 app.include_router(get_user_router, tags=["users"])
@@ -106,6 +105,7 @@ app.include_router(metrics_router, tags=["monitoring"])
 app.include_router(get_cases_by_status_router, tags=["backoffice"])
 app.include_router(get_users_router, tags=["backoffice"])
 app.include_router(case_dashboard_data_router, tags=["backoffice"])
+app.include_router(bulk_update_case_status_router, tags=["backoffice"])
 
 # Report endpoints
 app.include_router(provider_payment_report_router, tags=["reports"])
