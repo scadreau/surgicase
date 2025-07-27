@@ -1,5 +1,5 @@
 # Created: 2025-07-27 02:00:40
-# Last Modified: 2025-07-27 01:44:58
+# Last Modified: 2025-07-27 02:49:42
 # Author: Scott Cadreau
 
 # endpoints/case/bulk_update_case_status.py
@@ -68,7 +68,7 @@ def build_update_query_with_timestamps(timestamp_field: str = None) -> str:
             WHERE case_id = %s AND active = 1
         """
 
-@router.patch("/bulkupdatecasestatus")
+@router.patch("/bulk_update_case_status")
 @track_business_operation("bulk_update", "case_status")
 def bulk_update_case_status(request: Request, update_request: BulkCaseStatusUpdate = Body(...)) -> Dict[str, Any]:
     """
