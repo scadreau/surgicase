@@ -1,12 +1,18 @@
 # Created: 2025-01-15
-# Last Modified: 2025-07-27 03:43:36
+# Last Modified: 2025-07-27 01:00:57
 # Author: Scott Cadreau
 
 """
-Standalone scheduler service for SurgiCase weekly case status updates.
+Standalone scheduler service for SurgiCase weekly scheduled tasks.
 
-This script can be run as a Linux service to handle scheduled case status updates
-from status 10 to status 15 every Monday at 08:00 UTC.
+This script can be run as a Linux service to handle:
+- Case status updates (Monday & Thursday at 08:00 UTC)
+- NPI data updates (Tuesday at 08:00 UTC)
+
+Weekly Schedule:
+- Monday 08:00 UTC: Pending payment update (status 10 -> 15)
+- Tuesday 08:00 UTC: NPI data refresh from CMS website
+- Thursday 08:00 UTC: Paid update (status 15 -> 20)
 
 Usage:
     python scheduler_service.py
@@ -16,7 +22,7 @@ To run as a systemd service, create a service file:
 
 Service file content:
     [Unit]
-    Description=SurgiCase Weekly Case Status Scheduler
+    Description=SurgiCase Scheduler Service
     After=network.target
 
     [Service]
@@ -40,7 +46,7 @@ import logging
 import sys
 import signal
 import os
-from utils.weekly_case_status_scheduler import run_scheduler
+from utils.scheduler import run_scheduler
 
 # Configure logging
 logging.basicConfig(

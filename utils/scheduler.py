@@ -1,5 +1,5 @@
 # Created: 2025-01-15
-# Last Modified: 2025-07-27 04:50:36
+# Last Modified: 2025-07-27 00:55:15
 # Author: Scott Cadreau
 
 import schedule
@@ -15,6 +15,7 @@ from core.models import BulkCaseStatusUpdate
 from endpoints.case.bulk_update_case_status import bulk_update_case_status
 from fastapi import Request
 from unittest.mock import Mock
+from utils.extract_npi_data import weekly_npi_data_update
 
 logger = logging.getLogger(__name__)
 
@@ -163,12 +164,51 @@ def weekly_paid_update():
     except Exception as e:
         logger.error(f"Error in weekly paid update job: {str(e)}")
 
+def weekly_npi_update():
+    """
+    Weekly scheduled function to update NPI data from CMS website.
+    
+    This function:
+    1. Downloads the latest weekly NPI file from CMS
+    2. Checks if the file has already been processed (duplicate prevention)
+    3. Processes the data and updates npi_data tables
+    4. Creates search tables for surgeon and facility lookups
+    5. Archives the processed file
+    """
+    logger.info("Starting weekly NPI data update job...")
+    
+    try:
+        # Call the NPI update function with duplicate prevention
+        result = weekly_npi_data_update()
+        
+        # Log the results based on status
+        if result['status'] == 'success':
+            logger.info(f"Weekly NPI data update completed successfully:")
+            logger.info(f"  Filename processed: {result['filename']}")
+            logger.info(f"  Execution time: {result['execution_time']:.2f} seconds")
+            logger.info(f"  Entity type 0 records: {result['entity_counts']['total_0_rows']}")
+            logger.info(f"  Entity type 1 records: {result['entity_counts']['total_1_rows']}")
+            logger.info(f"  Entity type 2 records: {result['entity_counts']['total_2_rows']}")
+            
+        elif result['status'] == 'skipped':
+            logger.info(f"Weekly NPI data update skipped:")
+            logger.info(f"  Reason: {result['reason']}")
+            logger.info(f"  Filename: {result['filename']}")
+            logger.info("  This typically indicates the CMS website has not updated with a new weekly file yet.")
+            
+        elif result['status'] == 'error':
+            logger.error(f"Weekly NPI data update failed: {result['error']}")
+        
+    except Exception as e:
+        logger.error(f"Error in weekly NPI data update job: {str(e)}")
+
 def setup_weekly_scheduler():
     """
-    Set up the weekly scheduler for case status updates.
+    Set up the weekly scheduler for case status updates and NPI data updates.
     
-    Schedules both weekly update functions:
+    Schedules all weekly update functions:
     - weekly_pending_payment_update: Monday at 08:00 UTC (status 10 -> 15)
+    - weekly_npi_update: Tuesday at 08:00 UTC (NPI data refresh)
     - weekly_paid_update: Thursday at 08:00 UTC (status 15 -> 20)
     
     To change days/times: modify the schedule lines below
@@ -176,11 +216,15 @@ def setup_weekly_scheduler():
     # Schedule pending payment update for Monday at 08:00 UTC
     schedule.every().monday.at("08:00").do(weekly_pending_payment_update)
     
+    # Schedule NPI data update for Tuesday at 08:00 UTC
+    schedule.every().tuesday.at("08:00").do(weekly_npi_update)
+    
     # Schedule paid update for Thursday at 08:00 UTC
     schedule.every().thursday.at("08:00").do(weekly_paid_update)
     
-    logger.info("Weekly case status update scheduler configured:")
+    logger.info("Weekly scheduler configured:")
     logger.info("  - Pending payment update: Monday at 08:00 UTC")
+    logger.info("  - NPI data update: Tuesday at 08:00 UTC")
     logger.info("  - Paid update: Thursday at 08:00 UTC")
 
 def run_scheduler():
@@ -236,6 +280,13 @@ def run_paid_update_now():
     """
     logger.info("Running paid update immediately...")
     weekly_paid_update()
+
+def run_npi_update_now():
+    """
+    Utility function to run the NPI data update immediately (for testing).
+    """
+    logger.info("Running NPI data update immediately...")
+    weekly_npi_update()
 
 def run_update_now():
     """

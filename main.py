@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-27 03:43:48
+# Last Modified: 2025-07-27 01:03:07
 
 # main.py
 from fastapi import FastAPI, Request
@@ -115,10 +115,11 @@ if __name__ == "__main__":
     import uvicorn
     import os
     
-    # Optional: Start the weekly case status scheduler in background
+    # Optional: Start the scheduler service in background
+    # Handles: Case status updates (Mon/Thu), NPI data updates (Tue)
     # Set ENABLE_SCHEDULER=true environment variable to enable
     if os.getenv("ENABLE_SCHEDULER", "false").lower() == "true":
-        from utils.weekly_case_status_scheduler import run_scheduler_in_background
+        from utils.scheduler import run_scheduler_in_background
         run_scheduler_in_background()
     
     uvicorn.run(app, host="0.0.0.0", port=8000)

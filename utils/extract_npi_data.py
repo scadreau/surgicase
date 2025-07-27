@@ -1,5 +1,5 @@
 # Created: 2025-07-21
-# Last Modified: 2025-07-24 00:27:43
+# Last Modified: 2025-07-27 00:54:21
 
 """
 NPI Data Extraction and Processing Script
@@ -30,6 +30,11 @@ data management in the SurgiCase system. It performs the following key operation
    - Search table creation logged to npi_search_table_log table
    - Real-time console output for progress tracking
    - Detailed error handling and recovery mechanisms
+
+5. DUPLICATE PREVENTION: Prevents processing of files already handled
+   - Checks archive directory for previously processed files
+   - Prevents redundant downloads and processing
+   - Safe for automated scheduling
 
 USAGE:
     python utils/extract_npi_data.py
@@ -75,6 +80,29 @@ DOWNLOAD_DIR = "../npi_data"
 
 # Ensure the download directory exists
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+def check_file_already_processed(filename):
+    """
+    Check if a file has already been processed by looking in the archive directory.
+    
+    Args:
+        filename: The name of the file to check
+        
+    Returns:
+        bool: True if file has already been processed, False otherwise
+    """
+    archive_dir = os.path.join(DOWNLOAD_DIR, 'archive')
+    
+    if not os.path.exists(archive_dir):
+        return False
+    
+    archive_file_path = os.path.join(archive_dir, filename)
+    file_exists = os.path.exists(archive_file_path)
+    
+    if file_exists:
+        print(f"File {filename} has already been processed (found in archive)")
+    
+    return file_exists
 
 def download_and_extract_npi_file():
     """Download the most recent NPI weekly file and extract it"""
@@ -509,8 +537,52 @@ def cleanup_old_files(current_csv_file):
         print(f"Warning: Cleanup failed: {e}")
         # Don't raise the exception - cleanup failure shouldn't stop the main process
 
+def weekly_npi_data_update():
+    """
+    Scheduled weekly NPI data update function with duplicate prevention.
+    
+    This function is designed to be called by the scheduler service.
+    It includes duplicate file detection to prevent reprocessing.
+    """
+    print("Starting scheduled weekly NPI data update process...")
+    overall_start_time = time.time()
+    
+    try:
+        # Step 1: Download and extract the NPI file
+        csv_file = download_and_extract_npi_file()
+        
+        # Step 2: Check if this file has already been processed
+        if check_file_already_processed(csv_file):
+            print(f"File {csv_file} has already been processed. Skipping update.")
+            print("This may indicate the weekly file has not been updated on the CMS website yet.")
+            return {"status": "skipped", "reason": "File already processed", "filename": csv_file}
+        
+        # Step 3: Process the main NPI data file
+        entity_counts = process_npi_data_file(csv_file)
+        
+        # Step 4: Create the search tables
+        create_search_tables()
+        
+        # Step 5: Clean up old files
+        cleanup_old_files(csv_file)
+        
+        overall_time = time.time() - overall_start_time
+        print(f"\nScheduled NPI data update process finished successfully!")
+        print(f"Total execution time: {overall_time:.2f} seconds ({overall_time/60:.1f} minutes)")
+        
+        return {
+            "status": "success", 
+            "filename": csv_file,
+            "execution_time": overall_time,
+            "entity_counts": entity_counts
+        }
+        
+    except Exception as e:
+        print(f"Error in scheduled NPI data update: {e}")
+        return {"status": "error", "error": str(e)}
+
 def main():
-    """Main execution function"""
+    """Main execution function for manual runs"""
     print("Starting NPI data update process...")
     overall_start_time = time.time()
     
