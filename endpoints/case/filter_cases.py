@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-27 03:10:30
+# Last Modified: 2025-07-27 03:28:51
 
 # endpoints/case/filter_cases.py
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -10,7 +10,7 @@ import time
 
 router = APIRouter()
 
-@router.get("/casefilter")
+@router.get("/case_filter")
 @track_business_operation("filter", "case")
 def get_cases(request: Request, user_id: str = Query(..., description="The user ID to retrieve cases for"), filter: str = Query("", description="Comma-separated list of case_status values (e.g. 0,1,2) or 'all' for all statuses")):
     """

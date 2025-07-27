@@ -1,5 +1,5 @@
 # Created: 2025-07-17 16:42:31
-# Last Modified: 2025-07-23 11:59:23
+# Last Modified: 2025-07-27 03:24:46
 
 # utils/report_cleanup.py
 import os
@@ -9,7 +9,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def cleanup_old_reports(reports_dir: str = "reports", days_to_keep: int = 7):
+def cleanup_old_reports(reports_dir: str = "reports", days_to_keep: int = 365):
     """
     Clean up report files older than specified days.
     

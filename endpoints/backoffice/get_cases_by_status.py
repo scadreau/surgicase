@@ -1,5 +1,5 @@
 # Created: 2025-07-15 11:54:13
-# Last Modified: 2025-07-27 03:09:19
+# Last Modified: 2025-07-27 03:28:51
 # Author: Scott Cadreau
 
 # endpoints/backoffice/get_cases_by_status.py
@@ -12,7 +12,7 @@ from datetime import datetime
 
 router = APIRouter()
 
-@router.get("/casesbystatus")
+@router.get("/cases_by_status")
 @track_business_operation("get", "cases_by_status")
 def get_cases_by_status(
     request: Request, 
