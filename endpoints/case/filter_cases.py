@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-23 11:59:43
+# Last Modified: 2025-07-27 04:10:21
 
 # endpoints/case/filter_cases.py
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -12,7 +12,7 @@ router = APIRouter()
 
 @router.get("/casefilter")
 @track_business_operation("filter", "case")
-def get_cases(request: Request, user_id: str = Query(..., description="The user ID to retrieve cases for"), filter: str = Query("", description="Comma-separated list of case_status values (e.g. 0,1,2)")):
+def get_cases(request: Request, user_id: str = Query(..., description="The user ID to retrieve cases for"), filter: str = Query("", description="Comma-separated list of case_status values (e.g. 0,1,2) or 'all' for all statuses")):
     """
     Retrieve all cases for a user_id, filtered by case_status values.
     Returns a list of cases in the same format as get_case.
@@ -24,8 +24,10 @@ def get_cases(request: Request, user_id: str = Query(..., description="The user 
     error_message = None
     
     try:
-        # Parse filter string into a list of integers
-        if filter:
+        # Parse filter string - handle "all" case or comma-separated integers
+        if filter.lower() == "all":
+            status_list = ["all"]
+        elif filter:
             status_list = [int(s) for s in filter.split(",") if s.strip().isdigit()]
         else:
             status_list = []
@@ -48,12 +50,31 @@ def get_cases(request: Request, user_id: str = Query(..., description="The user 
                 else:
                     max_case_status = user_profile["max_case_status"] or 20
                 
-                # Build query
+                # Build query with special handling for max_case_status filter and "all" option
                 sql = "SELECT user_id, case_id, case_date, patient_first, patient_last, ins_provider, surgeon_id, facility_id, case_status, demo_file, note_file, misc_file, pay_amount FROM cases WHERE user_id = %s and active = 1"
                 params = [user_id]
-                if status_list:
-                    sql += " AND case_status IN (%s)" % (",".join(["%s"] * len(status_list)))
-                    params.extend([str(s) for s in status_list])
+                
+                if status_list and status_list != ["all"]:
+                    # Check if max_case_status is in the filter list
+                    if max_case_status in status_list:
+                        # Remove max_case_status from the list for separate handling
+                        other_statuses = [s for s in status_list if s != max_case_status]
+                        
+                        if other_statuses:
+                            # Query for both specific statuses and >= max_case_status
+                            sql += " AND (case_status IN (%s) OR case_status >= %%s)" % (",".join(["%s"] * len(other_statuses)))
+                            params.extend([str(s) for s in other_statuses])
+                            params.append(max_case_status)
+                        else:
+                            # Only max_case_status requested, get all >= max_case_status
+                            sql += " AND case_status >= %s"
+                            params.append(max_case_status)
+                    else:
+                        # Normal filtering without max_case_status special handling
+                        sql += " AND case_status IN (%s)" % (",".join(["%s"] * len(status_list)))
+                        params.extend([str(s) for s in status_list])
+                # If status_list is empty or ["all"], no additional WHERE clause needed
+                
                 cursor.execute(sql, params)
                 cases = cursor.fetchall()
 
