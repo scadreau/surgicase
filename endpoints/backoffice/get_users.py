@@ -1,5 +1,6 @@
 # Created: 2025-07-22 12:20:56
-# Last Modified: 2025-07-27 02:56:49
+# Last Modified: 2025-07-27 02:59:10
+# Author: Scott Cadreau
 
 # endpoints/backoffice/get_users.py
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -43,7 +44,7 @@ def get_users(request: Request, user_id: str = Query(..., description="The user 
                 # Fetch all active users with user_tier where user_type <= requesting user's user_type
                 cursor.execute("""
                     SELECT user_id, user_email, first_name, last_name, addr1, addr2, city, state, zipcode, 
-                           telephone, user_npi, referred_by_user, user_type, message_pref, states_licensed, user_tier, create_ts
+                           telephone, user_npi, referred_by_user, user_type, message_pref, states_licensed, user_tier, create_ts, last_updated_ts
                     FROM user_profile 
                     WHERE active = 1 AND user_type <= %s
                     ORDER BY last_name, first_name
