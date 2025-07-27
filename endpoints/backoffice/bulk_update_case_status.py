@@ -1,8 +1,8 @@
 # Created: 2025-07-27 02:00:40
-# Last Modified: 2025-07-27 02:49:42
+# Last Modified: 2025-07-27 03:51:09
 # Author: Scott Cadreau
 
-# endpoints/case/bulk_update_case_status.py
+# endpoints/backoffice/bulk_update_case_status.py
 from fastapi import APIRouter, HTTPException, Body, Request
 import pymysql.cursors
 import pymysql

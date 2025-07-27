@@ -1,5 +1,5 @@
 # Created: 2025-01-15
-# Last Modified: 2025-07-27 00:55:15
+# Last Modified: 2025-07-27 03:51:17
 # Author: Scott Cadreau
 
 import schedule
@@ -12,7 +12,7 @@ import sys
 from typing import List, Dict, Any
 from core.database import get_db_connection, close_db_connection
 from core.models import BulkCaseStatusUpdate
-from endpoints.case.bulk_update_case_status import bulk_update_case_status
+from endpoints.backoffice.bulk_update_case_status import bulk_update_case_status
 from fastapi import Request
 from unittest.mock import Mock
 from utils.extract_npi_data import weekly_npi_data_update

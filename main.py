@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-27 02:29:35
+# Last Modified: 2025-07-27 03:51:12
 
 # main.py
 from fastapi import FastAPI, Request
@@ -11,7 +11,7 @@ from endpoints.case.create_case import router as create_case_router
 from endpoints.case.update_case import router as update_case_router
 from endpoints.case.delete_case import router as delete_case_router
 from endpoints.case.filter_cases import router as filter_cases_router
-from endpoints.case.bulk_update_case_status import router as bulk_update_case_status_router
+from endpoints.backoffice.bulk_update_case_status import router as bulk_update_case_status_router
 
 from endpoints.user.get_user import router as get_user_router
 from endpoints.user.create_user import router as create_user_router
