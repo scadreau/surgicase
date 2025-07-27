@@ -1,5 +1,5 @@
 # Created: 2025-01-15
-# Last Modified: 2025-07-27 04:48:09
+# Last Modified: 2025-07-27 04:50:36
 # Author: Scott Cadreau
 
 import schedule
@@ -7,6 +7,8 @@ import time
 import threading
 import logging
 import pymysql.cursors
+import signal
+import sys
 from typing import List, Dict, Any
 from core.database import get_db_connection, close_db_connection
 from core.models import BulkCaseStatusUpdate
@@ -15,6 +17,15 @@ from fastapi import Request
 from unittest.mock import Mock
 
 logger = logging.getLogger(__name__)
+
+# Global flag for graceful shutdown
+shutdown_requested = False
+
+def signal_handler(signum, frame):
+    """Handle shutdown signals gracefully."""
+    global shutdown_requested
+    logger.info(f"Received signal {signum}. Initiating graceful shutdown...")
+    shutdown_requested = True
 
 def get_cases_with_status(status: int) -> List[str]:
     """
@@ -178,14 +189,29 @@ def run_scheduler():
     
     This function should be called to start the scheduling service.
     It will run indefinitely, checking for scheduled jobs every hour.
+    Supports graceful shutdown via signal handling.
     """
+    global shutdown_requested
+    
+    # Set up signal handlers for graceful shutdown
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+    
     setup_weekly_scheduler()
     
     logger.info("Case status scheduler started. Running continuously...")
     
-    while True:
+    while not shutdown_requested:
         schedule.run_pending()
-        time.sleep(3600)  # Check every hour (3600 seconds)
+        
+        # Sleep in smaller intervals to check shutdown flag more frequently
+        for _ in range(3600):  # 3600 seconds (1 hour) total
+            if shutdown_requested:
+                break
+            time.sleep(1)  # Check shutdown flag every second
+    
+    logger.info("Case status scheduler shutting down gracefully...")
+    sys.exit(0)
 
 def run_scheduler_in_background():
     """
