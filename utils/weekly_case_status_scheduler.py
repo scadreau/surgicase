@@ -1,5 +1,5 @@
 # Created: 2025-01-15
-# Last Modified: 2025-07-27 04:44:47
+# Last Modified: 2025-07-27 04:48:09
 # Author: Scott Cadreau
 
 import schedule
@@ -177,7 +177,7 @@ def run_scheduler():
     Run the scheduler in a continuous loop.
     
     This function should be called to start the scheduling service.
-    It will run indefinitely, checking for scheduled jobs every minute.
+    It will run indefinitely, checking for scheduled jobs every hour.
     """
     setup_weekly_scheduler()
     
@@ -185,7 +185,7 @@ def run_scheduler():
     
     while True:
         schedule.run_pending()
-        time.sleep(60)  # Check every minute
+        time.sleep(3600)  # Check every hour (3600 seconds)
 
 def run_scheduler_in_background():
     """
