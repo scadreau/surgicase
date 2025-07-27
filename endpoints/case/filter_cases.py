@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-27 04:10:21
+# Last Modified: 2025-07-27 03:10:30
 
 # endpoints/case/filter_cases.py
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -50,8 +50,19 @@ def get_cases(request: Request, user_id: str = Query(..., description="The user 
                 else:
                     max_case_status = user_profile["max_case_status"] or 20
                 
-                # Build query with special handling for max_case_status filter and "all" option
-                sql = "SELECT user_id, case_id, case_date, patient_first, patient_last, ins_provider, surgeon_id, facility_id, case_status, demo_file, note_file, misc_file, pay_amount FROM cases WHERE user_id = %s and active = 1"
+                # Build query with special handling for max_case_status filter and "all" option with surgeon and facility names
+                sql = """
+                    SELECT 
+                        c.user_id, c.case_id, c.case_date, c.patient_first, c.patient_last, 
+                        c.ins_provider, c.surgeon_id, c.facility_id, c.case_status, 
+                        c.demo_file, c.note_file, c.misc_file, c.pay_amount,
+                        CONCAT(s.first_name, ' ', s.last_name) as surgeon_name,
+                        f.facility_name
+                    FROM cases c
+                    LEFT JOIN surgeon_list s ON c.surgeon_id = s.surgeon_id
+                    LEFT JOIN facility_list f ON c.facility_id = f.facility_id
+                    WHERE c.user_id = %s and c.active = 1
+                """
                 params = [user_id]
                 
                 if status_list and status_list != ["all"]:
@@ -62,16 +73,16 @@ def get_cases(request: Request, user_id: str = Query(..., description="The user 
                         
                         if other_statuses:
                             # Query for both specific statuses and >= max_case_status
-                            sql += " AND (case_status IN (%s) OR case_status >= %%s)" % (",".join(["%s"] * len(other_statuses)))
+                            sql += " AND (c.case_status IN (%s) OR c.case_status >= %%s)" % (",".join(["%s"] * len(other_statuses)))
                             params.extend([str(s) for s in other_statuses])
                             params.append(max_case_status)
                         else:
                             # Only max_case_status requested, get all >= max_case_status
-                            sql += " AND case_status >= %s"
+                            sql += " AND c.case_status >= %s"
                             params.append(max_case_status)
                     else:
                         # Normal filtering without max_case_status special handling
-                        sql += " AND case_status IN (%s)" % (",".join(["%s"] * len(status_list)))
+                        sql += " AND c.case_status IN (%s)" % (",".join(["%s"] * len(status_list)))
                         params.extend([str(s) for s in status_list])
                 # If status_list is empty or ["all"], no additional WHERE clause needed
                 
@@ -88,10 +99,16 @@ def get_cases(request: Request, user_id: str = Query(..., description="The user 
                     # Convert datetime to ISO format
                     if case_data["case_date"]:
                         case_data["case_date"] = case_data["case_date"].isoformat()
-                    # fetch procedure codes for each case
-                    cursor.execute("SELECT procedure_code FROM case_procedure_codes WHERE case_id = %s", (case_data["case_id"],))
-                    codes = [row['procedure_code'] for row in cursor.fetchall()]
-                    case_data['procedure_codes'] = codes
+                    
+                    # fetch procedure codes with descriptions - JOIN with procedure_codes table
+                    cursor.execute("""
+                        SELECT cpc.procedure_code, pc.procedure_desc 
+                        FROM case_procedure_codes cpc 
+                        LEFT JOIN procedure_codes_desc pc ON cpc.procedure_code = pc.procedure_code 
+                        WHERE cpc.case_id = %s
+                    """, (case_data["case_id"],))
+                    procedure_data = [{'procedure_code': row['procedure_code'], 'procedure_desc': row['procedure_desc']} for row in cursor.fetchall()]
+                    case_data['procedure_codes'] = procedure_data
                     result.append(case_data)
             
             # Record successful case filtering

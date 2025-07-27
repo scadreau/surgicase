@@ -1,5 +1,5 @@
 # Created: 2025-07-15 11:54:13
-# Last Modified: 2025-07-27 03:02:57
+# Last Modified: 2025-07-27 03:09:19
 # Author: Scott Cadreau
 
 # endpoints/backoffice/get_cases_by_status.py
@@ -76,23 +76,34 @@ def get_cases_by_status(
                     error_message = "User does not have permission to access all cases"
                     raise HTTPException(status_code=403, detail="User does not have permission to access all cases.")
 
-                # Build query for all cases (no user_id filter)
-                sql = "SELECT user_id, case_id, case_date, patient_first, patient_last, ins_provider, surgeon_id, facility_id, case_status, demo_file, note_file, misc_file, pay_amount FROM cases WHERE active = 1"
+                # Build query for all cases with surgeon and facility names
+                sql = """
+                    SELECT 
+                        c.user_id, c.case_id, c.case_date, c.patient_first, c.patient_last, 
+                        c.ins_provider, c.surgeon_id, c.facility_id, c.case_status, 
+                        c.demo_file, c.note_file, c.misc_file, c.pay_amount,
+                        CONCAT(s.first_name, ' ', s.last_name) as surgeon_name,
+                        f.facility_name
+                    FROM cases c
+                    LEFT JOIN surgeon_list s ON c.surgeon_id = s.surgeon_id
+                    LEFT JOIN facility_list f ON c.facility_id = f.facility_id
+                    WHERE c.active = 1
+                """
                 params = []
                 
                 # Only add status filter if not "all"
                 if status_list != "all" and status_list:
                     placeholders = ",".join(["%s"] * len(status_list))
-                    sql += f" AND case_status IN ({placeholders})"
+                    sql += f" AND c.case_status IN ({placeholders})"
                     params.extend(status_list)
                 
                 # Add date filters if provided
                 if parsed_start_date:
-                    sql += " AND case_date >= %s"
+                    sql += " AND c.case_date >= %s"
                     params.append(parsed_start_date)
                 
                 if parsed_end_date:
-                    sql += " AND case_date <= %s"
+                    sql += " AND c.case_date <= %s"
                     params.append(parsed_end_date)
                     
                 cursor.execute(sql, params)
@@ -103,10 +114,16 @@ def get_cases_by_status(
                     # Convert datetime to ISO format if it's a datetime object
                     if case_data["case_date"] and hasattr(case_data["case_date"], 'isoformat'):
                         case_data["case_date"] = case_data["case_date"].isoformat()
-                    # fetch procedure codes for each case
-                    cursor.execute("SELECT procedure_code FROM case_procedure_codes WHERE case_id = %s", (case_data["case_id"],))
-                    codes = [row['procedure_code'] for row in cursor.fetchall()]
-                    case_data['procedure_codes'] = codes
+                    
+                    # fetch procedure codes with descriptions - JOIN with procedure_codes table
+                    cursor.execute("""
+                        SELECT cpc.procedure_code, pc.procedure_desc 
+                        FROM case_procedure_codes cpc 
+                        LEFT JOIN procedure_codes_desc pc ON cpc.procedure_code = pc.procedure_code 
+                        WHERE cpc.case_id = %s
+                    """, (case_data["case_id"],))
+                    procedure_data = [{'procedure_code': row['procedure_code'], 'procedure_desc': row['procedure_desc']} for row in cursor.fetchall()]
+                    case_data['procedure_codes'] = procedure_data
                     result.append(case_data)
 
                 # Record successful cases retrieval
