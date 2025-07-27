@@ -1,0 +1,11 @@
+Use functional programming primarily (Only use classes when they are needed.  Such as in models.py)
+Python 3.12+
+FastAPI
+Go 1.24.5+
+
+Always include the following 3 lines at the beginning of any .py file (note the trailing spaces)
+# Created: 
+# Last Modified: 
+# Author: Scott Cadreau
+
+When needed read the most recent table_structures_<date_time>.sql file for current database and table information
