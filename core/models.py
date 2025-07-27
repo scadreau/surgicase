@@ -1,5 +1,6 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-22 12:15:30
+# Last Modified: 2025-07-27 02:01:11
+# Author: Scott Cadreau
 
 # core/models.py
 from typing import Optional, List
@@ -131,3 +132,9 @@ class LogRequestModel(BaseModel):
     execution_time_ms: int
     error_message: str | None = None
     client_ip: str | None = None
+
+# Bulk Case Status Update Models
+class BulkCaseStatusUpdate(BaseModel):
+    case_ids: List[str]
+    new_status: int
+    force: Optional[bool] = False

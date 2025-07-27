@@ -39,6 +39,15 @@ This document provides a comprehensive list of all available API endpoints in th
 - **Parameters:** `case_id` (string, required) - The case ID to delete
 - **Description:** Delete (deactivate) case by case_id
 
+### Bulk Update Case Status
+- **Method:** `PATCH`
+- **Path:** `/bulkupdatecasestatus`
+- **Body:** BulkCaseStatusUpdate object containing:
+  - `case_ids` (array of strings, required) - List of case IDs to update
+  - `new_status` (integer, required) - The new status value to set
+  - `force` (boolean, optional, default: false) - Allow backward status progression
+- **Description:** Bulk update case status for multiple cases with validation to prevent backward progression unless forced
+
 ### Filter Cases
 - **Method:** `GET`
 - **Path:** `/casefilter`
