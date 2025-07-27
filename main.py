@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-27 02:00:56
+# Last Modified: 2025-07-27 03:43:48
 
 # main.py
 from fastapi import FastAPI, Request
@@ -113,4 +113,12 @@ app.include_router(quickbooks_export_router, tags=["exports"])
 
 if __name__ == "__main__":
     import uvicorn
+    import os
+    
+    # Optional: Start the weekly case status scheduler in background
+    # Set ENABLE_SCHEDULER=true environment variable to enable
+    if os.getenv("ENABLE_SCHEDULER", "false").lower() == "true":
+        from utils.weekly_case_status_scheduler import run_scheduler_in_background
+        run_scheduler_in_background()
+    
     uvicorn.run(app, host="0.0.0.0", port=8000)
