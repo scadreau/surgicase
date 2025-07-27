@@ -1,5 +1,5 @@
 # Created: 2025-01-15
-# Last Modified: 2025-07-27 03:43:18
+# Last Modified: 2025-07-27 04:44:47
 # Author: Scott Cadreau
 
 import schedule
@@ -56,23 +56,23 @@ def get_cases_with_status(status: int) -> List[str]:
             except Exception as close_error:
                 logger.error(f"Error closing database connection: {str(close_error)}")
 
-def weekly_case_status_update():
+def weekly_pending_payment_update():
     """
-    Weekly scheduled function to update case status from 10 to 15.
+    Weekly scheduled function to update case status from 10 to 15 (pending payment).
     
     This function:
     1. Searches for all cases with case_status=10
     2. Updates them to case_status=15 using the bulk_update_case_status function
     3. Logs the results
     """
-    logger.info("Starting weekly case status update job...")
+    logger.info("Starting weekly pending payment update job...")
     
     try:
         # Get all cases with status 10
         case_ids = get_cases_with_status(10)
         
         if not case_ids:
-            logger.info("No cases found with status 10. Weekly update job completed.")
+            logger.info("No cases found with status 10. Weekly pending payment update job completed.")
             return
         
         # Create the bulk update request
@@ -89,7 +89,7 @@ def weekly_case_status_update():
         result = bulk_update_case_status(mock_request, update_request)
         
         # Log the results
-        logger.info(f"Weekly case status update completed:")
+        logger.info(f"Weekly pending payment update completed:")
         logger.info(f"  Total processed: {result['total_processed']}")
         logger.info(f"  Successfully updated: {result['total_updated']}")
         logger.info(f"  Exceptions: {result['total_exceptions']}")
@@ -102,21 +102,75 @@ def weekly_case_status_update():
             logger.info(f"Successfully updated cases: {updated_case_ids}")
         
     except Exception as e:
-        logger.error(f"Error in weekly case status update job: {str(e)}")
+        logger.error(f"Error in weekly pending payment update job: {str(e)}")
+
+def weekly_paid_update():
+    """
+    Weekly scheduled function to update case status from 15 to 20 (paid).
+    
+    This function:
+    1. Searches for all cases with case_status=15
+    2. Updates them to case_status=20 using the bulk_update_case_status function
+    3. Logs the results
+    """
+    logger.info("Starting weekly paid update job...")
+    
+    try:
+        # Get all cases with status 15
+        case_ids = get_cases_with_status(15)
+        
+        if not case_ids:
+            logger.info("No cases found with status 15. Weekly paid update job completed.")
+            return
+        
+        # Create the bulk update request
+        update_request = BulkCaseStatusUpdate(
+            case_ids=case_ids,
+            new_status=20,
+            force=False  # Don't force backward progression
+        )
+        
+        # Create a mock request object for the bulk_update_case_status function
+        mock_request = Mock(spec=Request)
+        
+        # Call the bulk update function
+        result = bulk_update_case_status(mock_request, update_request)
+        
+        # Log the results
+        logger.info(f"Weekly paid update completed:")
+        logger.info(f"  Total processed: {result['total_processed']}")
+        logger.info(f"  Successfully updated: {result['total_updated']}")
+        logger.info(f"  Exceptions: {result['total_exceptions']}")
+        
+        if result['exceptions']:
+            logger.warning(f"Cases with exceptions: {[exc['case_id'] for exc in result['exceptions']]}")
+            
+        if result['updated_cases']:
+            updated_case_ids = [case['case_id'] for case in result['updated_cases']]
+            logger.info(f"Successfully updated cases: {updated_case_ids}")
+        
+    except Exception as e:
+        logger.error(f"Error in weekly paid update job: {str(e)}")
 
 def setup_weekly_scheduler():
     """
     Set up the weekly scheduler for case status updates.
     
-    Schedules the weekly_case_status_update function to run:
-    # Change day and time below as needed
-    # Currently set to Monday at 08:00 UTC
-    """
-    # Schedule for Monday at 08:00 UTC
-    # To change: modify the day and time in the line below
-    schedule.every().monday.at("08:00").do(weekly_case_status_update)
+    Schedules both weekly update functions:
+    - weekly_pending_payment_update: Monday at 08:00 UTC (status 10 -> 15)
+    - weekly_paid_update: Thursday at 08:00 UTC (status 15 -> 20)
     
-    logger.info("Weekly case status update scheduler configured for Monday at 08:00 UTC")
+    To change days/times: modify the schedule lines below
+    """
+    # Schedule pending payment update for Monday at 08:00 UTC
+    schedule.every().monday.at("08:00").do(weekly_pending_payment_update)
+    
+    # Schedule paid update for Thursday at 08:00 UTC
+    schedule.every().thursday.at("08:00").do(weekly_paid_update)
+    
+    logger.info("Weekly case status update scheduler configured:")
+    logger.info("  - Pending payment update: Monday at 08:00 UTC")
+    logger.info("  - Paid update: Thursday at 08:00 UTC")
 
 def run_scheduler():
     """
@@ -143,9 +197,24 @@ def run_scheduler_in_background():
     scheduler_thread.start()
     logger.info("Case status scheduler started in background thread")
 
+def run_pending_payment_update_now():
+    """
+    Utility function to run the pending payment update immediately (for testing).
+    """
+    logger.info("Running pending payment update immediately...")
+    weekly_pending_payment_update()
+
+def run_paid_update_now():
+    """
+    Utility function to run the paid update immediately (for testing).
+    """
+    logger.info("Running paid update immediately...")
+    weekly_paid_update()
+
 def run_update_now():
     """
     Utility function to run the case status update immediately (for testing).
+    Kept for backward compatibility - runs the pending payment update.
     """
     logger.info("Running case status update immediately...")
-    weekly_case_status_update() 
+    weekly_pending_payment_update() 
