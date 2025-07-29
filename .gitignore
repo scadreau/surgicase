@@ -140,3 +140,6 @@ npi_data/*.csv
 
 # Reports
 reports/
+
+# Updates
+update_*.md

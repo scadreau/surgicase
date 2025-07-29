@@ -20,3 +20,5 @@ When it is deemed necessary create a separate readme with the functional details
 
 For database integration use pymysql
 
+At the end of a conversation, if I type "create report" please create a small .md file called update_<date_time>.md.  Only do this if the create report is entered on its own line
+
