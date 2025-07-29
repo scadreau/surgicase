@@ -1,5 +1,5 @@
 # Created: 2025-07-17 10:30:00
-# Last Modified: 2025-07-17 11:08:44
+# Last Modified: 2025-07-29 01:04:06
 
 # utils/s3_storage.py
 import boto3
@@ -170,7 +170,10 @@ def generate_s3_key(
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
         # Create S3 key
-        s3_key = f"{base_prefix}{file_type}/{timestamp}_{filename}"
+        if file_type:
+            s3_key = f"{base_prefix}{file_type}/{timestamp}_{filename}"
+        else:
+            s3_key = f"{base_prefix}{timestamp}_{filename}"
         
         return s3_key
         
@@ -178,7 +181,10 @@ def generate_s3_key(
         logger.error(f"Error generating S3 key: {str(e)}")
         # Fallback to simple key
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        return f"reports/{file_type}/{timestamp}_{filename}"
+        if file_type:
+            return f"reports/{file_type}/{timestamp}_{filename}"
+        else:
+            return f"reports/{timestamp}_{filename}"
 
 def delete_file_from_s3(s3_key: str) -> Dict[str, Any]:
     """
