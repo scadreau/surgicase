@@ -1,5 +1,5 @@
 # Created: 2025-07-27 02:29:13
-# Last Modified: 2025-07-29 01:13:10
+# Last Modified: 2025-07-29 01:17:19
 # Author: Scott Cadreau
 
 # endpoints/backoffice/case_dashboard_data.py
@@ -91,7 +91,7 @@ def case_dashboard_data(
                         'case_status': case_status,
                         'case_status_desc': status_descriptions.get(case_status, f"Status {case_status}"),
                         'cases': cases_count,
-                        'total_amount': float(f"{amount:.2f}")
+                        'total_amount': f"{amount:.2f}"
                     })
                     
                     total_cases += cases_count
@@ -107,7 +107,7 @@ def case_dashboard_data(
             "dashboard_data": dashboard_data,
             "summary": {
                 "total_cases": total_cases,
-                "total_amount": float(f"{total_amount:.2f}")
+                "total_amount": f"{total_amount:.2f}"
             },
             "filters": {
                 "start_date": start_date,
