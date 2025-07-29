@@ -1,10 +1,9 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-23 12:16:38
+# Last Modified: 2025-07-29 01:51:48
 
 # endpoints/facility/create_facility.py
 from fastapi import APIRouter, HTTPException, Request
 import pymysql.cursors
-import pymysql
 from core.database import get_db_connection, close_db_connection, is_connection_valid
 from core.models import FacilityCreate
 from utils.monitoring import track_business_operation, business_metrics

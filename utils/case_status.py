@@ -1,8 +1,7 @@
 # Created: 2025-07-15 23:02:51
-# Last Modified: 2025-07-23 22:11:04
+# Last Modified: 2025-07-29 01:51:02
 # utils/case_status.py
 import pymysql.cursors
-import pymysql
 
 def update_case_status(case_id: str, conn) -> dict:
     """

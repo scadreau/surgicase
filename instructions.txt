@@ -20,9 +20,9 @@ When it is deemed necessary create a separate readme with the functional details
 
 For database integration use pymysql
 
-At the end of a conversation, if I type "create report" please create a small .md file called in the updates directory update_<date_time>.md.  
+At the end of a conversation, if I type "create update" please create a small .md file called in the updates directory update_<date_time>.md.  
 date_time should be YYYY-mm-dd_hh-mm-ss.  
-Only do this if the create report is entered on its own line.
+Only do this if the create update is entered on its own line.
 
 Do not edit the # Last Modified: line.  It is handled by an automatic script on save
 

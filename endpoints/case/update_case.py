@@ -1,10 +1,9 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-26 02:38:44
+# Last Modified: 2025-07-29 01:51:57
 
 # endpoints/case/update_case.py
 from fastapi import APIRouter, HTTPException, Body, Request
 import pymysql.cursors
-import pymysql
 import logging
 import time
 from core.database import get_db_connection, close_db_connection, is_connection_valid

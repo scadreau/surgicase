@@ -1,11 +1,11 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-23 11:59:16
+# Last Modified: 2025-07-29 01:52:36
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from core.database import get_db_connection, close_db_connection
 from datetime import datetime
-import pymysql
+import pymysql.cursors
 import json
 from core.models import LogRequestModel
 from utils.monitoring import track_business_operation, business_metrics

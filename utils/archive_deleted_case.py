@@ -1,9 +1,8 @@
 # Created: 2025-07-15 20:17:09
-# Last Modified: 2025-07-23 09:41:58
+# Last Modified: 2025-07-29 01:51:08
 
 # utils/archive_deleted_case.py
 
-import pymysql
 import pymysql.cursors
 import logging
 from core.database import get_db_connection, close_db_connection

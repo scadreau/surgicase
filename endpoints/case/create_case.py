@@ -1,11 +1,10 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-23 11:59:30
+# Last Modified: 2025-07-29 01:52:03
 
 # endpoints/case/create_case.py
 from fastapi import APIRouter, HTTPException, Request
 from fastapi import Depends
 import pymysql.cursors
-import pymysql
 from core.database import get_db_connection, close_db_connection, is_connection_valid
 from core.models import CaseCreate
 from utils.case_status import update_case_status
