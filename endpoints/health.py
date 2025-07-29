@@ -1,5 +1,6 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-28 23:57:10
+# Last Modified: 2025-07-29 00:00:29
+# Author: Scott Cadreau
 
 # endpoints/health.py
 from fastapi import APIRouter, HTTPException
