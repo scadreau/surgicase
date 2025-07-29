@@ -1,5 +1,5 @@
 # Created: 2025-07-28 19:48:18
-# Last Modified: 2025-07-29 00:42:09
+# Last Modified: 2025-07-29 00:51:44
 # Author: Scott Cadreau
 
 # endpoints/exports/case_export.py
@@ -214,7 +214,7 @@ def export_cases_csv(request: CaseExportRequest):
                 s3_key = generate_s3_key(
                     file_type="exports_csv",
                     filename=filename,
-                    folder_prefix="exports_csv/"
+                    folder_prefix="/private/exports/csv/"
                 )
                 
                 s3_result = upload_file_to_s3(
