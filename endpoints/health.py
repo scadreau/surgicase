@@ -1,10 +1,11 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-29 00:00:29
+# Last Modified: 2025-07-29 01:46:58
 # Author: Scott Cadreau
 
 # endpoints/health.py
 from fastapi import APIRouter, HTTPException
 from core.database import get_db_connection
+from utils.monitoring import track_business_operation, business_metrics
 import boto3
 import os
 import time
@@ -143,6 +144,7 @@ def check_system_resources() -> Dict[str, Any]:
         }
 
 @router.get("/health")
+@track_business_operation("check", "health")
 def health_check():
     """
     Comprehensive health check endpoint with detailed component status
@@ -194,6 +196,7 @@ def health_check():
     return health_response
 
 @router.get("/health/ready")
+@track_business_operation("check", "health_ready")
 def readiness_check():
     """
     Kubernetes readiness check - indicates if the service is ready to receive traffic
@@ -217,6 +220,7 @@ def readiness_check():
         raise HTTPException(status_code=503, detail="Service not ready")
 
 @router.get("/health/live")
+@track_business_operation("check", "health_live")
 def liveness_check():
     """
     Kubernetes liveness check - indicates if the service is alive and should not be restarted
@@ -229,6 +233,7 @@ def liveness_check():
         raise HTTPException(status_code=503, detail="Service not alive")
 
 @router.get("/health/simple")
+@track_business_operation("check", "health_simple")
 def simple_health_check():
     """
     Simple health check for load balancers and basic monitoring
