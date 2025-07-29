@@ -17,3 +17,6 @@ Always add prometheus monitoring to new endpoints
 Update the main readme when appropriate
 
 When it is deemed necessary create a separate readme with the functional details
+
+for database integration use pymysql
+
