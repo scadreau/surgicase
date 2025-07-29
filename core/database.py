@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 16:01:37
+# Last Modified: 2025-07-28 23:41:11
 
 # core/database.py
 import boto3
@@ -8,7 +8,9 @@ import pymysql
 import pymysql.cursors
 import os
 import time
-from typing import Optional
+import threading
+from typing import Optional, Dict, Any
+from queue import Queue, Empty
 
 # Import monitoring utilities
 try:
@@ -19,55 +21,140 @@ except ImportError:
     logger = None
     track_database_operation = lambda operation, table="unknown": lambda func: func
 
-def get_db_credentials(secret_name):
+# Global credentials cache and connection pool
+_credentials_cache: Dict[str, Any] = {}
+_credentials_lock = threading.Lock()
+_connection_pool: Optional[Queue] = None
+_pool_config: Dict[str, Any] = {}
+_pool_lock = threading.Lock()
+
+def get_db_credentials(secret_name: str) -> Dict[str, Any]:
     """
-    Function to fetch database credentials from AWS Secrets Manager
+    Function to fetch database credentials from AWS Secrets Manager with caching
     """
-    region = os.environ.get("AWS_REGION", "us-east-1")
-    client = boto3.client("secretsmanager", region_name=region)
-    response = client.get_secret_value(SecretId=secret_name)
-    secret = json.loads(response["SecretString"])
-    return secret
+    with _credentials_lock:
+        # Check cache first (cache for 5 minutes)
+        cache_key = f"{secret_name}_cache"
+        cache_time_key = f"{secret_name}_time"
+        
+        if (cache_key in _credentials_cache and 
+            cache_time_key in _credentials_cache and
+            time.time() - _credentials_cache[cache_time_key] < 300):  # 5 minutes cache
+            return _credentials_cache[cache_key]
+        
+        # Fetch from AWS if not cached or expired
+        region = os.environ.get("AWS_REGION", "us-east-1")
+        client = boto3.client("secretsmanager", region_name=region)
+        response = client.get_secret_value(SecretId=secret_name)
+        secret = json.loads(response["SecretString"])
+        
+        # Cache the result
+        _credentials_cache[cache_key] = secret
+        _credentials_cache[cache_time_key] = time.time()
+        
+        return secret
+
+def _create_connection() -> pymysql.Connection:
+    """Create a new database connection"""
+    # Fetch DB info from Secrets Manager (cached)
+    secretdb = get_db_credentials("arn:aws:secretsmanager:us-east-1:002118831669:secret:prod/rds/serverinfo-MyhF8S")
+    rds_host = secretdb["rds_address"]
+    db_name = secretdb["db_name"]    
+    secretdb = get_db_credentials("arn:aws:secretsmanager:us-east-1:002118831669:secret:rds!cluster-9376049b-abee-46d9-9cdb-95b95d6cdda0-fjhTNH")
+    db_user = secretdb["username"]
+    db_pass = secretdb["password"]
+    
+    # Create connection with autocommit=False for transaction control
+    connection = pymysql.connect(
+        host=rds_host, 
+        user=db_user, 
+        password=db_pass, 
+        database=db_name,
+        autocommit=False,  # Explicitly disable autocommit
+        charset='utf8mb4',
+        cursorclass=pymysql.cursors.DictCursor
+    )
+    return connection
+
+def _initialize_pool():
+    """Initialize the connection pool"""
+    global _connection_pool, _pool_config
+    
+    with _pool_lock:
+        if _connection_pool is not None:
+            return
+            
+        # Pool configuration
+        pool_size = int(os.environ.get("DB_POOL_SIZE", "10"))
+        _pool_config = {
+            "pool_size": pool_size,
+            "max_overflow": int(os.environ.get("DB_POOL_MAX_OVERFLOW", "5")),
+            "pool_timeout": int(os.environ.get("DB_POOL_TIMEOUT", "30"))
+        }
+        
+        _connection_pool = Queue(maxsize=pool_size + _pool_config["max_overflow"])
+        
+        # Pre-populate with initial connections
+        for _ in range(min(pool_size, 3)):  # Start with 3 connections
+            try:
+                conn = _create_connection()
+                _connection_pool.put(conn, block=False)
+            except Exception as e:
+                if logger:
+                    logger.warning(f"Failed to pre-populate connection pool: {e}")
+                break
 
 def get_db_connection():
     """
-    Helper function to establish database connection with monitoring
+    Helper function to establish database connection with connection pooling
     """
+    global _connection_pool
     start_time = time.time()
     
     try:
-        # Fetch DB info from Secrets Manager
-        secretdb = get_db_credentials("arn:aws:secretsmanager:us-east-1:002118831669:secret:prod/rds/serverinfo-MyhF8S")
-        rds_host = secretdb["rds_address"]
-        db_name = secretdb["db_name"]    
-        secretdb = get_db_credentials("arn:aws:secretsmanager:us-east-1:002118831669:secret:rds!cluster-9376049b-abee-46d9-9cdb-95b95d6cdda0-fjhTNH")
-        db_user = secretdb["username"]
-        db_pass = secretdb["password"]
+        # Initialize pool if needed
+        if _connection_pool is None:
+            _initialize_pool()
         
-        # Create connection with autocommit=False for transaction control
-        connection = pymysql.connect(
-            host=rds_host, 
-            user=db_user, 
-            password=db_pass, 
-            db=db_name,
-            autocommit=False,  # Explicitly disable autocommit
-            charset='utf8mb4',
-            cursorclass=pymysql.cursors.DictCursor
-        )
+        # Try to get connection from pool
+        connection = None
+        try:
+            connection = _connection_pool.get(timeout=_pool_config["pool_timeout"])
+            
+            # Validate connection
+            if is_connection_valid(connection):
+                # Track successful connection from pool
+                if db_monitor:
+                    db_monitor.connection_created()
+                    duration = time.time() - start_time
+                    if logger:
+                        logger.debug("database_connection_from_pool", duration=duration)
+                return connection
+            else:
+                # Connection is stale, create new one
+                connection.close() if connection else None
+                connection = None
+                
+        except Empty:
+            # Pool is empty, create new connection if under max limit
+            pass
         
-        # Track connection creation if monitoring is available
+        # Create new connection if pool empty or connection invalid
+        connection = _create_connection()
+        
+        # Track connection creation
         if db_monitor:
             db_monitor.connection_created()
             duration = time.time() - start_time
             if logger:
-                logger.debug("database_connection_established", duration=duration, host=rds_host)
+                logger.debug("database_connection_established", duration=duration)
         
         return connection
         
     except Exception as e:
         duration = time.time() - start_time
         
-        # Track connection errors if monitoring is available
+        # Track connection errors
         if db_monitor:
             db_monitor.connection_created()  # This will increment the error counter
             if logger:
@@ -91,20 +178,51 @@ def is_connection_valid(connection: Optional[pymysql.Connection]) -> bool:
 
 def close_db_connection(connection: Optional[pymysql.Connection]):
     """
-    Helper function to close database connection with monitoring
+    Helper function to return connection to pool or close it
     """
-    if connection and is_connection_valid(connection):
-        try:
-            connection.close()
+    global _connection_pool
+    
+    if not connection:
+        return
+        
+    try:
+        # If connection is valid and pool isn't full, return to pool
+        if (is_connection_valid(connection) and 
+            _connection_pool is not None and 
+            not _connection_pool.full()):
             
-            # Track connection closure if monitoring is available
+            # Reset connection state for reuse
+            if not connection.get_autocommit():
+                try:
+                    connection.rollback()  # Reset any uncommitted transaction
+                except Exception:
+                    pass  # Ignore rollback errors
+            
+            _connection_pool.put(connection, block=False)
+            
+            # Track connection returned to pool
             if db_monitor:
                 db_monitor.connection_closed()
                 if logger:
-                    logger.debug("database_connection_closed")
-                
-        except Exception as e:
+                    logger.debug("database_connection_returned_to_pool")
+            return
+            
+    except Exception as e:
+        if logger:
+            logger.warning(f"Failed to return connection to pool: {e}")
+    
+    # If we can't return to pool, close the connection
+    try:
+        connection.close()
+        
+        # Track connection closure
+        if db_monitor:
+            db_monitor.connection_closed()
             if logger:
-                logger.error("database_connection_close_failed", error=str(e))
-            # Don't raise the exception for connection close failures
-            pass
+                logger.debug("database_connection_closed")
+            
+    except Exception as e:
+        if logger:
+            logger.error("database_connection_close_failed", error=str(e))
+        # Don't raise the exception for connection close failures
+        pass
