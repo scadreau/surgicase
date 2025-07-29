@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-07-23 13:59:09
+# Last Modified: 2025-07-29 00:59:34
 
 # endpoints/reports/provider_payment_report.py
 from fastapi import APIRouter, HTTPException, Query
@@ -270,7 +270,7 @@ def generate_provider_payment_report(
                 }
                 
                 # Upload to S3
-                s3_key = generate_s3_key('', filename)
+                s3_key = generate_s3_key('provider-payments', filename)
                 s3_result = upload_file_to_s3(
                     file_path=filepath,
                     s3_key=s3_key,
