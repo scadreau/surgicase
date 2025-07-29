@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-27 03:57:15
+# Last Modified: 2025-07-28 19:48:37
 
 # main.py
 from fastapi import FastAPI, Request
@@ -43,6 +43,7 @@ from endpoints.backoffice.bulk_update_case_status import router as bulk_update_c
 
 from endpoints.reports.provider_payment_report import router as provider_payment_report_router
 from endpoints.exports.quickbooks_export import router as quickbooks_export_router
+from endpoints.exports.case_export import router as case_export_router
 
 # Import monitoring utilities
 from utils.monitoring import monitor_request, system_monitor, db_monitor, logger
@@ -112,6 +113,7 @@ app.include_router(provider_payment_report_router, tags=["reports"])
 
 # Export endpoints
 app.include_router(quickbooks_export_router, tags=["exports"])
+app.include_router(case_export_router, tags=["exports"])
 
 if __name__ == "__main__":
     import uvicorn

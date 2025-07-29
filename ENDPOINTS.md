@@ -11,6 +11,7 @@ This document provides a comprehensive list of all available API endpoints in th
 - [Utility Endpoints](#utility-endpoints)
 - [Health & Monitoring](#health--monitoring)
 - [Backoffice](#backoffice)
+- [Exports & Reports](#exports--reports)
 - [Monitoring Infrastructure](#monitoring-infrastructure)
 - [Scaling Infrastructure](#scaling-infrastructure)
 
@@ -253,6 +254,44 @@ This document provides a comprehensive list of all available API endpoints in th
   - `user_id` (string, required) - The user ID making the request (must be user_type >= 10)
   - `filter` (string, optional) - Comma-separated list of case_status values
 - **Description:** Retrieve all cases filtered by case_status values, only if the calling user has user_type >= 10
+
+---
+
+## Exports & Reports
+
+### Export Cases
+- **Method:** `POST`
+- **Path:** `/cases`
+- **Request Body:** JSON object with `case_ids` array
+- **Description:** Export comprehensive case data with associated procedure codes
+- **Request Format:**
+```json
+{
+  "case_ids": [1, 2, 3, 4, 5]
+}
+```
+- **Response:** JSON object containing case data, procedure codes, and export summary
+- **Returns:** All columns from `cases` table joined with `case_procedure_codes` table
+
+### QuickBooks Vendors Export
+- **Method:** `GET`
+- **Path:** `/quickbooks-vendors-csv`
+- **Parameters:** 
+  - `start_date` (string, optional) - Start date filter (YYYY-MM-DD)
+  - `end_date` (string, optional) - End date filter (YYYY-MM-DD)
+  - `user_id` (string, optional) - Filter by specific provider user_id
+- **Description:** Export provider data as CSV for QuickBooks vendor import
+- **Returns:** CSV file download
+
+### QuickBooks Transactions Export
+- **Method:** `GET`
+- **Path:** `/quickbooks-transactions-iif`
+- **Parameters:** 
+  - `start_date` (string, optional) - Start date filter (YYYY-MM-DD)
+  - `end_date` (string, optional) - End date filter (YYYY-MM-DD)
+  - `user_id` (string, optional) - Filter by specific provider user_id
+- **Description:** Export provider payment transactions as IIF for QuickBooks import
+- **Returns:** IIF file download
 
 ---
 
