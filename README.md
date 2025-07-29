@@ -1,5 +1,5 @@
 # Created: 2025-01-27
-# Last Modified: 2025-07-28 23:41:58
+# Last Modified: 2025-07-28 23:57:52
 
 # SurgiCase Management System
 
@@ -216,9 +216,9 @@ The application will be available at:
 - `LOG_LEVEL` - Logging level (DEBUG, INFO, WARNING, ERROR)
 
 #### Database Connection Pooling
-- `DB_POOL_SIZE` - Base connection pool size (default: 10)
-- `DB_POOL_MAX_OVERFLOW` - Additional connections when pool full (default: 5)
-- `DB_POOL_TIMEOUT` - Timeout waiting for connection in seconds (default: 30)
+- `DB_POOL_SIZE` - Base connection pool size (default: 15)
+- `DB_POOL_MAX_OVERFLOW` - Additional connections when pool full (default: 10)
+- `DB_POOL_TIMEOUT` - Timeout waiting for connection in seconds (default: 10)
 
 **Connection Pool Benefits:**
 - **5-minute credential caching** eliminates repeated AWS Secrets Manager calls (saves 200-500ms per request)

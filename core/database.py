@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-28 23:41:11
+# Last Modified: 2025-07-28 23:57:41
 
 # core/database.py
 import boto3
@@ -84,12 +84,12 @@ def _initialize_pool():
         if _connection_pool is not None:
             return
             
-        # Pool configuration
-        pool_size = int(os.environ.get("DB_POOL_SIZE", "10"))
+        # Pool configuration - optimized for rapid requests
+        pool_size = int(os.environ.get("DB_POOL_SIZE", "15"))
         _pool_config = {
             "pool_size": pool_size,
-            "max_overflow": int(os.environ.get("DB_POOL_MAX_OVERFLOW", "5")),
-            "pool_timeout": int(os.environ.get("DB_POOL_TIMEOUT", "30"))
+            "max_overflow": int(os.environ.get("DB_POOL_MAX_OVERFLOW", "10")),
+            "pool_timeout": int(os.environ.get("DB_POOL_TIMEOUT", "10"))  # Faster timeout for rapid requests
         }
         
         _connection_pool = Queue(maxsize=pool_size + _pool_config["max_overflow"])
@@ -132,12 +132,15 @@ def get_db_connection():
                 return connection
             else:
                 # Connection is stale, create new one
+                if logger:
+                    logger.debug("database_connection_invalid_replacing")
                 connection.close() if connection else None
                 connection = None
                 
         except Empty:
             # Pool is empty, create new connection if under max limit
-            pass
+            if logger:
+                logger.debug("database_connection_pool_empty_creating_new")
         
         # Create new connection if pool empty or connection invalid
         connection = _create_connection()

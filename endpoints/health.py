@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-15 20:45:52
+# Last Modified: 2025-07-28 23:57:10
 
 # endpoints/health.py
 from fastapi import APIRouter, HTTPException
@@ -24,13 +24,13 @@ logger = get_logger()
 def check_database_health() -> Dict[str, Any]:
     """Check database connectivity and health"""
     start_time = time.time()
+    connection = None
     try:
         connection = get_db_connection()
         # Test a simple query
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
             cursor.fetchone()
-        connection.close()
         
         duration = time.time() - start_time
         logger.info(f"Database health check passed in {duration:.3f}s")
@@ -50,6 +50,11 @@ def check_database_health() -> Dict[str, Any]:
             "details": f"Database connection failed: {str(e)}",
             "error": str(e)
         }
+    finally:
+        # Always return connection to pool
+        if connection:
+            from core.database import close_db_connection
+            close_db_connection(connection)
 
 def check_aws_secrets_manager_health() -> Dict[str, Any]:
     """Check AWS Secrets Manager connectivity"""
