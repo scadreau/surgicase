@@ -1,5 +1,5 @@
 # Created: 2025-01-27
-# Last Modified: 2025-07-27 04:53:16
+# Last Modified: 2025-07-29 01:39:21
 
 # utils/monitoring.py
 import time
@@ -248,163 +248,146 @@ def track_database_operation(operation: str, table: str = "unknown"):
 
 # Database monitoring utilities
 
-class DatabaseMonitor:
-    """Database connection and performance monitoring"""
-    
-    def __init__(self):
-        self.connection_count = 0
-        self._lock = threading.Lock()
-    
-    def connection_created(self):
-        """Called when a new database connection is created"""
-        with self._lock:
-            self.connection_count += 1
-            DB_CONNECTION_ACTIVE.set(self.connection_count)
-            logger.debug("database_connection_created", active_connections=self.connection_count)
-    
-    def connection_closed(self):
-        """Called when a database connection is closed"""
-        with self._lock:
-            self.connection_count = max(0, self.connection_count - 1)
-            DB_CONNECTION_ACTIVE.set(self.connection_count)
-            logger.debug("database_connection_closed", active_connections=self.connection_count)
-    
-    def get_connection_stats(self) -> Dict[str, Any]:
-        """Get current database connection statistics"""
-        return {
-            "active_connections": self.connection_count,
-            "timestamp": datetime.utcnow().isoformat() + "Z"
-        }
+# Database monitoring - functional approach
+_db_connection_count = 0
+_db_connection_lock = threading.Lock()
+
+def db_connection_created():
+    """Called when a new database connection is created"""
+    global _db_connection_count
+    with _db_connection_lock:
+        _db_connection_count += 1
+        DB_CONNECTION_ACTIVE.set(_db_connection_count)
+        logger.debug("database_connection_created", active_connections=_db_connection_count)
+
+def db_connection_closed():
+    """Called when a database connection is closed"""
+    global _db_connection_count
+    with _db_connection_lock:
+        _db_connection_count = max(0, _db_connection_count - 1)
+        DB_CONNECTION_ACTIVE.set(_db_connection_count)
+        logger.debug("database_connection_closed", active_connections=_db_connection_count)
+
+def get_db_connection_stats() -> Dict[str, Any]:
+    """Get current database connection statistics"""
+    return {
+        "active_connections": _db_connection_count,
+        "timestamp": datetime.utcnow().isoformat() + "Z"
+    }
 
 # System monitoring utilities
 
-class SystemMonitor:
-    """System resource monitoring"""
-    
-    @staticmethod
-    def update_system_metrics():
-        """Update system resource metrics"""
-        try:
-            # CPU usage
-            cpu_percent = psutil.cpu_percent(interval=0.1)
-            SYSTEM_CPU_USAGE.set(cpu_percent)
-            
-            # Memory usage
-            memory = psutil.virtual_memory()
-            SYSTEM_MEMORY_USAGE.set(memory.percent)
-            
-            # Disk usage
-            disk = psutil.disk_usage('/')
-            SYSTEM_DISK_USAGE.set(disk.percent)
-            
-            logger.debug(
-                "system_metrics_updated",
-                cpu_percent=cpu_percent,
-                memory_percent=memory.percent,
-                disk_percent=disk.percent
-            )
-            
-        except Exception as e:
-            logger.error("system_metrics_update_failed", error=str(e))
-    
-    @staticmethod
-    def get_system_stats() -> Dict[str, Any]:
-        """Get current system statistics"""
-        try:
-            cpu_percent = psutil.cpu_percent(interval=0.1)
-            memory = psutil.virtual_memory()
-            disk = psutil.disk_usage('/')
-            
-            return {
-                "cpu_percent": round(cpu_percent, 2),
-                "memory_percent": round(memory.percent, 2),
-                "memory_available_gb": round(memory.available / (1024**3), 2),
-                "disk_percent": round(disk.percent, 2),
-                "disk_free_gb": round(disk.free / (1024**3), 2),
-                "timestamp": datetime.utcnow().isoformat() + "Z"
-            }
-        except Exception as e:
-            logger.error("system_stats_collection_failed", error=str(e))
-            return {"error": str(e)}
+def update_system_metrics():
+    """Update system resource metrics"""
+    try:
+        # CPU usage
+        cpu_percent = psutil.cpu_percent(interval=0.1)
+        SYSTEM_CPU_USAGE.set(cpu_percent)
+        
+        # Memory usage
+        memory = psutil.virtual_memory()
+        SYSTEM_MEMORY_USAGE.set(memory.percent)
+        
+        # Disk usage
+        disk = psutil.disk_usage('/')
+        SYSTEM_DISK_USAGE.set(disk.percent)
+        
+        logger.debug(
+            "system_metrics_updated",
+            cpu_percent=cpu_percent,
+            memory_percent=memory.percent,
+            disk_percent=disk.percent
+        )
+        
+    except Exception as e:
+        logger.error("system_metrics_update_failed", error=str(e))
+
+def get_system_stats() -> Dict[str, Any]:
+    """Get current system statistics"""
+    try:
+        cpu_percent = psutil.cpu_percent(interval=0.1)
+        memory = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        
+        return {
+            "cpu_percent": round(cpu_percent, 2),
+            "memory_percent": round(memory.percent, 2),
+            "memory_available_gb": round(memory.available / (1024**3), 2),
+            "disk_percent": round(disk.percent, 2),
+            "disk_free_gb": round(disk.free / (1024**3), 2),
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+    except Exception as e:
+        logger.error("system_stats_collection_failed", error=str(e))
+        return {"error": str(e)}
 
 # Business metrics utilities
 
-class BusinessMetrics:
-    """Business-specific metrics collection"""
-    
-    @staticmethod
-    def update_case_metrics(active_count: int):
-        """Update active cases metric"""
-        ACTIVE_CASES.set(active_count)
-        logger.debug("case_metrics_updated", active_cases=active_count)
-    
-    @staticmethod
-    def update_user_metrics(active_count: int):
-        """Update active users metric"""
-        ACTIVE_USERS.set(active_count)
-        logger.debug("user_metrics_updated", active_users=active_count)
-    
-    @staticmethod
-    def record_case_operation(operation: str, status: str, case_id: Optional[str] = None):
-        """Record a case operation"""
-        CASE_OPERATIONS.labels(operation=operation, status=status).inc()
-        logger.info(
-            "case_operation_recorded",
-            operation=operation,
-            status=status,
-            case_id=case_id
-        )
-    
-    @staticmethod
-    def record_user_operation(operation: str, status: str, user_id: Optional[str] = None):
-        """Record a user operation"""
-        USER_OPERATIONS.labels(operation=operation, status=status).inc()
-        logger.info(
-            "user_operation_recorded",
-            operation=operation,
-            status=status,
-            user_id=user_id
-        )
-    
-    @staticmethod
-    def record_surgeon_operation(operation: str, status: str, surgeon_id: Optional[int] = None):
-        """Record a surgeon operation"""
-        SURGEON_OPERATIONS.labels(operation=operation, status=status).inc()
-        logger.info(
-            "surgeon_operation_recorded",
-            operation=operation,
-            status=status,
-            surgeon_id=surgeon_id
-        )
-    
-    @staticmethod
-    def record_facility_operation(operation: str, status: str, facility_id: Optional[int] = None):
-        """Record a facility operation"""
-        FACILITY_OPERATIONS.labels(operation=operation, status=status).inc()
-        logger.info(
-            "facility_operation_recorded",
-            operation=operation,
-            status=status,
-            facility_id=facility_id
-        )
-    
-    @staticmethod
-    def record_utility_operation(operation: str, status: str):
-        """Record a utility operation"""
-        logger.info(
-            "utility_operation_recorded",
-            operation=operation,
-            status=status
-        )
-    
-    @staticmethod
-    def record_timing(operation: str, duration_ms: float):
-        """Record operation timing metrics"""
-        logger.info(
-            "operation_timing_recorded",
-            operation=operation,
-            duration_ms=duration_ms
-        )
+def update_case_metrics(active_count: int):
+    """Update active cases metric"""
+    ACTIVE_CASES.set(active_count)
+    logger.debug("case_metrics_updated", active_cases=active_count)
+
+def update_user_metrics(active_count: int):
+    """Update active users metric"""
+    ACTIVE_USERS.set(active_count)
+    logger.debug("user_metrics_updated", active_users=active_count)
+
+def record_case_operation(operation: str, status: str, case_id: Optional[str] = None):
+    """Record a case operation"""
+    CASE_OPERATIONS.labels(operation=operation, status=status).inc()
+    logger.info(
+        "case_operation_recorded",
+        operation=operation,
+        status=status,
+        case_id=case_id
+    )
+
+def record_user_operation(operation: str, status: str, user_id: Optional[str] = None):
+    """Record a user operation"""
+    USER_OPERATIONS.labels(operation=operation, status=status).inc()
+    logger.info(
+        "user_operation_recorded",
+        operation=operation,
+        status=status,
+        user_id=user_id
+    )
+
+def record_surgeon_operation(operation: str, status: str, surgeon_id: Optional[int] = None):
+    """Record a surgeon operation"""
+    SURGEON_OPERATIONS.labels(operation=operation, status=status).inc()
+    logger.info(
+        "surgeon_operation_recorded",
+        operation=operation,
+        status=status,
+        surgeon_id=surgeon_id
+    )
+
+def record_facility_operation(operation: str, status: str, facility_id: Optional[int] = None):
+    """Record a facility operation"""
+    FACILITY_OPERATIONS.labels(operation=operation, status=status).inc()
+    logger.info(
+        "facility_operation_recorded",
+        operation=operation,
+        status=status,
+        facility_id=facility_id
+    )
+
+def record_utility_operation(operation: str, status: str):
+    """Record a utility operation"""
+    logger.info(
+        "utility_operation_recorded",
+        operation=operation,
+        status=status
+    )
+
+def record_timing(operation: str, duration_ms: float):
+    """Record operation timing metrics"""
+    logger.info(
+        "operation_timing_recorded",
+        operation=operation,
+        duration_ms=duration_ms
+    )
 
 # Request/Response monitoring middleware
 
@@ -457,10 +440,33 @@ def monitor_request(request: Request, call_next):
             status=status
         )
 
-# Initialize monitoring instances
-db_monitor = DatabaseMonitor()
-system_monitor = SystemMonitor()
-business_metrics = BusinessMetrics()
+# Backward compatibility objects for existing code
+class _DatabaseMonitorCompat:
+    """Compatibility wrapper for old DatabaseMonitor usage"""
+    def connection_created(self): return db_connection_created()
+    def connection_closed(self): return db_connection_closed()
+    def get_connection_stats(self): return get_db_connection_stats()
+
+class _SystemMonitorCompat:
+    """Compatibility wrapper for old SystemMonitor usage"""
+    def update_system_metrics(self): return update_system_metrics()
+    def get_system_stats(self): return get_system_stats()
+
+class _BusinessMetricsCompat:
+    """Compatibility wrapper for old BusinessMetrics usage"""
+    def update_case_metrics(self, active_count: int): return update_case_metrics(active_count)
+    def update_user_metrics(self, active_count: int): return update_user_metrics(active_count)
+    def record_case_operation(self, operation: str, status: str, case_id: Optional[str] = None): return record_case_operation(operation, status, case_id)
+    def record_user_operation(self, operation: str, status: str, user_id: Optional[str] = None): return record_user_operation(operation, status, user_id)
+    def record_surgeon_operation(self, operation: str, status: str, surgeon_id: Optional[int] = None): return record_surgeon_operation(operation, status, surgeon_id)
+    def record_facility_operation(self, operation: str, status: str, facility_id: Optional[int] = None): return record_facility_operation(operation, status, facility_id)
+    def record_utility_operation(self, operation: str, status: str): return record_utility_operation(operation, status)
+    def record_timing(self, operation: str, duration_ms: float): return record_timing(operation, duration_ms)
+
+# Initialize compatibility instances for existing code
+db_monitor = _DatabaseMonitorCompat()
+system_monitor = _SystemMonitorCompat()
+business_metrics = _BusinessMetricsCompat()
 
 # Export all metrics for Prometheus
 def get_metrics():
@@ -472,8 +478,8 @@ def get_metrics_summary() -> Dict[str, Any]:
     """Get a summary of all metrics for debugging purposes"""
     return {
         "timestamp": datetime.utcnow().isoformat() + "Z",
-        "database": db_monitor.get_connection_stats(),
-        "system": system_monitor.get_system_stats(),
+        "database": get_db_connection_stats(),
+        "system": get_system_stats(),
         "metrics_info": {
             "request_count": "Total HTTP requests by method, endpoint, and status",
             "request_duration": "HTTP request duration histograms",
