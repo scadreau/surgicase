@@ -1,5 +1,5 @@
 # Created: 2025-07-29 04:32:53
-# Last Modified: 2025-07-29 04:37:30
+# Last Modified: 2025-07-29 04:50:53
 # Author: Scott Cadreau
 
 # utils/compress_pdf.py
@@ -18,7 +18,8 @@ def compress_pdf(
     image_quality: int = 75,
     image_max_width: int = 1600,
     remove_annotations: bool = False,
-    remove_links: bool = False
+    remove_links: bool = False,
+    safe_mode: bool = True
 ) -> bool:
     """
     Compress a PDF using PyMuPDF
@@ -31,6 +32,7 @@ def compress_pdf(
         image_max_width: Maximum width for images in pixels (default 1600)
         remove_annotations: Whether to remove annotations (default False)
         remove_links: Whether to remove hyperlinks (default False)
+        safe_mode: If True, skip aggressive image compression to prevent corruption (default True)
         
     Returns:
         bool: True if compression successful, False otherwise
@@ -66,8 +68,9 @@ def compress_pdf(
                 for link in links:
                     page.delete_link(link)
             
-            # Compress images on the page
-            _compress_page_images(page, image_quality, image_max_width)
+            # Compress images on the page (only if not in safe mode)
+            if not safe_mode:
+                _compress_page_images(page, image_quality, image_max_width)
         
         # Save with compression
         doc.save(
@@ -142,6 +145,9 @@ def _compress_page_images(page, image_quality: int, max_width: int) -> None:
     """
     Compress images on a PDF page
     
+    WARNING: This function can corrupt PDFs by modifying embedded images.
+    Use with caution and always test thoroughly. Consider using safe_mode=True instead.
+    
     Args:
         page: PyMuPDF page object
         image_quality: JPEG quality (1-100)
@@ -203,7 +209,8 @@ def _compress_page_images(page, image_quality: int, max_width: int) -> None:
 def compress_pdf_in_memory(
     input_path: str,
     compression_level: str = "medium",
-    image_quality: int = 75
+    image_quality: int = 75,
+    safe_mode: bool = True
 ) -> Optional[bytes]:
     """
     Compress a PDF and return the compressed data as bytes
@@ -212,6 +219,7 @@ def compress_pdf_in_memory(
         input_path: Path to the input PDF file
         compression_level: "low", "medium", "high", or "maximum" compression
         image_quality: JPEG quality for images (1-100, default 75)
+        safe_mode: If True, skip aggressive image compression to prevent corruption (default True)
         
     Returns:
         bytes: Compressed PDF data, or None if compression failed
@@ -221,7 +229,7 @@ def compress_pdf_in_memory(
             temp_path = temp_file.name
         
         # Use the main compression function
-        if compress_pdf(input_path, temp_path, compression_level, image_quality):
+        if compress_pdf(input_path, temp_path, compression_level, image_quality, safe_mode=safe_mode):
             with open(temp_path, 'rb') as f:
                 compressed_data = f.read()
             
@@ -283,6 +291,61 @@ def get_pdf_compression_stats(input_path: str, compressed_path: str) -> dict:
     except Exception as e:
         logger.error(f"Error getting PDF compression stats: {str(e)}")
         return {"error": str(e)}
+
+def compress_pdf_safe(input_path: str, output_path: str) -> bool:
+    """
+    Safely compress a PDF using only document-level compression
+    without modifying embedded images (prevents corruption)
+    
+    Args:
+        input_path: Path to the input PDF file
+        output_path: Path where compressed PDF will be saved
+        
+    Returns:
+        bool: True if compression successful, False otherwise
+    """
+    try:
+        # Validate input file exists
+        if not os.path.exists(input_path):
+            logger.error(f"Input PDF file does not exist: {input_path}")
+            return False
+        
+        # Ensure output directory exists
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        # Open PDF document
+        doc = fitz.open(input_path)
+        
+        # Save with safe compression settings (no image manipulation)
+        doc.save(
+            output_path,
+            garbage=3,  # Remove unused objects
+            clean=True,  # Clean up document structure
+            deflate=True,  # Compress streams
+            deflate_images=False,  # Don't touch images - this prevents corruption
+            deflate_fonts=True  # Compress fonts safely
+        )
+        
+        doc.close()
+        
+        # Verify the compressed PDF is readable
+        if not is_pdf_valid(output_path):
+            logger.error(f"Compressed PDF is corrupted: {output_path}")
+            return False
+        
+        # Log compression results
+        original_size = os.path.getsize(input_path)
+        compressed_size = os.path.getsize(output_path)
+        compression_ratio = (1 - compressed_size / original_size) * 100
+        
+        logger.info(f"Safely compressed PDF {input_path}: {original_size} -> {compressed_size} bytes "
+                   f"({compression_ratio:.1f}% reduction)")
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error safely compressing PDF {input_path}: {str(e)}")
+        return False
 
 def is_pdf_valid(file_path: str) -> bool:
     """

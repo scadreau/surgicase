@@ -1,5 +1,5 @@
 # Created: 2025-07-29 03:41:16
-# Last Modified: 2025-07-29 04:40:10
+# Last Modified: 2025-07-29 04:50:43
 # Author: Scott Cadreau
 
 # endpoints/backoffice/get_case_images.py
@@ -18,7 +18,7 @@ from core.database import get_db_connection, close_db_connection
 from utils.monitoring import track_business_operation, business_metrics
 from utils.s3_case_files import download_file_from_s3
 from utils.compress_pic import compress_image
-from utils.compress_pdf import compress_pdf, is_pdf_valid
+from utils.compress_pdf import compress_pdf_safe, is_pdf_valid
 
 router = APIRouter()
 
@@ -264,12 +264,9 @@ def _compress_file(original_path: str, compressed_path: str, stats: dict) -> boo
         elif file_ext == '.pdf':
             # Validate it's a proper PDF first
             if is_pdf_valid(original_path):
-                success = compress_pdf(
+                success = compress_pdf_safe(
                     input_path=original_path,
-                    output_path=compressed_path,
-                    compression_level="medium",
-                    image_quality=75,
-                    image_max_width=1600
+                    output_path=compressed_path
                 )
                 if success:
                     stats["pdfs_compressed"] += 1
