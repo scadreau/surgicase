@@ -1,5 +1,5 @@
 # Created: 2025-07-29 03:41:16
-# Last Modified: 2025-07-29 03:41:17
+# Last Modified: 2025-07-29 04:37:32
 # Author: Scott Cadreau
 
 # endpoints/backoffice/get_case_images.py
@@ -17,6 +17,8 @@ from datetime import datetime
 from core.database import get_db_connection, close_db_connection
 from utils.monitoring import track_business_operation, business_metrics
 from utils.s3_case_files import download_file_from_s3
+from utils.compress_pic import compress_image
+from utils.compress_pdf import compress_pdf, is_pdf_valid
 
 router = APIRouter()
 
@@ -85,9 +87,10 @@ def get_case_images(
         temp_dir = os.path.join(temp_base_dir, f"case_images_{timestamp}")
         os.makedirs(temp_dir, exist_ok=True)
         
-        # Download files for each case
+        # Download and compress files for each case
         downloaded_files = []
         download_errors = []
+        compression_stats = {"images_compressed": 0, "pdfs_compressed": 0, "compression_errors": 0}
         
         for case in cases:
             case_id = case["case_id"]
@@ -103,10 +106,21 @@ def get_case_images(
             # Download demo file if exists
             if demo_file:
                 try:
-                    local_path = os.path.join(case_dir, f"demo_{demo_file}")
-                    success = download_file_from_s3(case_user_id, demo_file, local_path)
+                    original_path = os.path.join(case_dir, f"original_demo_{demo_file}")
+                    compressed_path = os.path.join(case_dir, f"demo_{demo_file}")
+                    
+                    success = download_file_from_s3(case_user_id, demo_file, original_path)
                     if success:
-                        downloaded_files.append(local_path)
+                        # Compress the file based on type
+                        compression_success = _compress_file(original_path, compressed_path, compression_stats)
+                        if compression_success:
+                            downloaded_files.append(compressed_path)
+                            # Remove original file to save space
+                            os.remove(original_path)
+                        else:
+                            # If compression fails, use original file
+                            os.rename(original_path, compressed_path)
+                            downloaded_files.append(compressed_path)
                     else:
                         download_errors.append(f"Failed to download demo file for case {case_id}: {demo_file}")
                 except Exception as e:
@@ -115,10 +129,21 @@ def get_case_images(
             # Download note file if exists
             if note_file:
                 try:
-                    local_path = os.path.join(case_dir, f"note_{note_file}")
-                    success = download_file_from_s3(case_user_id, note_file, local_path)
+                    original_path = os.path.join(case_dir, f"original_note_{note_file}")
+                    compressed_path = os.path.join(case_dir, f"note_{note_file}")
+                    
+                    success = download_file_from_s3(case_user_id, note_file, original_path)
                     if success:
-                        downloaded_files.append(local_path)
+                        # Compress the file based on type
+                        compression_success = _compress_file(original_path, compressed_path, compression_stats)
+                        if compression_success:
+                            downloaded_files.append(compressed_path)
+                            # Remove original file to save space
+                            os.remove(original_path)
+                        else:
+                            # If compression fails, use original file
+                            os.rename(original_path, compressed_path)
+                            downloaded_files.append(compressed_path)
                     else:
                         download_errors.append(f"Failed to download note file for case {case_id}: {note_file}")
                 except Exception as e:
@@ -148,6 +173,14 @@ def get_case_images(
         # Record successful operation
         business_metrics.record_utility_operation("get_case_images", "success")
         
+        # Record compression metrics
+        if compression_stats["images_compressed"] > 0:
+            business_metrics.record_utility_operation("image_compression", "success", compression_stats["images_compressed"])
+        if compression_stats["pdfs_compressed"] > 0:
+            business_metrics.record_utility_operation("pdf_compression", "success", compression_stats["pdfs_compressed"])
+        if compression_stats["compression_errors"] > 0:
+            business_metrics.record_utility_operation("compression", "error", compression_stats["compression_errors"])
+        
         # Return ZIP file
         return FileResponse(
             path=zip_path,
@@ -157,7 +190,10 @@ def get_case_images(
                 'Content-Disposition': f'attachment; filename="{zip_filename}"',
                 'X-Downloaded-Files': str(len(downloaded_files)),
                 'X-Download-Errors': str(len(download_errors)),
-                'X-Cases-Processed': str(len(cases))
+                'X-Cases-Processed': str(len(cases)),
+                'X-Images-Compressed': str(compression_stats["images_compressed"]),
+                'X-PDFs-Compressed': str(compression_stats["pdfs_compressed"]),
+                'X-Compression-Errors': str(compression_stats["compression_errors"])
             }
         )
         
@@ -192,4 +228,67 @@ def get_case_images(
             user_id=user_id,
             response_data={"cases_requested": len(case_request.case_ids)} if case_request else None,
             error_message=error_message
-        ) 
+        )
+
+def _compress_file(original_path: str, compressed_path: str, stats: dict) -> bool:
+    """
+    Compress a file based on its type (image or PDF)
+    
+    Args:
+        original_path: Path to original file
+        compressed_path: Path where compressed file should be saved
+        stats: Dictionary to track compression statistics
+        
+    Returns:
+        bool: True if compression successful, False otherwise
+    """
+    try:
+        file_ext = os.path.splitext(original_path)[1].lower()
+        
+        # Handle image files
+        if file_ext in ['.jpg', '.jpeg', '.png', '.tiff', '.tif', '.bmp']:
+            success = compress_image(
+                input_path=original_path,
+                output_path=compressed_path,
+                quality=75,
+                max_width=1600
+            )
+            if success:
+                stats["images_compressed"] += 1
+                return True
+            else:
+                stats["compression_errors"] += 1
+                return False
+        
+        # Handle PDF files
+        elif file_ext == '.pdf':
+            # Validate it's a proper PDF first
+            if is_pdf_valid(original_path):
+                success = compress_pdf(
+                    input_path=original_path,
+                    output_path=compressed_path,
+                    compression_level="medium",
+                    image_quality=75,
+                    image_max_width=1600
+                )
+                if success:
+                    stats["pdfs_compressed"] += 1
+                    return True
+                else:
+                    stats["compression_errors"] += 1
+                    return False
+            else:
+                # Invalid PDF, skip compression
+                stats["compression_errors"] += 1
+                return False
+        
+        # For other file types, no compression - just copy
+        else:
+            import shutil
+            shutil.copy2(original_path, compressed_path)
+            return True
+            
+    except Exception as e:
+        logger.error(f"Error compressing file {original_path}: {str(e)}")
+        stats["compression_errors"] += 1
+        return False 

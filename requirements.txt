@@ -4,5 +4,6 @@ fastapi
 uvicorn
 fpdf
 Pillow
+PyMuPDF
 prometheus-fastapi-instrumentator
 schedule 
