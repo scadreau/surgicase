@@ -1,5 +1,5 @@
 # Created: 2025-07-29 03:41:16
-# Last Modified: 2025-07-29 04:37:32
+# Last Modified: 2025-07-29 04:40:10
 # Author: Scott Cadreau
 
 # endpoints/backoffice/get_case_images.py
@@ -175,11 +175,11 @@ def get_case_images(
         
         # Record compression metrics
         if compression_stats["images_compressed"] > 0:
-            business_metrics.record_utility_operation("image_compression", "success", compression_stats["images_compressed"])
+            business_metrics.record_utility_operation("image_compression", "success")
         if compression_stats["pdfs_compressed"] > 0:
-            business_metrics.record_utility_operation("pdf_compression", "success", compression_stats["pdfs_compressed"])
+            business_metrics.record_utility_operation("pdf_compression", "success")
         if compression_stats["compression_errors"] > 0:
-            business_metrics.record_utility_operation("compression", "error", compression_stats["compression_errors"])
+            business_metrics.record_utility_operation("compression", "error")
         
         # Return ZIP file
         return FileResponse(
