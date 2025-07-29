@@ -1,6 +1,8 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-29 01:52:36
+# Last Modified: 2025-07-29 02:20:15
+# Author: Scott Cadreau
 
+# endpoints/utility/log_request.py
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from core.database import get_db_connection, close_db_connection

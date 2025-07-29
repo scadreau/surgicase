@@ -1,5 +1,6 @@
 # Created: 2025-07-16 12:20:00
-# Last Modified: 2025-07-23 11:59:02
+# Last Modified: 2025-07-29 02:14:51
+# Author: Scott Cadreau
 
 # utils/get_table_structures.py
 """

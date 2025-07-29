@@ -1,5 +1,5 @@
 # Created: 2025-01-27
-# Last Modified: 2025-07-28 23:57:52
+# Last Modified: 2025-07-29 02:19:21
 
 # SurgiCase Management System
 
@@ -416,15 +416,6 @@ surgicase/
 3. **Application Deployment**: Deploy to EC2, ECS, or similar
 4. **Monitoring Setup**: Configure Prometheus, Grafana, and Loki
 5. **SSL/TLS**: Configure HTTPS with proper certificates
-
-### Docker Deployment (Optional)
-```bash
-# Build image
-docker build -t surgicase .
-
-# Run container
-docker run -p 8000:8000 surgicase
-```
 
 ### Systemd Service
 ```ini

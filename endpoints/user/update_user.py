@@ -1,5 +1,6 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-29 01:51:19
+# Last Modified: 2025-07-29 02:21:05
+# Author: Scott Cadreau
 
 # endpoints/user/update_user.py
 from fastapi import APIRouter, HTTPException, Body, Request

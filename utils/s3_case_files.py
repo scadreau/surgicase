@@ -1,5 +1,6 @@
 # Created: 2025-07-22 18:43:07
-# Last Modified: 2025-07-22 18:43:08
+# Last Modified: 2025-07-29 02:13:37
+# Author: Scott Cadreau
 
 # utils/s3_case_files.py
 import boto3

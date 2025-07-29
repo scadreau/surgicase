@@ -1,6 +1,8 @@
 # Created: 2025-07-16 11:24:30
-# Last Modified: 2025-07-23 13:57:23
+# Last Modified: 2025-07-29 02:20:37
+# Author: Scott Cadreau
 
+# endpoints/utility/check_npi.py
 from fastapi import APIRouter, Query, HTTPException, Request
 import requests
 from utils.text_formatting import capitalize_name_field

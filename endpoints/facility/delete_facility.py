@@ -1,5 +1,6 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-29 01:51:45
+# Last Modified: 2025-07-29 02:22:24
+# Author: Scott Cadreau
 
 # endpoints/facility/delete_facility.py
 from fastapi import APIRouter, HTTPException, Query, Request

@@ -1,5 +1,6 @@
 # Created: 2025-07-17 11:36:00
-# Last Modified: 2025-07-29 01:41:47
+# Last Modified: 2025-07-29 02:14:45
+# Author: Scott Cadreau
 
 # utils/logo_manager.py
 import os

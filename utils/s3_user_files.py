@@ -1,5 +1,6 @@
 # Created: 2025-07-22 18:53:59
-# Last Modified: 2025-07-22 18:54:00
+# Last Modified: 2025-07-29 02:13:05
+# Author: Scott Cadreau
 
 # utils/s3_user_files.py
 import boto3

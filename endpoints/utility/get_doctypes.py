@@ -1,5 +1,6 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-23 12:18:28
+# Last Modified: 2025-07-29 02:20:24
+# Author: Scott Cadreau
 
 # endpoints/utility/get_doctypes.py
 from fastapi import APIRouter, HTTPException, Request

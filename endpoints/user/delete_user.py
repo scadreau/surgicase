@@ -1,5 +1,6 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-29 01:51:21
+# Last Modified: 2025-07-29 02:21:17
+# Author: Scott Cadreau
 
 # endpoints/user/delete_user.py
 from fastapi import APIRouter, HTTPException, Query, Request

@@ -1,5 +1,6 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-28 23:57:41
+# Last Modified: 2025-07-29 02:23:44
+# Author: Scott Cadreau
 
 # core/database.py
 import boto3

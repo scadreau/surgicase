@@ -1,5 +1,6 @@
 # Created: 2025-07-21 15:08:09
-# Last Modified: 2025-07-24 00:27:17
+# Last Modified: 2025-07-29 02:21:26
+# Author: Scott Cadreau
 
 # endpoints/surgeon/search_surgeon.py
 from fastapi import APIRouter, HTTPException, Query, Request

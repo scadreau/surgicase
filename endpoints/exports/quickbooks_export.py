@@ -1,5 +1,6 @@
 # Created: 2025-01-27 15:00:00
-# Last Modified: 2025-07-25 23:38:22
+# Last Modified: 2025-07-29 02:22:37
+# Author: Scott Cadreau
 
 # endpoints/exports/quickbooks_export.py
 from fastapi import APIRouter, HTTPException, Query

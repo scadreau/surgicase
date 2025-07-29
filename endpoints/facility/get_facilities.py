@@ -1,5 +1,6 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-23 12:17:14
+# Last Modified: 2025-07-29 02:22:18
+# Author: Scott Cadreau
 
 # endpoints/facility/get_facilities.py
 from fastapi import APIRouter, HTTPException, Query, Request

@@ -1,5 +1,6 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-23 12:12:10
+# Last Modified: 2025-07-29 02:21:11
+# Author: Scott Cadreau
 
 # endpoints/user/get_user.py
 from fastapi import APIRouter, HTTPException, Query, Request

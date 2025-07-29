@@ -1,5 +1,6 @@
 # Created: 2025-07-23
-# Last Modified: 2025-07-23 13:51:21
+# Last Modified: 2025-07-29 02:12:36
+# Author: Scott Cadreau
 
 # utils/text_formatting.py
 """

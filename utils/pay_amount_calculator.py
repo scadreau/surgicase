@@ -1,5 +1,6 @@
 # Created: 2025-07-16 14:50:43
-# Last Modified: 2025-07-20 23:58:10
+# Last Modified: 2025-07-29 02:14:05
+# Author: Scott Cadreau
 
 # utils/pay_amount_calculator.py
 import pymysql.cursors
