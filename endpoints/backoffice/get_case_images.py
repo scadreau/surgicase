@@ -1,5 +1,5 @@
 # Created: 2025-07-29 03:41:16
-# Last Modified: 2025-07-29 04:50:43
+# Last Modified: 2025-07-29 04:53:57
 # Author: Scott Cadreau
 
 # endpoints/backoffice/get_case_images.py
@@ -13,12 +13,15 @@ import tempfile
 import zipfile
 import shutil
 import time
+import logging
 from datetime import datetime
 from core.database import get_db_connection, close_db_connection
 from utils.monitoring import track_business_operation, business_metrics
 from utils.s3_case_files import download_file_from_s3
 from utils.compress_pic import compress_image
 from utils.compress_pdf import compress_pdf_safe, is_pdf_valid
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
