@@ -1,5 +1,5 @@
 # Created: 2025-07-29 04:32:53
-# Last Modified: 2025-07-29 06:35:53
+# Last Modified: 2025-07-29 09:08:04
 # Author: Scott Cadreau
 
 # utils/compress_pdf.py
@@ -405,7 +405,7 @@ def compress_pdf_ghostscript(
             logger.error("Ghostscript is not available on this system")
             return False
         
-        # Build ghostscript command
+        # Build ghostscript command - let PDFSETTINGS do the work without DPI overrides
         gs_cmd = [
             'gs',
             '-sDEVICE=pdfwrite',
@@ -414,15 +414,25 @@ def compress_pdf_ghostscript(
             '-dNOPAUSE',
             '-dQUIET',
             '-dBATCH',
-            f'-dColorImageDownsampleType=/Bicubic',
-            f'-dColorImageResolution={dpi}',
-            f'-dGrayImageDownsampleType=/Bicubic', 
-            f'-dGrayImageResolution={dpi}',
-            f'-dMonoImageDownsampleType=/Bicubic',
-            f'-dMonoImageResolution={dpi}',
+            '-dCompressFonts=true',
+            '-dCompressPages=true',
+            '-dEmbedAllFonts=true',
+            '-dSubsetFonts=true',
+            '-dAutoRotatePages=/None',
             f'-sOutputFile={output_path}',
             input_path
         ]
+        
+        # Only add custom DPI if quality is "custom" - otherwise let PDFSETTINGS handle it
+        if quality not in ['screen', 'ebook', 'printer', 'prepress']:
+            gs_cmd.extend([
+                f'-dColorImageDownsampleType=/Bicubic',
+                f'-dColorImageResolution={dpi}',
+                f'-dGrayImageDownsampleType=/Bicubic', 
+                f'-dGrayImageResolution={dpi}',
+                f'-dMonoImageDownsampleType=/Bicubic',
+                f'-dMonoImageResolution={dpi}'
+            ])
         
         # Execute ghostscript command
         result = subprocess.run(

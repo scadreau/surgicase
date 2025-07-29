@@ -1,5 +1,5 @@
 # Created: 2025-07-29 03:41:16
-# Last Modified: 2025-07-29 06:36:56
+# Last Modified: 2025-07-29 09:08:18
 # Author: Scott Cadreau
 
 # endpoints/backoffice/get_case_images.py
@@ -270,8 +270,7 @@ def _compress_file(original_path: str, compressed_path: str, stats: dict) -> boo
             success = compress_pdf_ghostscript(
                 input_path=original_path,
                 output_path=compressed_path,
-                quality="ebook",  # Good balance of quality and size reduction
-                dpi=150
+                quality="screen"  # More aggressive compression for better size reduction
             )
             if success:
                 stats["pdfs_compressed"] += 1
