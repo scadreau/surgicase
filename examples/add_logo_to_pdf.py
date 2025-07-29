@@ -1,5 +1,6 @@
 # Created: 2025-07-17 11:37:00
-# Last Modified: 2025-07-17 11:37:20
+# Last Modified: 2025-07-29 02:28:50
+# Author: Scott Cadreau
 
 # examples/add_logo_to_pdf.py
 """

@@ -130,23 +130,8 @@ endpoints/ (35+ files across all subdirectories)
 ├── exports/ (1 file - quickbooks_export.py)
 └── metrics.py
 
-tests/ (4 files)
-├── test_s3_integration.py
-├── test_pay_amount_calculator.py
-├── test_monitoring.py
-├── test_log_request.py
-└── test_logo_functionality.py
-
 core/ (1 file)
 └── database.py
-
-main files/ (3 files)
-├── main_case_write.py
-├── main_case_read.py
-└── main.py (already has author line)
-
-examples/ (1 file)
-└── add_logo_to_pdf.py
 ```
 
 ### Phase 2: Convert Classes to Functions (Priority: High)

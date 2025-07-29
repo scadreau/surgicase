@@ -1,5 +1,6 @@
 # Created: 2025-01-27
-# Last Modified: 2025-07-15 20:46:44
+# Last Modified: 2025-07-29 02:28:35
+# Author: Scott Cadreau
 
 # endpoints/metrics.py
 from fastapi import APIRouter, Response, HTTPException

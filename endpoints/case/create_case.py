@@ -1,5 +1,6 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-29 01:52:03
+# Last Modified: 2025-07-29 02:27:31
+# Author: Scott Cadreau
 
 # endpoints/case/create_case.py
 from fastapi import APIRouter, HTTPException, Request
