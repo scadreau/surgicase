@@ -1,5 +1,5 @@
 # Created: 2025-07-28 19:48:18
-# Last Modified: 2025-07-29 00:13:17
+# Last Modified: 2025-07-29 00:21:45
 # Author: Scott Cadreau
 
 # endpoints/exports/case_export.py
@@ -82,7 +82,7 @@ def format_export_response(cases: List[Dict[str, Any]], requested_case_ids: List
 
 # --- Main Export Endpoint ---
 
-@router.post("/cases")
+@router.post("/export_cases")
 @track_business_operation("export", "cases")
 def export_cases(request: CaseExportRequest):
     """
