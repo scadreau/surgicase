@@ -1,5 +1,5 @@
 # Created: 2025-07-29 03:41:16
-# Last Modified: 2025-07-29 05:02:21
+# Last Modified: 2025-07-29 06:36:56
 # Author: Scott Cadreau
 
 # endpoints/backoffice/get_case_images.py
@@ -19,7 +19,7 @@ from core.database import get_db_connection, close_db_connection
 from utils.monitoring import track_business_operation, business_metrics
 from utils.s3_case_files import download_file_from_s3
 from utils.compress_pic import compress_image
-# from utils.compress_pdf import compress_pdf_safe, is_pdf_valid  # Temporarily disabled
+from utils.compress_pdf import compress_pdf_ghostscript, is_pdf_valid
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ def get_case_images(
     """
     Retrieve case images for specified case IDs and return as ZIP file.
     Downloads demo_file and note_file from S3 for each case and packages them into a ZIP.
-    Images are compressed for bandwidth optimization. PDFs are currently not compressed.
+    Images and PDFs are compressed for bandwidth optimization using ghostscript for PDFs.
     Only accessible to users with user_type >= 10.
     """
     conn = None
@@ -94,7 +94,7 @@ def get_case_images(
         # Download and compress files for each case
         downloaded_files = []
         download_errors = []
-        compression_stats = {"images_compressed": 0, "compression_errors": 0}
+        compression_stats = {"images_compressed": 0, "pdfs_compressed": 0, "compression_errors": 0}
         
         for case in cases:
             case_id = case["case_id"]
@@ -180,9 +180,8 @@ def get_case_images(
         # Record compression metrics
         if compression_stats["images_compressed"] > 0:
             business_metrics.record_utility_operation("image_compression", "success")
-        # PDF compression temporarily disabled
-        # if compression_stats["pdfs_compressed"] > 0:
-        #     business_metrics.record_utility_operation("pdf_compression", "success")
+        if compression_stats["pdfs_compressed"] > 0:
+            business_metrics.record_utility_operation("pdf_compression", "success")
         if compression_stats["compression_errors"] > 0:
             business_metrics.record_utility_operation("compression", "error")
         
@@ -197,7 +196,7 @@ def get_case_images(
                 'X-Download-Errors': str(len(download_errors)),
                 'X-Cases-Processed': str(len(cases)),
                 'X-Images-Compressed': str(compression_stats["images_compressed"]),
-                'X-PDFs-Compressed': '0',  # PDF compression temporarily disabled
+                'X-PDFs-Compressed': str(compression_stats["pdfs_compressed"]),
                 'X-Compression-Errors': str(compression_stats["compression_errors"])
             }
         )
@@ -237,8 +236,8 @@ def get_case_images(
 
 def _compress_file(original_path: str, compressed_path: str, stats: dict) -> bool:
     """
-    Compress a file based on its type. Currently only images are compressed.
-    PDFs are copied without compression due to quality degradation issues.
+    Compress a file based on its type. Images are compressed using PIL/Pillow.
+    PDFs are compressed using ghostscript for better quality preservation.
     
     Args:
         original_path: Path to original file
@@ -266,12 +265,23 @@ def _compress_file(original_path: str, compressed_path: str, stats: dict) -> boo
                 stats["compression_errors"] += 1
                 return False
         
-        # Handle PDF files - temporarily disabled compression due to quality issues
+        # Handle PDF files - using ghostscript compression
         elif file_ext == '.pdf':
-            # Just copy PDF files without compression for now
-            shutil.copy2(original_path, compressed_path)
-            logger.info(f"PDF copied without compression: {original_path}")
-            return True
+            success = compress_pdf_ghostscript(
+                input_path=original_path,
+                output_path=compressed_path,
+                quality="ebook",  # Good balance of quality and size reduction
+                dpi=150
+            )
+            if success:
+                stats["pdfs_compressed"] += 1
+                return True
+            else:
+                # If ghostscript compression fails, fall back to copying
+                shutil.copy2(original_path, compressed_path)
+                logger.warning(f"PDF compression failed, using original: {original_path}")
+                stats["compression_errors"] += 1
+                return True
         
         # For other file types, no compression - just copy
         else:

@@ -1,5 +1,5 @@
 # Created: 2025-07-29 04:32:53
-# Last Modified: 2025-07-29 04:50:53
+# Last Modified: 2025-07-29 06:35:53
 # Author: Scott Cadreau
 
 # utils/compress_pdf.py
@@ -8,6 +8,8 @@ import logging
 import fitz  # PyMuPDF
 from typing import Dict, Any, Optional
 import tempfile
+import subprocess
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -362,4 +364,113 @@ def is_pdf_valid(file_path: str) -> bool:
         doc.close()
         return True
     except Exception:
-        return False 
+        return False
+
+def compress_pdf_ghostscript(
+    input_path: str,
+    output_path: str,
+    quality: str = "ebook",
+    dpi: int = 150
+) -> bool:
+    """
+    Compress a PDF using ghostscript command line tool.
+    This is often more reliable than PyMuPDF for maintaining quality.
+    
+    Args:
+        input_path: Path to the input PDF file
+        output_path: Path where compressed PDF will be saved
+        quality: Compression quality setting:
+                - "screen": Low quality, smallest size (72 dpi images)
+                - "ebook": Medium quality, good for web viewing (150 dpi images)
+                - "printer": High quality, good for printing (300 dpi images) 
+                - "prepress": Highest quality, largest size (300 dpi, color preservation)
+        dpi: Custom DPI for image downsampling (overrides quality preset)
+        
+    Returns:
+        bool: True if compression successful, False otherwise
+    """
+    try:
+        # Validate input file exists
+        if not os.path.exists(input_path):
+            logger.error(f"Input PDF file does not exist: {input_path}")
+            return False
+            
+        # Ensure output directory exists
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        # Check if ghostscript is available
+        try:
+            subprocess.run(['gs', '--version'], capture_output=True, check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            logger.error("Ghostscript is not available on this system")
+            return False
+        
+        # Build ghostscript command
+        gs_cmd = [
+            'gs',
+            '-sDEVICE=pdfwrite',
+            '-dCompatibilityLevel=1.4',
+            '-dPDFSETTINGS=/' + quality,
+            '-dNOPAUSE',
+            '-dQUIET',
+            '-dBATCH',
+            f'-dColorImageDownsampleType=/Bicubic',
+            f'-dColorImageResolution={dpi}',
+            f'-dGrayImageDownsampleType=/Bicubic', 
+            f'-dGrayImageResolution={dpi}',
+            f'-dMonoImageDownsampleType=/Bicubic',
+            f'-dMonoImageResolution={dpi}',
+            f'-sOutputFile={output_path}',
+            input_path
+        ]
+        
+        # Execute ghostscript command
+        result = subprocess.run(
+            gs_cmd,
+            capture_output=True,
+            text=True,
+            timeout=300  # 5 minute timeout
+        )
+        
+        if result.returncode != 0:
+            logger.error(f"Ghostscript compression failed: {result.stderr}")
+            return False
+            
+        # Verify output file was created and is valid
+        if not os.path.exists(output_path):
+            logger.error(f"Ghostscript did not create output file: {output_path}")
+            return False
+            
+        if not is_pdf_valid(output_path):
+            logger.error(f"Ghostscript produced invalid PDF: {output_path}")
+            return False
+        
+        # Log compression results
+        original_size = os.path.getsize(input_path)
+        compressed_size = os.path.getsize(output_path)
+        compression_ratio = (1 - compressed_size / original_size) * 100
+        
+        logger.info(f"Ghostscript compressed PDF {input_path}: {original_size} -> {compressed_size} bytes "
+                   f"({compression_ratio:.1f}% reduction) using quality='{quality}'")
+        
+        return True
+        
+    except subprocess.TimeoutExpired:
+        logger.error(f"Ghostscript compression timed out for {input_path}")
+        return False
+    except Exception as e:
+        logger.error(f"Error compressing PDF with ghostscript {input_path}: {str(e)}")
+        return False
+
+def get_ghostscript_version() -> Optional[str]:
+    """
+    Get the installed ghostscript version
+    
+    Returns:
+        str: Version string if ghostscript is available, None otherwise
+    """
+    try:
+        result = subprocess.run(['gs', '--version'], capture_output=True, text=True, check=True)
+        return result.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None 
