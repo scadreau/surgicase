@@ -1,5 +1,5 @@
 # Created: 2025-07-22 18:43:07
-# Last Modified: 2025-07-29 02:13:37
+# Last Modified: 2025-07-29 03:41:35
 # Author: Scott Cadreau
 
 # utils/s3_case_files.py
@@ -257,4 +257,49 @@ def move_case_files_to_deleted(
             "user_id": user_id,
             "details": [],
             "errors": [error_msg]
-        } 
+        }
+
+def download_file_from_s3(user_id: str, filename: str, local_path: str) -> bool:
+    """
+    Download a single file from S3 case documents to a local path
+    
+    Args:
+        user_id: User ID to determine S3 path
+        filename: Name of the file to download
+        local_path: Local file path where the file should be saved
+        
+    Returns:
+        bool: True if download successful, False otherwise
+    """
+    try:
+        # Get S3 configuration
+        config = get_s3_case_config()
+        s3_client = get_s3_case_client(config)
+        
+        bucket_name = config['bucket_name']
+        # Use source_prefix which should be 'private/case-documents/'
+        s3_key = f"{config['source_prefix']}{user_id}/{filename}"
+        
+        # Ensure local directory exists
+        os.makedirs(os.path.dirname(local_path), exist_ok=True)
+        
+        # Download the file
+        s3_client.download_file(bucket_name, s3_key, local_path)
+        
+        # Verify the file was downloaded and has content
+        if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
+            logger.info(f"Successfully downloaded {s3_key} to {local_path}")
+            return True
+        else:
+            logger.error(f"Downloaded file {local_path} is empty or doesn't exist")
+            return False
+            
+    except ClientError as e:
+        if e.response['Error']['Code'] == '404':
+            logger.warning(f"File not found in S3: {s3_key}")
+        else:
+            logger.error(f"S3 client error downloading {s3_key}: {str(e)}")
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected error downloading {s3_key}: {str(e)}")
+        return False 
