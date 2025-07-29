@@ -3,9 +3,17 @@ Python 3.12+
 FastAPI
 Go 1.24.5+
 
-Always include the following 3 lines at the beginning of any .py file (note the trailing spaces)
+Always include the following 3 lines at the beginning of any .py or .go file (note the trailing spaces)
 # Created: 
 # Last Modified: 
 # Author: Scott Cadreau
 
 When needed read the most recent table_structures_<date_time>.sql file for current database and table information
+
+The test server is https://allstarsapi1.metoraymedical.com
+
+Always add prometheus monitoring to new endpoints
+
+Update the main readme when appropriate
+
+When it is deemed necessary create a separate readme with the functional details
