@@ -142,4 +142,4 @@ npi_data/*.csv
 reports/
 
 # Updates
-update_*.md
+updates/
