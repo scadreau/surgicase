@@ -1,5 +1,6 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-07-29 01:04:13
+# Last Modified: 2025-07-29 01:57:19
+# Author: Scott Cadreau
 
 # endpoints/reports/provider_payment_report.py
 from fastapi import APIRouter, HTTPException, Query

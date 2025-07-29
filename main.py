@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-29 00:13:43
+# Last Modified: 2025-07-29 01:57:42
 
 # main.py
 from fastapi import FastAPI, Request
@@ -41,7 +41,7 @@ from endpoints.backoffice.get_users import router as get_users_router
 from endpoints.backoffice.case_dashboard_data import router as case_dashboard_data_router
 from endpoints.backoffice.bulk_update_case_status import router as bulk_update_case_status_router
 
-from endpoints.reports.provider_payment_report import router as provider_payment_report_router
+from endpoints.reports import provider_payment_report_router
 
 from endpoints.exports.quickbooks_export import router as quickbooks_export_router
 from endpoints.exports.case_export import router as case_export_router

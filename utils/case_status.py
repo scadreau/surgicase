@@ -1,5 +1,7 @@
 # Created: 2025-07-15 23:02:51
-# Last Modified: 2025-07-29 01:51:02
+# Last Modified: 2025-07-29 01:54:46
+# Author: Scott Cadreau
+
 # utils/case_status.py
 import pymysql.cursors
 
