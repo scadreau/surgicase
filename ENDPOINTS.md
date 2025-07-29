@@ -3,6 +3,7 @@
 This document provides a comprehensive list of all available API endpoints in the SurgiCase application.
 
 ## Table of Contents
+- [Infrastructure Overview](#infrastructure-overview)
 - [Case Management](#case-management)
 - [User Management](#user-management)
 - [Surgeon Management](#surgeon-management)
@@ -10,6 +11,29 @@ This document provides a comprehensive list of all available API endpoints in th
 - [Utility Endpoints](#utility-endpoints)
 - [Health & Monitoring](#health--monitoring)
 - [Backoffice](#backoffice)
+- [Monitoring Infrastructure](#monitoring-infrastructure)
+- [Scaling Infrastructure](#scaling-infrastructure)
+
+---
+
+## Infrastructure Overview
+
+### Production Servers
+- **Main SurgiCase API Server**: `172.31.38.136` (private)
+- **Dedicated Monitoring Server**: `172.31.86.18` (private) / `3.83.225.230` (public)
+- **VPC**: `vpc-0d0a4d7473692be39`
+- **Security Group**: `sg-06718ecd804840607`
+
+### Application Access
+- **API Base URL**: `http://172.31.38.136:8000`
+- **API Documentation**: `http://172.31.38.136:8000/docs`
+- **Health Check**: `http://172.31.38.136:8000/health`
+- **Metrics**: `http://172.31.38.136:8000/metrics`
+
+### Monitoring Access
+- **Prometheus**: `http://3.83.225.230:9090`
+- **Grafana**: `http://3.83.225.230:3000` (admin / SurgiCase2025!)
+- **Loki**: `http://3.83.225.230:3100`
 
 ---
 
@@ -377,4 +401,167 @@ All endpoints are monitored with:
 - Request/response logging
 - Performance metrics
 - Business operation tracking
-- Error tracking and alerting 
+- Error tracking and alerting
+
+### Dedicated Monitoring Infrastructure
+
+The SurgiCase system utilizes a dedicated monitoring server for comprehensive observability:
+
+**Monitoring Services:**
+- **Prometheus** (`http://3.83.225.230:9090`)
+  - Metrics collection and storage
+  - Real-time alerting and monitoring
+  - Service discovery for horizontal scaling
+  - 90-day metric retention
+  
+- **Grafana** (`http://3.83.225.230:3000`)
+  - Interactive dashboards and visualization
+  - Pre-configured SurgiCase overview dashboard
+  - Alert management and notification channels
+  - Multi-instance monitoring support
+  
+- **Loki** (`http://3.83.225.230:3100`)
+  - Centralized log aggregation
+  - Structured log analysis
+  - Integration with Grafana for log exploration
+  - Real-time log streaming
+
+**Monitoring Coverage:**
+- Application performance metrics (response times, error rates)
+- Business metrics (case creation, payment processing, user activity)
+- System metrics (CPU, memory, disk usage)
+- Database metrics (connection pools, query performance)
+- Health checks (database connectivity, AWS services)
+
+---
+
+## Monitoring Infrastructure
+
+### Prometheus Endpoints
+
+**Target Monitoring:**
+- **Targets**: `http://3.83.225.230:9090/targets`
+  - View all monitored services and their health status
+  - Service discovery status for scaled instances
+  
+- **Configuration**: `http://3.83.225.230:9090/config`
+  - Current Prometheus configuration
+  - Scrape configurations and intervals
+
+**Query Interface:**
+- **Query**: `http://3.83.225.230:9090/graph`
+  - Interactive metric queries and visualization
+  - PromQL query interface
+  
+- **API Query**: `http://3.83.225.230:9090/api/v1/query?query=<metric>`
+  - Programmatic metric access
+  - Example: `up{job="surgicase-api"}`
+
+**Common Metrics Queries:**
+```
+# Application health across all instances
+up{job=~"surgicase-api.*"}
+
+# Request rate per instance
+rate(http_requests_total[5m])
+
+# Database connections
+mysql_global_status_threads_connected
+
+# Error rate
+rate(http_requests_total{status=~"5.."}[5m])
+```
+
+### Grafana Dashboards
+
+**Main Dashboard:** `http://3.83.225.230:3000/d/surgicase-overview`
+- Application performance overview
+- Request rates and response times
+- Database performance metrics
+- Business operation metrics
+- System resource utilization
+
+**Dashboard Features:**
+- Real-time metric visualization
+- Customizable time ranges
+- Alert integration
+- Multi-instance support for scaling
+- Drill-down capabilities
+
+### Loki Log Aggregation
+
+**Log Query Interface:** `http://3.83.225.230:3000/explore`
+- Structured log search and analysis
+- Real-time log streaming
+- Log correlation with metrics
+
+**Log Sources:**
+- SurgiCase application logs
+- System logs from monitoring server
+- Future: Centralized application logs from all instances
+
+---
+
+## Scaling Infrastructure
+
+### Service Discovery Framework
+
+The monitoring infrastructure includes service discovery for horizontal scaling:
+
+**Instance Registration:**
+```bash
+# Register new SurgiCase instances for monitoring
+sudo /opt/register-instance.sh <private_ip> 8000 production
+```
+
+**Scaling Targets:**
+- **Target Group**: Prometheus automatically discovers new instances
+- **Dynamic Configuration**: `/etc/prometheus/targets/surgicase-instances.yml`
+- **Health Monitoring**: Automatic health check integration
+
+### Load Balancer Integration (When Deployed)
+
+**Application Load Balancer:**
+- **Health Check Path**: `/health/ready`
+- **Health Check Interval**: 30 seconds
+- **Healthy Threshold**: 2 consecutive successes
+- **Unhealthy Threshold**: 3 consecutive failures
+
+**Target Group Configuration:**
+- **Protocol**: HTTP
+- **Port**: 8000
+- **Health Check Matcher**: HTTP 200
+
+### Multi-Instance Monitoring
+
+**Instance Identification:**
+- Instances automatically tagged with cluster and environment labels
+- Prometheus scrapes all instances in the target group
+- Grafana dashboards aggregate metrics across all instances
+
+**Scaling Metrics:**
+```
+# Total instances running
+count(up{job=~"surgicase-api.*"})
+
+# Instance-specific metrics
+up{job=~"surgicase-api.*"} by (instance)
+
+# Aggregate request rate across all instances
+sum(rate(http_requests_total[5m]))
+```
+
+### Monitoring Server Capacity
+
+**Current Capacity:**
+- **Monitoring Server**: m8g.xlarge (4 vCPU, 16GB RAM, 256GB storage)
+- **Supported Instances**: Up to ~50 SurgiCase instances
+- **Metric Retention**: 90 days
+- **Storage**: 10GB allocated for metrics
+
+**Scaling Considerations:**
+- Monitoring server can handle significant horizontal scaling
+- For extreme scale (100+ instances), consider Prometheus federation
+- Grafana performance scales well with current configuration
+
+--- 
