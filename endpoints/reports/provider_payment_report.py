@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-07-30 13:59:26
+# Last Modified: 2025-07-30 20:35:37
 # Author: Scott Cadreau
 
 # endpoints/reports/provider_payment_report.py
@@ -12,12 +12,30 @@ from utils.report_cleanup import cleanup_old_reports, get_reports_directory_size
 from utils.s3_storage import upload_file_to_s3, generate_s3_key
 from utils.text_formatting import capitalize_name_field
 from fpdf import FPDF
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import tempfile
 from typing import Optional
 
 router = APIRouter()
+
+def get_upcoming_friday(run_date=None):
+    """Calculate the upcoming Friday from the given date (or today if not provided)"""
+    if run_date is None:
+        run_date = datetime.now().date()
+    elif isinstance(run_date, datetime):
+        run_date = run_date.date()
+    
+    # Find the next Friday (weekday 4)
+    # Monday=0, Tuesday=1, Wednesday=2, Thursday=3, Friday=4, Saturday=5, Sunday=6
+    days_until_friday = (4 - run_date.weekday()) % 7
+    
+    # If today is Friday, get next Friday (7 days from now)
+    if days_until_friday == 0:
+        days_until_friday = 7
+    
+    upcoming_friday = run_date + timedelta(days=days_until_friday)
+    return upcoming_friday
 
 class ProviderPaymentReportPDF(FPDF):
     def __init__(self):
@@ -26,7 +44,7 @@ class ProviderPaymentReportPDF(FPDF):
     def header(self):
         self.set_font("Arial", 'B', 13)
         header_height = self.font_size + 2
-        self.cell(0, header_height, "Provider Payment Report", ln=True, align="C")
+        self.cell(0, header_height, "All-Stars Surgical Provider Payment Report", ln=True, align="C")
         self.ln(1)
         
         self.set_font("Arial", '', 11)
@@ -62,6 +80,11 @@ class ProviderPaymentReportPDF(FPDF):
             provider_name += f" (NPI: {provider_data['user_npi']})"
         
         self.cell(0, provider_height, provider_name, ln=True, align="L")
+        
+        # Add projected pay date line below provider name
+        projected_pay_date = get_upcoming_friday()
+        projected_pay_text = f"Projected Pay Date: {projected_pay_date.strftime('%B %d, %Y')}"
+        self.cell(0, provider_height, projected_pay_text, ln=True, align="L")
         self.ln(2)
 
         # Table header
