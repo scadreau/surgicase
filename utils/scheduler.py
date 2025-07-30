@@ -1,5 +1,5 @@
 # Created: 2025-01-15
-# Last Modified: 2025-07-27 03:51:17
+# Last Modified: 2025-07-30 18:41:07
 # Author: Scott Cadreau
 
 import schedule
@@ -217,14 +217,14 @@ def setup_weekly_scheduler():
     schedule.every().monday.at("08:00").do(weekly_pending_payment_update)
     
     # Schedule NPI data update for Tuesday at 08:00 UTC
-    schedule.every().tuesday.at("08:00").do(weekly_npi_update)
+    schedule.every().thursday.at("08:00").do(weekly_npi_update)
     
     # Schedule paid update for Thursday at 08:00 UTC
     schedule.every().thursday.at("08:00").do(weekly_paid_update)
     
     logger.info("Weekly scheduler configured:")
     logger.info("  - Pending payment update: Monday at 08:00 UTC")
-    logger.info("  - NPI data update: Tuesday at 08:00 UTC")
+    logger.info("  - NPI data update: Thursday at 08:00 UTC")
     logger.info("  - Paid update: Thursday at 08:00 UTC")
 
 def run_scheduler():
