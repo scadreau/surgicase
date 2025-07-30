@@ -143,3 +143,7 @@ reports/
 
 # Updates
 updates/
+
+# Exports
+exports/
+case_export_*
