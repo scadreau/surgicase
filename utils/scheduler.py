@@ -1,5 +1,5 @@
 # Created: 2025-01-15
-# Last Modified: 2025-07-30 18:41:07
+# Last Modified: 2025-07-30 22:11:23
 # Author: Scott Cadreau
 
 import schedule
@@ -9,6 +9,7 @@ import logging
 import pymysql.cursors
 import signal
 import sys
+import requests
 from typing import List, Dict, Any
 from core.database import get_db_connection, close_db_connection
 from core.models import BulkCaseStatusUpdate
@@ -202,12 +203,63 @@ def weekly_npi_update():
     except Exception as e:
         logger.error(f"Error in weekly NPI data update job: {str(e)}")
 
+def weekly_provider_payment_report():
+    """
+    Weekly scheduled function to generate provider payment report and send emails.
+    
+    This function:
+    1. Calls the provider payment report endpoint with weekly email type
+    2. Generates PDF report for cases with status=15 (pending payment)
+    3. Automatically sends emails to configured recipients
+    4. Uses weekly email template for professional notifications
+    
+    Runs after weekly_pending_payment_update to capture newly eligible cases.
+    """
+    logger.info("Starting weekly provider payment report job...")
+    
+    try:
+        # Call the provider payment report endpoint with weekly email type
+        response = requests.get(
+            'http://localhost:8000/provider_payment_report?email_type=weekly',
+            timeout=300  # 5 minute timeout for report generation
+        )
+        
+        if response.status_code == 200:
+            logger.info("✅ Weekly provider payment report generated successfully")
+            
+            # Log email status from response headers
+            email_headers = {k: v for k, v in response.headers.items() if k.startswith('X-Email')}
+            if email_headers:
+                emails_sent = email_headers.get('X-Email-Count', '0')
+                total_recipients = email_headers.get('X-Email-Total-Recipients', '0')
+                email_success = email_headers.get('X-Email-Sent', 'False')
+                
+                logger.info(f"📧 Email notifications: {emails_sent}/{total_recipients} sent successfully")
+                logger.info(f"📧 Email status: {email_success}")
+            
+            # Log report details
+            content_length = len(response.content)
+            logger.info(f"📄 Report size: {content_length} bytes")
+            logger.info("Weekly provider payment report job completed successfully")
+            
+        else:
+            logger.error(f"❌ Provider payment report failed with status {response.status_code}")
+            logger.error(f"Response: {response.text[:500]}")  # Log first 500 chars of error
+            
+    except requests.exceptions.Timeout:
+        logger.error("❌ Provider payment report timed out (>5 minutes)")
+    except requests.exceptions.ConnectionError:
+        logger.error("❌ Cannot connect to API server for provider payment report")
+    except Exception as e:
+        logger.error(f"❌ Error in weekly provider payment report job: {str(e)}")
+
 def setup_weekly_scheduler():
     """
     Set up the weekly scheduler for case status updates and NPI data updates.
     
     Schedules all weekly update functions:
     - weekly_pending_payment_update: Monday at 08:00 UTC (status 10 -> 15)
+    - weekly_provider_payment_report: Monday at 08:30 UTC (generate report + send emails)
     - weekly_npi_update: Tuesday at 08:00 UTC (NPI data refresh)
     - weekly_paid_update: Thursday at 08:00 UTC (status 15 -> 20)
     
@@ -215,6 +267,9 @@ def setup_weekly_scheduler():
     """
     # Schedule pending payment update for Monday at 08:00 UTC
     schedule.every().monday.at("08:00").do(weekly_pending_payment_update)
+    
+    # Schedule provider payment report for Monday at 08:30 UTC (30 minutes after status update)
+    schedule.every().monday.at("08:30").do(weekly_provider_payment_report)
     
     # Schedule NPI data update for Tuesday at 08:00 UTC
     schedule.every().thursday.at("08:00").do(weekly_npi_update)
@@ -224,6 +279,7 @@ def setup_weekly_scheduler():
     
     logger.info("Weekly scheduler configured:")
     logger.info("  - Pending payment update: Monday at 08:00 UTC")
+    logger.info("  - Provider payment report: Monday at 08:30 UTC")
     logger.info("  - NPI data update: Thursday at 08:00 UTC")
     logger.info("  - Paid update: Thursday at 08:00 UTC")
 

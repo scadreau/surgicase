@@ -1,5 +1,5 @@
 # Created: 2025-07-30 14:30:30
-# Last Modified: 2025-07-30 21:09:27
+# Last Modified: 2025-07-30 22:00:21
 # Author: Scott Cadreau
 
 import boto3
@@ -721,12 +721,13 @@ def send_provider_payment_report_emails(
                 subject = format_email_template(template_config['subject'], email_variables)
                 body = format_email_template(template_config['body'], email_variables)
                 
-                # Send email using existing send_email function
+                # Send email using existing send_email function with display name
                 result = send_email(
                     to_addresses=recipient['email_address'],
                     subject=subject,
                     body=body,
                     attachments=[attachment],
+                    from_address="SurgiCase Automation <noreply@metoraymedical.com>",
                     aws_region=aws_region
                 )
                 

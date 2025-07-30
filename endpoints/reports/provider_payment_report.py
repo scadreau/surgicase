@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-07-30 21:01:31
+# Last Modified: 2025-07-30 22:08:02
 # Author: Scott Cadreau
 
 # endpoints/reports/provider_payment_report.py
@@ -167,7 +167,8 @@ class ProviderPaymentReportPDF(FPDF):
 def generate_provider_payment_report(
     start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
-    user_id: Optional[str] = Query(None, description="Filter by specific provider user_id")
+    user_id: Optional[str] = Query(None, description="Filter by specific provider user_id"),
+    email_type: Optional[str] = Query("on_demand", description="Email template type: 'weekly' or 'on_demand'")
 ):
     """
     Generate a provider payment report as a PDF file.
@@ -330,12 +331,12 @@ def generate_provider_payment_report(
                         "total_amount": f"{total_amount:.2f}"
                     }
                     
-                    # Send emails
+                    # Send emails with appropriate template type
                     email_result = send_provider_payment_report_emails(
                         report_path=filepath,
                         report_filename=filename,
                         report_data=email_data,
-                        email_type="on_demand"  # Default to on_demand, will be "weekly" when scheduled
+                        email_type=email_type  # Use parameter: "weekly" for scheduled, "on_demand" for manual
                     )
                     
                     logger.info(f"Email sending result: {email_result['message']}")
