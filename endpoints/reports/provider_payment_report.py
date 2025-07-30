@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-07-30 20:35:37
+# Last Modified: 2025-07-30 21:01:31
 # Author: Scott Cadreau
 
 # endpoints/reports/provider_payment_report.py
@@ -11,11 +11,15 @@ from utils.monitoring import track_business_operation, business_metrics
 from utils.report_cleanup import cleanup_old_reports, get_reports_directory_size
 from utils.s3_storage import upload_file_to_s3, generate_s3_key
 from utils.text_formatting import capitalize_name_field
+from utils.email_service import send_provider_payment_report_emails
 from fpdf import FPDF
 from datetime import datetime, timedelta
 import os
 import tempfile
+import logging
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -305,11 +309,52 @@ def generate_provider_payment_report(
                 # Record successful report generation
                 business_metrics.record_utility_operation("provider_report", "success")
                 
-                # Prepare response with S3 information
+                # Send email notifications
+                try:
+                    # Prepare email data
+                    report_date_range = ""
+                    if start_date and end_date:
+                        report_date_range = f"{start_date} to {end_date}"
+                    elif start_date:
+                        report_date_range = f"from {start_date}"
+                    elif end_date:
+                        report_date_range = f"through {end_date}"
+                    else:
+                        report_date_range = "all dates"
+                    
+                    email_data = {
+                        "creation_date": datetime.now().strftime('%B %d, %Y'),
+                        "report_date": report_date_range,
+                        "total_providers": len(providers),
+                        "total_cases": total_cases,
+                        "total_amount": f"{total_amount:.2f}"
+                    }
+                    
+                    # Send emails
+                    email_result = send_provider_payment_report_emails(
+                        report_path=filepath,
+                        report_filename=filename,
+                        report_data=email_data,
+                        email_type="on_demand"  # Default to on_demand, will be "weekly" when scheduled
+                    )
+                    
+                    logger.info(f"Email sending result: {email_result['message']}")
+                    
+                except Exception as e:
+                    # Log email error but don't fail the report generation
+                    logger.error(f"Error sending email notifications: {str(e)}")
+                    email_result = {
+                        "success": False,
+                        "message": f"Email sending failed: {str(e)}",
+                        "emails_sent": 0
+                    }
+                
+                # Prepare response with S3 and email information
                 response_data = {
                     "local_file": filepath,
                     "filename": filename,
-                    "s3_upload": s3_result
+                    "s3_upload": s3_result,
+                    "email_notifications": email_result
                 }
                 
                 # Return file for download with proper headers and S3 info
@@ -323,7 +368,10 @@ def generate_provider_payment_report(
                         'Content-Length': str(os.path.getsize(filepath)),
                         'X-S3-URL': s3_result.get('s3_url', ''),
                         'X-S3-Key': s3_result.get('s3_key', ''),
-                        'X-S3-Upload-Success': str(s3_result.get('success', False))
+                        'X-S3-Upload-Success': str(s3_result.get('success', False)),
+                        'X-Email-Sent': str(email_result.get('success', False)),
+                        'X-Email-Count': str(email_result.get('emails_sent', 0)),
+                        'X-Email-Total-Recipients': str(email_result.get('total_recipients', 0))
                     }
                 )
                 

@@ -1,5 +1,5 @@
 # Created: 2025-07-30 14:30:30
-# Last Modified: 2025-07-30 15:07:02
+# Last Modified: 2025-07-30 21:09:27
 # Author: Scott Cadreau
 
 import boto3
@@ -11,6 +11,7 @@ from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 import os
+import pymysql.cursors
 from botocore.exceptions import ClientError
 
 # Configure logging
@@ -423,4 +424,356 @@ def test_secrets_configuration(aws_region: str = "us-east-1") -> Dict[str, Any]:
             "region": aws_region,
             "error": str(e),
             "message": "Failed to retrieve configuration from Secrets Manager"
+        }
+
+# ========================================
+# Email Verification Functions
+# ========================================
+
+def verify_email_address(email_address: str, aws_region: str = "us-east-1") -> Dict[str, Any]:
+    """
+    Send verification email to add a new email address to SES
+    
+    Args:
+        email_address: Email address to verify
+        aws_region: AWS region for SES
+        
+    Returns:
+        Dictionary with verification status
+    """
+    try:
+        ses_client = boto3.client('ses', region_name=aws_region)
+        
+        # Check if already verified
+        verified = ses_client.list_verified_email_addresses()
+        if email_address in verified['VerifiedEmailAddresses']:
+            return {
+                "success": True,
+                "already_verified": True,
+                "message": f"Email {email_address} is already verified"
+            }
+        
+        # Send verification email
+        response = ses_client.verify_email_identity(EmailAddress=email_address)
+        
+        logger.info(f"Verification email sent to {email_address}")
+        
+        return {
+            "success": True,
+            "already_verified": False,
+            "message": f"Verification email sent to {email_address}. Check inbox and click verification link.",
+            "request_id": response['ResponseMetadata']['RequestId']
+        }
+        
+    except ClientError as e:
+        error_code = e.response['Error']['Code']
+        error_message = e.response['Error']['Message']
+        logger.error(f"Error verifying email {email_address}: {error_code} - {error_message}")
+        
+        return {
+            "success": False,
+            "error_code": error_code,
+            "message": f"Failed to send verification email: {error_message}"
+        }
+    except Exception as e:
+        error_msg = f"Unexpected error verifying email {email_address}: {str(e)}"
+        logger.error(error_msg)
+        return {
+            "success": False,
+            "message": error_msg
+        }
+
+def check_email_verification_status(email_address: str, aws_region: str = "us-east-1") -> Dict[str, Any]:
+    """
+    Check if an email address is verified in SES
+    
+    Args:
+        email_address: Email address to check
+        aws_region: AWS region for SES
+        
+    Returns:
+        Dictionary with verification status
+    """
+    try:
+        ses_client = boto3.client('ses', region_name=aws_region)
+        
+        # Get list of verified email addresses
+        verified = ses_client.list_verified_email_addresses()
+        is_verified = email_address in verified['VerifiedEmailAddresses']
+        
+        return {
+            "success": True,
+            "email_address": email_address,
+            "is_verified": is_verified,
+            "all_verified_emails": verified['VerifiedEmailAddresses']
+        }
+        
+    except Exception as e:
+        error_msg = f"Error checking verification status for {email_address}: {str(e)}"
+        logger.error(error_msg)
+        return {
+            "success": False,
+            "message": error_msg
+        }
+
+def auto_verify_recipients_for_report(report_name: str, aws_region: str = "us-east-1") -> Dict[str, Any]:
+    """
+    Automatically send verification emails to any unverified recipients for a report
+    
+    Args:
+        report_name: Name of the report (e.g., 'provider_payment_report')
+        aws_region: AWS region for SES
+        
+    Returns:
+        Dictionary with verification results
+    """
+    try:
+        # Get recipients for the report
+        recipients = get_report_email_recipients(report_name)
+        
+        if not recipients:
+            return {
+                "success": True,
+                "message": f"No recipients configured for {report_name}",
+                "results": []
+            }
+        
+        # Check and verify each recipient
+        results = []
+        verification_sent_count = 0
+        
+        for recipient in recipients:
+            email = recipient['email_address']
+            result = verify_email_address(email, aws_region)
+            result['recipient_name'] = f"{recipient.get('first_name', '')} {recipient.get('last_name', '')}".strip()
+            results.append(result)
+            
+            if result['success'] and not result.get('already_verified', False):
+                verification_sent_count += 1
+        
+        return {
+            "success": True,
+            "message": f"Verification process completed. {verification_sent_count} verification emails sent.",
+            "total_recipients": len(recipients),
+            "verification_emails_sent": verification_sent_count,
+            "results": results
+        }
+        
+    except Exception as e:
+        error_msg = f"Error auto-verifying recipients for {report_name}: {str(e)}"
+        logger.error(error_msg)
+        return {
+            "success": False,
+            "message": error_msg,
+            "results": []
+        }
+
+# ========================================
+# Provider Payment Report Email Functions
+# ========================================
+
+def get_email_templates(aws_region: str = "us-east-1") -> Dict[str, Any]:
+    """
+    Fetch email templates from AWS Secrets Manager
+    
+    Args:
+        aws_region: AWS region where the secret is stored
+        
+    Returns:
+        Dictionary containing email templates
+        
+    Raises:
+        Exception: If templates cannot be retrieved
+    """
+    try:
+        client = boto3.client('secretsmanager', region_name=aws_region)
+        response = client.get_secret_value(SecretId='surgicase/email_templates')
+        templates = json.loads(response['SecretString'])
+        logger.info("Successfully retrieved email templates from AWS Secrets Manager")
+        return templates
+    except Exception as e:
+        logger.error(f"Error fetching email templates from Secrets Manager: {str(e)}")
+        raise
+
+def get_report_email_recipients(report_name: str) -> List[Dict[str, str]]:
+    """
+    Query the report_email_list table for recipients of a specific report
+    
+    Args:
+        report_name: The name of the report (e.g., 'provider_payment_report')
+        
+    Returns:
+        List of dictionaries containing email_address, first_name, last_name
+        
+    Raises:
+        Exception: If database query fails
+    """
+    # Import here to avoid circular imports
+    from core.database import get_db_connection, close_db_connection
+    
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            sql = """
+                SELECT email_address, first_name, last_name 
+                FROM report_email_list 
+                WHERE report_name = %s
+            """
+            cursor.execute(sql, (report_name,))
+            recipients = cursor.fetchall()
+            logger.info(f"Found {len(recipients)} recipients for report: {report_name}")
+            return recipients
+    except Exception as e:
+        logger.error(f"Error fetching email recipients for {report_name}: {str(e)}")
+        raise
+    finally:
+        if conn:
+            close_db_connection(conn)
+
+def format_email_template(template: str, variables: Dict[str, str]) -> str:
+    """
+    Format email template with provided variables
+    
+    Args:
+        template: Email template string with {variable} placeholders
+        variables: Dictionary of variable names and values
+        
+    Returns:
+        Formatted email string
+        
+    Raises:
+        KeyError: If required variable is missing
+        Exception: If formatting fails
+    """
+    try:
+        return template.format(**variables)
+    except KeyError as e:
+        logger.error(f"Missing variable in email template: {str(e)}")
+        raise
+    except Exception as e:
+        logger.error(f"Error formatting email template: {str(e)}")
+        raise
+
+def send_provider_payment_report_emails(
+    report_path: str,
+    report_filename: str,
+    report_data: Dict[str, Any],
+    email_type: str = "on_demand",
+    aws_region: str = "us-east-1"
+) -> Dict[str, Any]:
+    """
+    Send provider payment report to all configured recipients
+    
+    Args:
+        report_path: Local path to the PDF report
+        report_filename: Name of the PDF file
+        report_data: Dictionary containing report metadata for email variables
+        email_type: Type of email template to use ("weekly" or "on_demand")
+        aws_region: AWS region for services
+        
+    Returns:
+        Dictionary with overall results and individual email statuses
+    """
+    try:
+        # Get email templates
+        templates = get_email_templates(aws_region)
+        template_config = templates['email_templates']['provider_payment_report'][email_type]
+        
+        # Get recipients
+        recipients = get_report_email_recipients('provider_payment_report')
+        
+        if not recipients:
+            logger.warning("No recipients found for provider_payment_report")
+            return {
+                "success": True,
+                "message": "No recipients configured for provider_payment_report",
+                "emails_sent": 0,
+                "total_recipients": 0,
+                "results": []
+            }
+        
+        # Prepare template variables
+        template_variables = {
+            "creation_date": report_data.get('creation_date', ''),
+            "report_date": report_data.get('report_date', ''),
+            "total_providers": str(report_data.get('total_providers', '')),
+            "total_cases": str(report_data.get('total_cases', '')),
+            "total_amount": str(report_data.get('total_amount', '')),
+            "filename": report_filename
+        }
+        
+        # Create attachment
+        attachment = create_attachment_from_file(report_path, report_filename)
+        
+        results = []
+        successful_sends = 0
+        
+        # Send email to each recipient
+        for recipient in recipients:
+            try:
+                # Add recipient-specific variables
+                email_variables = template_variables.copy()
+                email_variables['first_name'] = recipient.get('first_name', 'Valued Partner')
+                email_variables['last_name'] = recipient.get('last_name', '')
+                
+                # Format email content
+                subject = format_email_template(template_config['subject'], email_variables)
+                body = format_email_template(template_config['body'], email_variables)
+                
+                # Send email using existing send_email function
+                result = send_email(
+                    to_addresses=recipient['email_address'],
+                    subject=subject,
+                    body=body,
+                    attachments=[attachment],
+                    aws_region=aws_region
+                )
+                
+                # Format result for consistency
+                formatted_result = {
+                    "success": result.get('success', False),
+                    "recipient": recipient['email_address'],
+                    "message": result.get('message', ''),
+                    "message_id": result.get('message_id')
+                }
+                
+                results.append(formatted_result)
+                
+                if formatted_result['success']:
+                    successful_sends += 1
+                    logger.info(f"Successfully sent email to {recipient['email_address']}")
+                else:
+                    logger.error(f"Failed to send email to {recipient['email_address']}: {formatted_result['message']}")
+                    
+            except Exception as e:
+                error_result = {
+                    "success": False,
+                    "recipient": recipient['email_address'],
+                    "message": f"Error processing email for {recipient['email_address']}: {str(e)}",
+                    "message_id": None
+                }
+                results.append(error_result)
+                logger.error(error_result['message'])
+        
+        success_message = f"Email sending completed. {successful_sends}/{len(recipients)} emails sent successfully"
+        logger.info(success_message)
+        
+        return {
+            "success": True,
+            "message": success_message,
+            "emails_sent": successful_sends,
+            "total_recipients": len(recipients),
+            "results": results
+        }
+        
+    except Exception as e:
+        error_msg = f"Error sending provider payment report emails: {str(e)}"
+        logger.error(error_msg)
+        return {
+            "success": False,
+            "message": error_msg,
+            "emails_sent": 0,
+            "total_recipients": 0,
+            "results": []
         }
