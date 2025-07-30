@@ -1,0 +1,68 @@
+{
+  "aws_resources": {
+    "critical_services": [
+      {
+        "name": "rds_database",
+        "type": "rds",
+        "config": {
+          "description": "Primary RDS database connection"
+        }
+      },
+      {
+        "name": "aws_secrets_manager", 
+        "type": "secrets_manager",
+        "config": {
+          "region": "us-east-1"
+        }
+      },
+      {
+        "name": "api_gateway",
+        "type": "api_gateway",
+        "config": {
+          "api_id": "5gt34rnqxc",
+          "region": "us-east-1"
+        }
+      },
+      {
+        "name": "ec2_instances",
+        "type": "ec2",
+        "config": {
+          "instance_ids": ["i-099fb57644b0c33ba"],
+          "region": "us-east-1"
+        }
+      }
+    ],
+    "non_critical_services": [
+      {
+        "name": "s3_storage",
+        "type": "s3",
+        "config": {
+          "bucket_name": "amplify-surgicalcasemanag-surgicaldocsbucket5a7ebd-8usdadqv6nnp",
+          "region": "us-east-1"
+        }
+      },
+      {
+        "name": "amplify_app",
+        "type": "amplify", 
+        "config": {
+          "app_id": "d2ghhkk9htiisb",
+          "region": "us-east-1"
+        }
+      }
+    ]
+  },
+  "health_thresholds": {
+    "database": {
+      "healthy_ms": 500,
+      "degraded_ms": 2000
+    },
+    "aws_apis": {
+      "healthy_ms": 1000,
+      "degraded_ms": 3000
+    }
+  },
+  "cache_settings": {
+    "cache_duration_seconds": 300,
+    "enable_caching": true
+  }
+}

@@ -1,5 +1,5 @@
 # Created: 2025-01-27
-# Last Modified: 2025-07-30 06:45:15
+# Last Modified: 2025-07-30 17:18:45
 
 # SurgiCase Management System
 
@@ -153,7 +153,8 @@ The application will be available at:
 - **API**: http://localhost:8000
 - **Documentation**: http://localhost:8000/docs
 - **Metrics**: http://localhost:8000/metrics
-- **Health Check**: http://localhost:8000/health
+- **Health Check**: http://localhost:8000/health (comprehensive)
+- **System Status**: http://localhost:8000/health/system (simplified)
 
 ## 📚 API Endpoints
 
@@ -188,7 +189,8 @@ The application will be available at:
 - `POST /log_request` - Log API request
 
 ### Health & Monitoring
-- `GET /health` - Comprehensive health check
+- `GET /health` - Comprehensive health check with all AWS services
+- `GET /health/system` - Simplified system status (perfect for user login)
 - `GET /health/ready` - Kubernetes readiness probe
 - `GET /health/live` - Kubernetes liveness probe
 - `GET /metrics` - Prometheus metrics
@@ -241,10 +243,30 @@ The application exposes comprehensive metrics at `/metrics`:
 - **Database metrics**: Connection pools, query performance
 
 ### Health Checks
-- **Simple health**: Basic service availability
-- **Database health**: Database connectivity and performance
-- **AWS health**: S3 and Secrets Manager connectivity
-- **System health**: Resource utilization and performance
+The system provides comprehensive health monitoring with 5-minute caching for optimal performance:
+
+#### Critical Services (failure = system unhealthy)
+- **Database health**: RDS connectivity and query performance
+- **AWS Secrets Manager**: Credential access and authentication
+- **API Gateway**: Gateway status and accessibility  
+- **EC2 Instances**: Instance status and system health
+
+#### Non-Critical Services (failure = system degraded)
+- **S3 Storage**: Bucket accessibility and read operations
+- **Amplify**: Application deployment status
+- **System Resources**: CPU, memory, and disk utilization
+
+#### Endpoints
+- **`/health`**: Full detailed health check with all components
+- **`/health/system`**: Simplified status for user login (cached, fast)
+- **`/health/ready`**: Kubernetes readiness (critical services only)
+- **`/health/live`**: Kubernetes liveness (basic availability)
+
+#### Caching Strategy
+- **5-minute cache** reduces AWS API calls and improves response time
+- Perfect for **user login checks** - fast and comprehensive
+- Automatic cache refresh when health status changes
+- Per-instance caching for horizontal scaling
 
 ### Logging
 - **Structured logging**: JSON format for easy parsing

@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-29 01:46:58
+# Last Modified: 2025-07-30 17:18:45
 # Author: Scott Cadreau
 
 # endpoints/health.py
@@ -10,8 +10,9 @@ import boto3
 import os
 import time
 import json
-from datetime import datetime
-from typing import Dict, Any
+from datetime import datetime, timedelta
+from typing import Dict, Any, Optional
+from pathlib import Path
 
 router = APIRouter()
 
@@ -22,6 +23,57 @@ def get_logger():
     return logging.getLogger(__name__)
 
 logger = get_logger()
+
+# Global cache for health check results
+_health_cache = {
+    "last_check": None,
+    "results": None,
+    "config": None
+}
+
+def load_health_config() -> Dict[str, Any]:
+    """Load health configuration from JSON file"""
+    if _health_cache["config"] is not None:
+        return _health_cache["config"]
+    
+    try:
+        config_path = Path(__file__).parent.parent / "utils" / "health_config.json"
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+        _health_cache["config"] = config
+        return config
+    except Exception as e:
+        logger.error(f"Failed to load health config: {str(e)}")
+        # Return minimal config as fallback
+        return {
+            "aws_resources": {"critical_services": [], "non_critical_services": []},
+            "health_thresholds": {"database": {"healthy_ms": 500, "degraded_ms": 2000}, "aws_apis": {"healthy_ms": 1000, "degraded_ms": 3000}},
+            "cache_settings": {"cache_duration_seconds": 300, "enable_caching": True}
+        }
+
+def is_cache_valid() -> bool:
+    """Check if cached health results are still valid"""
+    config = load_health_config()
+    if not config["cache_settings"]["enable_caching"]:
+        return False
+    
+    if _health_cache["last_check"] is None or _health_cache["results"] is None:
+        return False
+    
+    cache_duration = timedelta(seconds=config["cache_settings"]["cache_duration_seconds"])
+    return datetime.utcnow() - _health_cache["last_check"] < cache_duration
+
+def get_status_from_response_time(response_time_ms: float, service_type: str) -> str:
+    """Determine health status based on response time and service type"""
+    config = load_health_config()
+    thresholds = config["health_thresholds"].get(service_type, config["health_thresholds"]["aws_apis"])
+    
+    if response_time_ms <= thresholds["healthy_ms"]:
+        return "healthy"
+    elif response_time_ms <= thresholds["degraded_ms"]:
+        return "degraded"
+    else:
+        return "unhealthy"
 
 def check_database_health() -> Dict[str, Any]:
     """Check database connectivity and health"""
@@ -143,57 +195,414 @@ def check_system_resources() -> Dict[str, Any]:
             "error": str(e)
         }
 
+def check_amplify_health() -> Dict[str, Any]:
+    """Check AWS Amplify app health"""
+    start_time = time.time()
+    try:
+        config = load_health_config()
+        amplify_config = None
+        
+        # Find amplify config
+        for service in config["aws_resources"]["non_critical_services"]:
+            if service["type"] == "amplify":
+                amplify_config = service["config"]
+                break
+        
+        if not amplify_config:
+            return {
+                "status": "unknown",
+                "details": "Amplify configuration not found"
+            }
+        
+        region = amplify_config.get("region", "us-east-1")
+        app_id = amplify_config["app_id"]
+        
+        client = boto3.client("amplify", region_name=region)
+        response = client.get_app(appId=app_id)
+        
+        app = response["app"]
+        duration = time.time() - start_time
+        response_time_ms = round(duration * 1000, 2)
+        
+        # Check app status
+        if app["platform"] and app["name"]:
+            status = get_status_from_response_time(response_time_ms, "aws_apis")
+            logger.info(f"Amplify health check passed in {duration:.3f}s")
+            
+            return {
+                "status": status,
+                "response_time_ms": response_time_ms,
+                "details": f"Amplify app '{app['name']}' is accessible",
+                "app_name": app["name"],
+                "platform": app["platform"],
+                "region": region
+            }
+        else:
+            return {
+                "status": "unhealthy",
+                "response_time_ms": response_time_ms,
+                "details": "Amplify app data incomplete",
+                "region": region
+            }
+            
+    except Exception as e:
+        duration = time.time() - start_time
+        logger.error(f"Amplify health check failed after {duration:.3f}s: {str(e)}")
+        
+        return {
+            "status": "unhealthy",
+            "response_time_ms": round(duration * 1000, 2),
+            "details": f"Amplify connectivity failed: {str(e)}",
+            "error": str(e)
+        }
+
+def check_api_gateway_health() -> Dict[str, Any]:
+    """Check AWS API Gateway health"""
+    start_time = time.time()
+    try:
+        config = load_health_config()
+        gateway_config = None
+        
+        # Find API Gateway config
+        for service in config["aws_resources"]["critical_services"]:
+            if service["type"] == "api_gateway":
+                gateway_config = service["config"]
+                break
+        
+        if not gateway_config:
+            return {
+                "status": "unknown",
+                "details": "API Gateway configuration not found"
+            }
+        
+        region = gateway_config.get("region", "us-east-1")
+        api_id = gateway_config["api_id"]
+        
+        client = boto3.client("apigateway", region_name=region)
+        response = client.get_rest_api(restApiId=api_id)
+        
+        duration = time.time() - start_time
+        response_time_ms = round(duration * 1000, 2)
+        
+        # Check API Gateway status
+        if response["id"] and response["name"]:
+            status = get_status_from_response_time(response_time_ms, "aws_apis")
+            logger.info(f"API Gateway health check passed in {duration:.3f}s")
+            
+            return {
+                "status": status,
+                "response_time_ms": response_time_ms,
+                "details": f"API Gateway '{response['name']}' is accessible",
+                "api_name": response["name"],
+                "api_id": response["id"],
+                "region": region
+            }
+        else:
+            return {
+                "status": "unhealthy",
+                "response_time_ms": response_time_ms,
+                "details": "API Gateway data incomplete",
+                "region": region
+            }
+            
+    except Exception as e:
+        duration = time.time() - start_time
+        logger.error(f"API Gateway health check failed after {duration:.3f}s: {str(e)}")
+        
+        return {
+            "status": "unhealthy",
+            "response_time_ms": round(duration * 1000, 2),
+            "details": f"API Gateway connectivity failed: {str(e)}",
+            "error": str(e)
+        }
+
+def check_s3_health() -> Dict[str, Any]:
+    """Check AWS S3 bucket health"""
+    start_time = time.time()
+    try:
+        config = load_health_config()
+        s3_config = None
+        
+        # Find S3 config
+        for service in config["aws_resources"]["non_critical_services"]:
+            if service["type"] == "s3":
+                s3_config = service["config"]
+                break
+        
+        if not s3_config:
+            return {
+                "status": "unknown",
+                "details": "S3 configuration not found"
+            }
+        
+        region = s3_config.get("region", "us-east-1")
+        bucket_name = s3_config["bucket_name"]
+        
+        client = boto3.client("s3", region_name=region)
+        
+        # Test bucket accessibility - head_bucket is lightweight
+        client.head_bucket(Bucket=bucket_name)
+        
+        # Test read access by listing root directory (with prefix to limit results)
+        response = client.list_objects_v2(Bucket=bucket_name, MaxKeys=1)
+        
+        duration = time.time() - start_time
+        response_time_ms = round(duration * 1000, 2)
+        
+        status = get_status_from_response_time(response_time_ms, "aws_apis")
+        logger.info(f"S3 health check passed in {duration:.3f}s")
+        
+        return {
+            "status": status,
+            "response_time_ms": response_time_ms,
+            "details": f"S3 bucket '{bucket_name}' is accessible",
+            "bucket_name": bucket_name,
+            "region": region,
+            "has_objects": "Contents" in response
+        }
+        
+    except Exception as e:
+        duration = time.time() - start_time
+        logger.error(f"S3 health check failed after {duration:.3f}s: {str(e)}")
+        
+        return {
+            "status": "unhealthy",
+            "response_time_ms": round(duration * 1000, 2),
+            "details": f"S3 connectivity failed: {str(e)}",
+            "error": str(e)
+        }
+
+def check_ec2_health() -> Dict[str, Any]:
+    """Check EC2 instances health"""
+    start_time = time.time()
+    try:
+        config = load_health_config()
+        ec2_config = None
+        
+        # Find EC2 config
+        for service in config["aws_resources"]["critical_services"]:
+            if service["type"] == "ec2":
+                ec2_config = service["config"]
+                break
+        
+        if not ec2_config:
+            return {
+                "status": "unknown",
+                "details": "EC2 configuration not found"
+            }
+        
+        region = ec2_config.get("region", "us-east-1")
+        instance_ids = ec2_config["instance_ids"]
+        
+        client = boto3.client("ec2", region_name=region)
+        
+        # Check instance status
+        response = client.describe_instance_status(
+            InstanceIds=instance_ids,
+            IncludeAllInstances=True
+        )
+        
+        duration = time.time() - start_time
+        response_time_ms = round(duration * 1000, 2)
+        
+        instance_statuses = []
+        all_healthy = True
+        
+        for status_info in response["InstanceStatuses"]:
+            instance_id = status_info["InstanceId"]
+            instance_state = status_info["InstanceState"]["Name"]
+            system_status = status_info.get("SystemStatus", {}).get("Status", "unknown")
+            instance_status = status_info.get("InstanceStatus", {}).get("Status", "unknown")
+            
+            is_healthy = (
+                instance_state == "running" and 
+                system_status == "ok" and 
+                instance_status == "ok"
+            )
+            
+            if not is_healthy:
+                all_healthy = False
+            
+            instance_statuses.append({
+                "instance_id": instance_id,
+                "state": instance_state,
+                "system_status": system_status,
+                "instance_status": instance_status,
+                "healthy": is_healthy
+            })
+        
+        if all_healthy:
+            status = get_status_from_response_time(response_time_ms, "aws_apis")
+            logger.info(f"EC2 health check passed in {duration:.3f}s")
+        else:
+            status = "unhealthy"
+            logger.warning(f"EC2 health check found unhealthy instances in {duration:.3f}s")
+        
+        return {
+            "status": status,
+            "response_time_ms": response_time_ms,
+            "details": f"Checked {len(instance_ids)} EC2 instance(s)",
+            "region": region,
+            "instances": instance_statuses,
+            "total_instances": len(instance_ids),
+            "healthy_instances": sum(1 for inst in instance_statuses if inst["healthy"])
+        }
+        
+    except Exception as e:
+        duration = time.time() - start_time
+        logger.error(f"EC2 health check failed after {duration:.3f}s: {str(e)}")
+        
+        return {
+            "status": "unhealthy",
+            "response_time_ms": round(duration * 1000, 2),
+            "details": f"EC2 connectivity failed: {str(e)}",
+            "error": str(e)
+        }
+
+def perform_comprehensive_health_check() -> Dict[str, Any]:
+    """Perform comprehensive health check of all configured services"""
+    start_time = time.time()
+    
+    # Perform core health checks (always run these)
+    db_health = check_database_health()
+    aws_secrets_health = check_aws_secrets_manager_health() 
+    system_health = check_system_resources()
+    
+    # Perform configurable AWS service checks
+    amplify_health = check_amplify_health()
+    api_gateway_health = check_api_gateway_health()
+    s3_health = check_s3_health()
+    ec2_health = check_ec2_health()
+    
+    # Organize components by criticality
+    critical_components = {
+        "database": db_health,
+        "aws_secrets_manager": aws_secrets_health,
+        "api_gateway": api_gateway_health,
+        "ec2_instances": ec2_health
+    }
+    
+    non_critical_components = {
+        "s3_storage": s3_health,
+        "amplify_app": amplify_health,
+        "system_resources": system_health
+    }
+    
+    # Calculate overall health status
+    critical_statuses = [comp["status"] for comp in critical_components.values() if comp["status"] != "unknown"]
+    non_critical_statuses = [comp["status"] for comp in non_critical_components.values() if comp["status"] != "unknown"]
+    
+    overall_status = "healthy"
+    if any(status == "unhealthy" for status in critical_statuses):
+        overall_status = "unhealthy"
+    elif any(status in ["unhealthy", "degraded"] for status in non_critical_statuses) or any(status == "degraded" for status in critical_statuses):
+        overall_status = "degraded"
+    
+    # Count service statuses for summary
+    all_components = {**critical_components, **non_critical_components}
+    total_services = len([comp for comp in all_components.values() if comp["status"] != "unknown"])
+    healthy_count = len([comp for comp in all_components.values() if comp["status"] == "healthy"])
+    degraded_count = len([comp for comp in all_components.values() if comp["status"] == "degraded"])
+    unhealthy_count = len([comp for comp in all_components.values() if comp["status"] == "unhealthy"])
+    
+    total_duration = time.time() - start_time
+    
+    return {
+        "status": overall_status,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "response_time_ms": round(total_duration * 1000, 2),
+        "summary": {
+            "total_services": total_services,
+            "healthy": healthy_count,
+            "degraded": degraded_count,
+            "unhealthy": unhealthy_count
+        },
+        "components": all_components,
+        "version": "2.0.0",
+        "service": "surgicase-api"
+    }
+
 @router.get("/health")
 @track_business_operation("check", "health")
 def health_check():
     """
-    Comprehensive health check endpoint with detailed component status
+    Comprehensive health check endpoint with detailed component status and caching
     """
-    start_time = time.time()
+    # Check if we have valid cached results
+    if is_cache_valid():
+        logger.info("Returning cached health check results")
+        return _health_cache["results"]
     
-    # Perform all health checks
-    db_health = check_database_health()
-    aws_health = check_aws_secrets_manager_health()
-    system_health = check_system_resources()
+    # Perform fresh health check
+    health_response = perform_comprehensive_health_check()
     
-    # Calculate overall health status
-    critical_components = [db_health, aws_health]
-    warning_components = [system_health]
-    
-    overall_status = "healthy"
-    if any(comp["status"] == "unhealthy" for comp in critical_components):
-        overall_status = "unhealthy"
-    elif any(comp["status"] == "warning" for comp in warning_components):
-        overall_status = "degraded"
-    
-    total_duration = time.time() - start_time
-    
-    health_response = {
-        "status": overall_status,
-        "timestamp": datetime.utcnow().isoformat() + "Z",
-        "response_time_ms": round(total_duration * 1000, 2),
-        "components": {
-            "database": db_health,
-            "aws_secrets_manager": aws_health,
-            "system_resources": system_health
-        },
-        "version": "1.0.0",
-        "service": "surgicase-api"
-    }
+    # Cache the results
+    _health_cache["last_check"] = datetime.utcnow()
+    _health_cache["results"] = health_response
     
     # Log health check result
-    if overall_status == "healthy":
-        logger.info(f"Health check passed in {total_duration:.3f}s")
-    elif overall_status == "degraded":
-        logger.warning(f"Health check degraded in {total_duration:.3f}s")
+    if health_response["status"] == "healthy":
+        logger.info(f"Health check passed in {health_response['response_time_ms']}ms")
+    elif health_response["status"] == "degraded":
+        logger.warning(f"Health check degraded in {health_response['response_time_ms']}ms")
     else:
-        logger.error(f"Health check failed in {total_duration:.3f}s")
+        logger.error(f"Health check failed in {health_response['response_time_ms']}ms")
     
     # Return appropriate HTTP status
-    if overall_status == "unhealthy":
+    if health_response["status"] == "unhealthy":
         raise HTTPException(status_code=503, detail=health_response)
     
     return health_response
+
+@router.get("/health/system")
+@track_business_operation("check", "health_system")
+def system_health_check():
+    """
+    Simplified system health check endpoint - returns only overall status
+    Perfect for user login checks and external monitoring
+    """
+    # Check if we have valid cached results
+    if is_cache_valid():
+        cached_result = _health_cache["results"]
+        return {
+            "status": cached_result["status"],
+            "timestamp": cached_result["timestamp"],
+            "response_time_ms": cached_result["response_time_ms"],
+            "summary": cached_result["summary"],
+            "version": cached_result["version"],
+            "service": cached_result["service"]
+        }
+    
+    # Perform fresh health check
+    health_response = perform_comprehensive_health_check()
+    
+    # Cache the results
+    _health_cache["last_check"] = datetime.utcnow()
+    _health_cache["results"] = health_response
+    
+    # Return simplified response
+    simplified_response = {
+        "status": health_response["status"],
+        "timestamp": health_response["timestamp"],
+        "response_time_ms": health_response["response_time_ms"],
+        "summary": health_response["summary"],
+        "version": health_response["version"],
+        "service": health_response["service"]
+    }
+    
+    # Log health check result
+    if health_response["status"] == "healthy":
+        logger.info(f"System health check passed in {health_response['response_time_ms']}ms")
+    elif health_response["status"] == "degraded":
+        logger.warning(f"System health check degraded in {health_response['response_time_ms']}ms")
+    else:
+        logger.error(f"System health check failed in {health_response['response_time_ms']}ms")
+    
+    # Return appropriate HTTP status
+    if health_response["status"] == "unhealthy":
+        raise HTTPException(status_code=503, detail=simplified_response)
+    
+    return simplified_response
 
 @router.get("/health/ready")
 @track_business_operation("check", "health_ready")
@@ -207,7 +616,9 @@ def readiness_check():
         # For readiness, we only care about critical components
         critical_components = [
             health["components"]["database"]["status"],
-            health["components"]["aws_secrets_manager"]["status"]
+            health["components"]["aws_secrets_manager"]["status"],
+            health["components"]["api_gateway"]["status"],
+            health["components"]["ec2_instances"]["status"]
         ]
         
         if any(status == "unhealthy" for status in critical_components):
