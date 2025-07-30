@@ -29,3 +29,5 @@ Do not edit the # Last Modified: line.  It is handled by an automatic script on 
 The aws cli user has access to all aws functionality
 
 Do not use environment variables.  If we need to create a new variable, we will store it in AWS Secrets
+
+Do not try to start or restart the server.  Just pause and tell me to update and reload it.
