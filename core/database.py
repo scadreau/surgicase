@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-29 02:23:44
+# Last Modified: 2025-07-30 18:56:45
 # Author: Scott Cadreau
 
 # core/database.py
@@ -57,10 +57,11 @@ def get_db_credentials(secret_name: str) -> Dict[str, Any]:
 
 def _create_connection() -> pymysql.Connection:
     """Create a new database connection"""
-    # Fetch DB info from Secrets Manager (cached)
-    secretdb = get_db_credentials("arn:aws:secretsmanager:us-east-1:002118831669:secret:prod/rds/serverinfo-MyhF8S")
-    rds_host = secretdb["rds_address"]
-    db_name = secretdb["db_name"]    
+    # Hardcoded values (optimization: eliminates one secrets call)
+    rds_host = "rds!cluster-9376049b-abee-46d9-9cdb-95b95d6cdda0"
+    db_name = "allstars"
+    
+    # Fetch credentials from Secrets Manager (cached)
     secretdb = get_db_credentials("arn:aws:secretsmanager:us-east-1:002118831669:secret:rds!cluster-9376049b-abee-46d9-9cdb-95b95d6cdda0-fjhTNH")
     db_user = secretdb["username"]
     db_pass = secretdb["password"]
