@@ -2,7 +2,7 @@ boto3
 pymysql
 fastapi
 uvicorn
-fpdf
+fpdf2
 Pillow
 PyMuPDF
 prometheus-fastapi-instrumentator

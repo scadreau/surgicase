@@ -173,7 +173,7 @@ curl -X GET "http://localhost:8000/provider-report?start_date=2025-01-01&end_dat
 ## Dependencies
 
 ### Required Python Packages
-- `fpdf`: PDF generation
+- `fpdf2`: PDF generation
 - `pymysql`: Database connectivity
 - `fastapi`: Web framework
 - `tempfile`: Temporary file handling (for cleanup utilities)
@@ -213,7 +213,7 @@ curl -X GET "http://localhost:8000/provider-report?start_date=2025-01-01&end_dat
 - **Endpoint**: `endpoints/reports/provider_payment_report.py`
 - **Cleanup Utility**: `utils/report_cleanup.py`
 - **Main App**: `main.py` (includes router)
-- **Requirements**: `requirements.txt` (includes fpdf dependency)
+- **Requirements**: `requirements.txt` (includes fpdf2 dependency)
 
 ## Changelog
 

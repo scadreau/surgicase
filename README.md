@@ -1,5 +1,5 @@
 # Created: 2025-01-27
-# Last Modified: 2025-07-29 02:19:21
+# Last Modified: 2025-07-30 06:45:15
 
 # SurgiCase Management System
 
@@ -69,7 +69,7 @@ boto3
 pymysql
 fastapi
 uvicorn
-fpdf
+fpdf2
 Pillow
 prometheus-fastapi-instrumentator
 schedule

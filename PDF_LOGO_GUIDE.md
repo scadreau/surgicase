@@ -1,14 +1,14 @@
 # Created: 2025-07-17 11:38:00
-# Last Modified: 2025-07-17 11:38:36
+# Last Modified: 2025-07-30 06:45:15
 
 # PDF Logo Integration Guide
 
-This guide explains how to add logos to PDF reports in the SurgiCase application using FPDF.
+This guide explains how to add logos to PDF reports in the SurgiCase application using FPDF2.
 
 ## Overview
 
 The SurgiCase application now supports adding logos to PDF reports through:
-- **Enhanced FPDF Class**: `ProviderPaymentReportPDF` with built-in logo support
+- **Enhanced FPDF2 Class**: `ProviderPaymentReportPDF` with built-in logo support
 - **Logo Manager**: `LogoManager` utility for configuration and validation
 - **Environment Variables**: Flexible configuration through environment variables
 - **Multiple Report Types**: Different logo configurations for different reports
@@ -75,7 +75,7 @@ pdf.set_logo_position(config['x'], config['y'])
 
 ## Supported Image Formats
 
-FPDF supports the following image formats:
+FPDF2 supports the following image formats:
 - **PNG** (recommended for logos)
 - **JPG/JPEG**
 - **GIF**
@@ -219,10 +219,10 @@ def generate_provider_payment_report():
 
 ### Adding to New Reports
 
-For new reports, extend the FPDF class:
+For new reports, extend the FPDF2 class:
 
 ```python
-from fpdf import FPDF
+from fpdf2 import FPDF
 from utils.logo_manager import LogoManager
 
 class CustomReportPDF(FPDF):

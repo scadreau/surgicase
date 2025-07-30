@@ -1,0 +1,3413 @@
+{
+  "delete_test_run_timestamp": "2025-07-30T06:30:14.160267",
+  "input_file_used": "aws_create_results.json",
+  "total_cases_attempted": 200,
+  "successful_deletions": 200,
+  "failed_deletions": 0,
+  "average_response_time_ms": 248.71,
+  "successful_deleted_case_ids": [
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882068936",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882069108",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882069275",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882069411",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882069552",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882069808",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882069977",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882070106",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882070246",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882070376",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882070616",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882070853",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882071012",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882071141",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882071386",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882071534",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882071684",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882071836",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882071988",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882072132",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882072272",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882072514",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882072647",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882072776",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882072925",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882073177",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882073307",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882073435",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882073586",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882073845",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882074081",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882074319",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882074445",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882074577",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882074709",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882074844",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882075002",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882075128",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882075260",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882075392",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882075526",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882075767",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882075900",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882076032",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882076187",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882076442",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882076576",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882076813",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882076942",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882077077",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882077209",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882077341",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882077489",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882077632",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882077758",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882077996",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882078131",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882078260",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882078495",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882078731",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882078858",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882079040",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882079178",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882079315",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882079446",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882079710",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882079937",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882080090",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882080219",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882080374",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882080507",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882080638",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882080761",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882080886",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882081020",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882081146",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882081277",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882081404",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882081554",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882081682",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882081919",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882082063",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882082300",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882082438",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882082573",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882082728",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882082991",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882083117",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882083238",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882083378",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882083520",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882083657",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882083804",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882083946",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882084082",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882084212",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882084343",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882084501",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882084634",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882084768",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882084899",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882085028",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882085158",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882085398",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882085526",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882085677",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882085826",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882086064",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882086198",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882086325",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882086475",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882086606",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882086743",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882086874",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882087019",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882087257",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882087393",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882087655",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882087800",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882088043",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882088185",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882088331",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882088572",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882088727",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882088859",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882088997",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882089125",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882089258",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882089401",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882089541",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882089675",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882089918",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882090050",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882090285",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882090417",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882090574",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882090699",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882090823",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882090999",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882091141",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882091372",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882091524",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882091783",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882091938",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882092069",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882092297",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882092424",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882092579",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882092703",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882092859",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882093009",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882093157",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882093285",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882093415",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882093565",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882093700",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882093825",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882094091",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882094224",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882094351",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882094480",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882094603",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882094732",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882094860",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882095097",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882095230",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882095489",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882095624",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882095769",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882095895",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882096033",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882096169",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882096402",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882096640",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882096797",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882097045",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882097177",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882097318",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882097474",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882097606",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882097735",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882097863",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882097997",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882098118",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882098246",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882098380",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882098516",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882098667",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882098898",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882099044",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882099195",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882099450",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882099578",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882099809",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882099972",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882100206",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882100445",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882100579",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882100816",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882100947"
+  ],
+  "failed_deletion_details": [],
+  "detailed_results": [
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882068936",
+      "status_code": 200,
+      "execution_time_ms": 262.89,
+      "timestamp": "2025-07-30T06:29:04.531448",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882068936",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:05.579626+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882069108",
+      "status_code": 200,
+      "execution_time_ms": 229.89,
+      "timestamp": "2025-07-30T06:29:04.861966",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882069108",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:05.913635+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882069275",
+      "status_code": 200,
+      "execution_time_ms": 227.3,
+      "timestamp": "2025-07-30T06:29:05.189965",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882069275",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:06.241305+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882069411",
+      "status_code": 200,
+      "execution_time_ms": 215.25,
+      "timestamp": "2025-07-30T06:29:05.506113",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882069411",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:06.557668+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882069552",
+      "status_code": 200,
+      "execution_time_ms": 212.04,
+      "timestamp": "2025-07-30T06:29:05.818986",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882069552",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:06.868754+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882069808",
+      "status_code": 200,
+      "execution_time_ms": 224.94,
+      "timestamp": "2025-07-30T06:29:06.144605",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882069808",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:07.196746+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882069977",
+      "status_code": 200,
+      "execution_time_ms": 304.13,
+      "timestamp": "2025-07-30T06:29:06.549638",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882069977",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:07.601446+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882070106",
+      "status_code": 200,
+      "execution_time_ms": 209.67,
+      "timestamp": "2025-07-30T06:29:06.859822",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882070106",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:07.911198+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882070246",
+      "status_code": 200,
+      "execution_time_ms": 242.27,
+      "timestamp": "2025-07-30T06:29:07.202712",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882070246",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:08.253131+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882070376",
+      "status_code": 200,
+      "execution_time_ms": 223.37,
+      "timestamp": "2025-07-30T06:29:07.527048",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882070376",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:08.569061+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882070616",
+      "status_code": 200,
+      "execution_time_ms": 252.89,
+      "timestamp": "2025-07-30T06:29:07.880579",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882070616",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:08.929216+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882070853",
+      "status_code": 200,
+      "execution_time_ms": 228.68,
+      "timestamp": "2025-07-30T06:29:08.210047",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882070853",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:09.261082+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882071012",
+      "status_code": 200,
+      "execution_time_ms": 331.86,
+      "timestamp": "2025-07-30T06:29:08.642840",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882071012",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:09.693815+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882071141",
+      "status_code": 200,
+      "execution_time_ms": 198.09,
+      "timestamp": "2025-07-30T06:29:08.941762",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882071141",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:09.992241+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882071386",
+      "status_code": 200,
+      "execution_time_ms": 328.22,
+      "timestamp": "2025-07-30T06:29:09.370464",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882071386",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:10.423128+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882071534",
+      "status_code": 200,
+      "execution_time_ms": 225.99,
+      "timestamp": "2025-07-30T06:29:09.697059",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882071534",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:10.748210+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882071684",
+      "status_code": 200,
+      "execution_time_ms": 222.49,
+      "timestamp": "2025-07-30T06:29:10.020102",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882071684",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:11.071242+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882071836",
+      "status_code": 200,
+      "execution_time_ms": 230.02,
+      "timestamp": "2025-07-30T06:29:10.350754",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882071836",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:11.402184+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882071988",
+      "status_code": 200,
+      "execution_time_ms": 356.25,
+      "timestamp": "2025-07-30T06:29:10.807509",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882071988",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:11.858794+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882072132",
+      "status_code": 200,
+      "execution_time_ms": 208.96,
+      "timestamp": "2025-07-30T06:29:11.116946",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882072132",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:12.168643+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882072272",
+      "status_code": 200,
+      "execution_time_ms": 217.6,
+      "timestamp": "2025-07-30T06:29:11.435271",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882072272",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:12.478232+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882072514",
+      "status_code": 200,
+      "execution_time_ms": 325.35,
+      "timestamp": "2025-07-30T06:29:11.861269",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882072514",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:12.908580+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882072647",
+      "status_code": 200,
+      "execution_time_ms": 226.56,
+      "timestamp": "2025-07-30T06:29:12.188340",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882072647",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:13.239070+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882072776",
+      "status_code": 200,
+      "execution_time_ms": 219.14,
+      "timestamp": "2025-07-30T06:29:12.508196",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882072776",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:13.560187+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882072925",
+      "status_code": 200,
+      "execution_time_ms": 214.55,
+      "timestamp": "2025-07-30T06:29:12.823331",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882072925",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:13.875303+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882073177",
+      "status_code": 200,
+      "execution_time_ms": 199.68,
+      "timestamp": "2025-07-30T06:29:13.124087",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882073177",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:14.177226+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882073307",
+      "status_code": 200,
+      "execution_time_ms": 208.27,
+      "timestamp": "2025-07-30T06:29:13.433232",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882073307",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:14.481312+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882073435",
+      "status_code": 200,
+      "execution_time_ms": 261.86,
+      "timestamp": "2025-07-30T06:29:13.795938",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882073435",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:14.847562+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882073586",
+      "status_code": 200,
+      "execution_time_ms": 226.77,
+      "timestamp": "2025-07-30T06:29:14.123492",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882073586",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:15.176033+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882073845",
+      "status_code": 200,
+      "execution_time_ms": 200.45,
+      "timestamp": "2025-07-30T06:29:14.424797",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882073845",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:15.477106+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882074081",
+      "status_code": 200,
+      "execution_time_ms": 331.84,
+      "timestamp": "2025-07-30T06:29:14.857176",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882074081",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:15.910552+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882074319",
+      "status_code": 200,
+      "execution_time_ms": 321.52,
+      "timestamp": "2025-07-30T06:29:15.279536",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882074319",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:16.330027+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882074445",
+      "status_code": 200,
+      "execution_time_ms": 260.07,
+      "timestamp": "2025-07-30T06:29:15.640245",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882074445",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:16.692507+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882074577",
+      "status_code": 200,
+      "execution_time_ms": 222.3,
+      "timestamp": "2025-07-30T06:29:15.963192",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882074577",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:17.008930+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882074709",
+      "status_code": 200,
+      "execution_time_ms": 205.72,
+      "timestamp": "2025-07-30T06:29:16.269757",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882074709",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:17.323522+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882074844",
+      "status_code": 200,
+      "execution_time_ms": 340.42,
+      "timestamp": "2025-07-30T06:29:16.711100",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882074844",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:17.658266+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882075002",
+      "status_code": 200,
+      "execution_time_ms": 213.69,
+      "timestamp": "2025-07-30T06:29:17.025754",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882075002",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:18.077236+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882075128",
+      "status_code": 200,
+      "execution_time_ms": 202.83,
+      "timestamp": "2025-07-30T06:29:17.329231",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882075128",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:18.383166+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882075260",
+      "status_code": 200,
+      "execution_time_ms": 193.57,
+      "timestamp": "2025-07-30T06:29:17.623651",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882075260",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:18.676812+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882075392",
+      "status_code": 200,
+      "execution_time_ms": 211.71,
+      "timestamp": "2025-07-30T06:29:17.936023",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882075392",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:18.987994+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882075526",
+      "status_code": 200,
+      "execution_time_ms": 333.37,
+      "timestamp": "2025-07-30T06:29:18.370380",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882075526",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:19.422458+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882075767",
+      "status_code": 200,
+      "execution_time_ms": 329.28,
+      "timestamp": "2025-07-30T06:29:18.800609",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882075767",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:19.852231+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882075900",
+      "status_code": 200,
+      "execution_time_ms": 205.96,
+      "timestamp": "2025-07-30T06:29:19.107120",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882075900",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:20.159547+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882076032",
+      "status_code": 200,
+      "execution_time_ms": 201.49,
+      "timestamp": "2025-07-30T06:29:19.409500",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882076032",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:20.461512+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882076187",
+      "status_code": 200,
+      "execution_time_ms": 298.8,
+      "timestamp": "2025-07-30T06:29:19.809059",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882076187",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:20.860311+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882076442",
+      "status_code": 200,
+      "execution_time_ms": 193.46,
+      "timestamp": "2025-07-30T06:29:20.103255",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882076442",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:21.155252+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882076576",
+      "status_code": 200,
+      "execution_time_ms": 224.68,
+      "timestamp": "2025-07-30T06:29:20.428830",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882076576",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:21.476098+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882076813",
+      "status_code": 200,
+      "execution_time_ms": 215.1,
+      "timestamp": "2025-07-30T06:29:20.744420",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882076813",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:21.795909+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882076942",
+      "status_code": 200,
+      "execution_time_ms": 230.6,
+      "timestamp": "2025-07-30T06:29:21.075873",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882076942",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:22.127217+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882077077",
+      "status_code": 200,
+      "execution_time_ms": 225.08,
+      "timestamp": "2025-07-30T06:29:21.401596",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882077077",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:22.453634+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882077209",
+      "status_code": 200,
+      "execution_time_ms": 195.15,
+      "timestamp": "2025-07-30T06:29:21.697512",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882077209",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:22.749810+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882077341",
+      "status_code": 200,
+      "execution_time_ms": 228.05,
+      "timestamp": "2025-07-30T06:29:22.026184",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882077341",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:23.079401+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882077489",
+      "status_code": 200,
+      "execution_time_ms": 346.62,
+      "timestamp": "2025-07-30T06:29:22.473671",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882077489",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:23.526199+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882077632",
+      "status_code": 200,
+      "execution_time_ms": 185.87,
+      "timestamp": "2025-07-30T06:29:22.760102",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882077632",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:23.812608+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882077758",
+      "status_code": 200,
+      "execution_time_ms": 230.16,
+      "timestamp": "2025-07-30T06:29:23.091024",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882077758",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:24.141338+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882077996",
+      "status_code": 200,
+      "execution_time_ms": 327.8,
+      "timestamp": "2025-07-30T06:29:23.519339",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882077996",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:24.568145+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882078131",
+      "status_code": 200,
+      "execution_time_ms": 207.68,
+      "timestamp": "2025-07-30T06:29:23.827820",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882078131",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:24.880396+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882078260",
+      "status_code": 200,
+      "execution_time_ms": 239.57,
+      "timestamp": "2025-07-30T06:29:24.167854",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882078260",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:25.217068+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882078495",
+      "status_code": 200,
+      "execution_time_ms": 293.19,
+      "timestamp": "2025-07-30T06:29:24.561596",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882078495",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:25.614565+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882078731",
+      "status_code": 200,
+      "execution_time_ms": 322.66,
+      "timestamp": "2025-07-30T06:29:24.984730",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882078731",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:26.037796+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882078858",
+      "status_code": 200,
+      "execution_time_ms": 179.33,
+      "timestamp": "2025-07-30T06:29:25.264599",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882078858",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:26.317230+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882079040",
+      "status_code": 200,
+      "execution_time_ms": 318.39,
+      "timestamp": "2025-07-30T06:29:25.683758",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882079040",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:26.733353+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882079178",
+      "status_code": 200,
+      "execution_time_ms": 316.6,
+      "timestamp": "2025-07-30T06:29:26.101079",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882079178",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:27.153032+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882079315",
+      "status_code": 200,
+      "execution_time_ms": 177.34,
+      "timestamp": "2025-07-30T06:29:26.378972",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882079315",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:27.431113+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882079446",
+      "status_code": 200,
+      "execution_time_ms": 235.19,
+      "timestamp": "2025-07-30T06:29:26.715010",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882079446",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:27.767105+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882079710",
+      "status_code": 200,
+      "execution_time_ms": 248.66,
+      "timestamp": "2025-07-30T06:29:27.064269",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882079710",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:28.116303+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882079937",
+      "status_code": 200,
+      "execution_time_ms": 203.54,
+      "timestamp": "2025-07-30T06:29:27.368701",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882079937",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:28.419050+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882080090",
+      "status_code": 200,
+      "execution_time_ms": 332.9,
+      "timestamp": "2025-07-30T06:29:27.802186",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882080090",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:28.853454+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882080219",
+      "status_code": 200,
+      "execution_time_ms": 309.81,
+      "timestamp": "2025-07-30T06:29:28.212921",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882080219",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:29.175064+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882080374",
+      "status_code": 200,
+      "execution_time_ms": 299.33,
+      "timestamp": "2025-07-30T06:29:28.613133",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882080374",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:29.664289+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882080507",
+      "status_code": 200,
+      "execution_time_ms": 258.72,
+      "timestamp": "2025-07-30T06:29:28.972367",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882080507",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:30.023995+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882080638",
+      "status_code": 200,
+      "execution_time_ms": 208.67,
+      "timestamp": "2025-07-30T06:29:29.281832",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882080638",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:30.333351+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882080761",
+      "status_code": 200,
+      "execution_time_ms": 221.47,
+      "timestamp": "2025-07-30T06:29:29.603827",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882080761",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:30.653790+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882080886",
+      "status_code": 200,
+      "execution_time_ms": 341.75,
+      "timestamp": "2025-07-30T06:29:30.046322",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882080886",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:31.097091+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882081020",
+      "status_code": 200,
+      "execution_time_ms": 210.55,
+      "timestamp": "2025-07-30T06:29:30.357563",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882081020",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:31.411576+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882081146",
+      "status_code": 200,
+      "execution_time_ms": 322.32,
+      "timestamp": "2025-07-30T06:29:30.780452",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882081146",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:31.829649+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882081277",
+      "status_code": 200,
+      "execution_time_ms": 336.08,
+      "timestamp": "2025-07-30T06:29:31.217331",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882081277",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:32.270070+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882081404",
+      "status_code": 200,
+      "execution_time_ms": 249.27,
+      "timestamp": "2025-07-30T06:29:31.567667",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882081404",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:32.620616+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882081554",
+      "status_code": 200,
+      "execution_time_ms": 222.74,
+      "timestamp": "2025-07-30T06:29:31.891318",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882081554",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:32.942993+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882081682",
+      "status_code": 200,
+      "execution_time_ms": 245.41,
+      "timestamp": "2025-07-30T06:29:32.237285",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882081682",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:33.287098+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882081919",
+      "status_code": 200,
+      "execution_time_ms": 225.62,
+      "timestamp": "2025-07-30T06:29:32.563692",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882081919",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:33.616080+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882082063",
+      "status_code": 200,
+      "execution_time_ms": 197.72,
+      "timestamp": "2025-07-30T06:29:32.862382",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882082063",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:33.914866+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882082300",
+      "status_code": 200,
+      "execution_time_ms": 205.72,
+      "timestamp": "2025-07-30T06:29:33.168591",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882082300",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:34.221212+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882082438",
+      "status_code": 200,
+      "execution_time_ms": 311.37,
+      "timestamp": "2025-07-30T06:29:33.580912",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882082438",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:34.632161+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882082573",
+      "status_code": 200,
+      "execution_time_ms": 209.76,
+      "timestamp": "2025-07-30T06:29:33.891173",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882082573",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:34.943371+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882082728",
+      "status_code": 200,
+      "execution_time_ms": 216.96,
+      "timestamp": "2025-07-30T06:29:34.209010",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882082728",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:35.261600+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882082991",
+      "status_code": 200,
+      "execution_time_ms": 300.02,
+      "timestamp": "2025-07-30T06:29:34.609719",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882082991",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:35.662181+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882083117",
+      "status_code": 200,
+      "execution_time_ms": 189.19,
+      "timestamp": "2025-07-30T06:29:34.899649",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882083117",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:35.947880+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882083238",
+      "status_code": 200,
+      "execution_time_ms": 194.78,
+      "timestamp": "2025-07-30T06:29:35.195418",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882083238",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:36.248002+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882083378",
+      "status_code": 200,
+      "execution_time_ms": 240.44,
+      "timestamp": "2025-07-30T06:29:35.536843",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882083378",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:36.591019+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882083520",
+      "status_code": 200,
+      "execution_time_ms": 211.89,
+      "timestamp": "2025-07-30T06:29:35.849319",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882083520",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:36.898857+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882083657",
+      "status_code": 200,
+      "execution_time_ms": 312.29,
+      "timestamp": "2025-07-30T06:29:36.262513",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882083657",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:37.314705+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882083804",
+      "status_code": 200,
+      "execution_time_ms": 228.35,
+      "timestamp": "2025-07-30T06:29:36.591761",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882083804",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:37.643967+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882083946",
+      "status_code": 200,
+      "execution_time_ms": 329.23,
+      "timestamp": "2025-07-30T06:29:37.022056",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882083946",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:38.074715+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882084082",
+      "status_code": 200,
+      "execution_time_ms": 338.77,
+      "timestamp": "2025-07-30T06:29:37.461698",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882084082",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:38.511064+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882084212",
+      "status_code": 200,
+      "execution_time_ms": 222.18,
+      "timestamp": "2025-07-30T06:29:37.784468",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882084212",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:38.822860+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882084343",
+      "status_code": 200,
+      "execution_time_ms": 298.94,
+      "timestamp": "2025-07-30T06:29:38.184377",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882084343",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:39.237973+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882084501",
+      "status_code": 200,
+      "execution_time_ms": 309.48,
+      "timestamp": "2025-07-30T06:29:38.594712",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882084501",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:39.643537+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882084634",
+      "status_code": 200,
+      "execution_time_ms": 321.01,
+      "timestamp": "2025-07-30T06:29:39.016387",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882084634",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:40.068065+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882084768",
+      "status_code": 200,
+      "execution_time_ms": 214.36,
+      "timestamp": "2025-07-30T06:29:39.331395",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882084768",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:40.383117+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882084899",
+      "status_code": 200,
+      "execution_time_ms": 210.37,
+      "timestamp": "2025-07-30T06:29:39.642243",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882084899",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:40.693121+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882085028",
+      "status_code": 200,
+      "execution_time_ms": 329.83,
+      "timestamp": "2025-07-30T06:29:40.073394",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882085028",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:41.120096+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882085158",
+      "status_code": 200,
+      "execution_time_ms": 206.59,
+      "timestamp": "2025-07-30T06:29:40.380935",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882085158",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:41.433528+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882085398",
+      "status_code": 200,
+      "execution_time_ms": 193.7,
+      "timestamp": "2025-07-30T06:29:40.675122",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882085398",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:41.727131+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882085526",
+      "status_code": 200,
+      "execution_time_ms": 212.96,
+      "timestamp": "2025-07-30T06:29:40.988581",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882085526",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:42.042583+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882085677",
+      "status_code": 200,
+      "execution_time_ms": 302.12,
+      "timestamp": "2025-07-30T06:29:41.391416",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882085677",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:42.442129+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882085826",
+      "status_code": 200,
+      "execution_time_ms": 232.62,
+      "timestamp": "2025-07-30T06:29:41.725134",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882085826",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:42.775679+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882086064",
+      "status_code": 200,
+      "execution_time_ms": 204.37,
+      "timestamp": "2025-07-30T06:29:42.030141",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882086064",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:43.081183+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882086198",
+      "status_code": 200,
+      "execution_time_ms": 243.99,
+      "timestamp": "2025-07-30T06:29:42.375045",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882086198",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:43.426409+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882086325",
+      "status_code": 200,
+      "execution_time_ms": 214.24,
+      "timestamp": "2025-07-30T06:29:42.689926",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882086325",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:43.739882+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882086475",
+      "status_code": 200,
+      "execution_time_ms": 334.11,
+      "timestamp": "2025-07-30T06:29:43.124649",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882086475",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:44.176241+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882086606",
+      "status_code": 200,
+      "execution_time_ms": 219.74,
+      "timestamp": "2025-07-30T06:29:43.444914",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882086606",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:44.496117+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882086743",
+      "status_code": 200,
+      "execution_time_ms": 188.08,
+      "timestamp": "2025-07-30T06:29:43.733568",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882086743",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:44.787122+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882086874",
+      "status_code": 200,
+      "execution_time_ms": 323.57,
+      "timestamp": "2025-07-30T06:29:44.158138",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882086874",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:45.205415+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882087019",
+      "status_code": 200,
+      "execution_time_ms": 310.12,
+      "timestamp": "2025-07-30T06:29:44.568814",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882087019",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:45.619725+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882087257",
+      "status_code": 200,
+      "execution_time_ms": 336.32,
+      "timestamp": "2025-07-30T06:29:45.005695",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882087257",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:46.056905+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882087393",
+      "status_code": 200,
+      "execution_time_ms": 204.89,
+      "timestamp": "2025-07-30T06:29:45.311474",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882087393",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:46.363997+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882087655",
+      "status_code": 200,
+      "execution_time_ms": 240.26,
+      "timestamp": "2025-07-30T06:29:45.652581",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882087655",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:46.702089+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882087800",
+      "status_code": 200,
+      "execution_time_ms": 329.75,
+      "timestamp": "2025-07-30T06:29:46.083183",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882087800",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:47.134985+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882088043",
+      "status_code": 200,
+      "execution_time_ms": 225.45,
+      "timestamp": "2025-07-30T06:29:46.409106",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882088043",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:47.461582+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882088185",
+      "status_code": 200,
+      "execution_time_ms": 221.75,
+      "timestamp": "2025-07-30T06:29:46.731566",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882088185",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:47.784026+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882088331",
+      "status_code": 200,
+      "execution_time_ms": 335.39,
+      "timestamp": "2025-07-30T06:29:47.167806",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882088331",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:48.219104+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882088572",
+      "status_code": 200,
+      "execution_time_ms": 208.42,
+      "timestamp": "2025-07-30T06:29:47.477025",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882088572",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:48.531067+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882088727",
+      "status_code": 200,
+      "execution_time_ms": 209.84,
+      "timestamp": "2025-07-30T06:29:47.787669",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882088727",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:48.838486+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882088859",
+      "status_code": 200,
+      "execution_time_ms": 211.47,
+      "timestamp": "2025-07-30T06:29:48.099880",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882088859",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:49.152525+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882088997",
+      "status_code": 200,
+      "execution_time_ms": 194.13,
+      "timestamp": "2025-07-30T06:29:48.394769",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882088997",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:49.446811+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882089125",
+      "status_code": 200,
+      "execution_time_ms": 191.11,
+      "timestamp": "2025-07-30T06:29:48.686762",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882089125",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:49.737427+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882089258",
+      "status_code": 200,
+      "execution_time_ms": 235.91,
+      "timestamp": "2025-07-30T06:29:49.023752",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882089258",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:50.076006+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882089401",
+      "status_code": 200,
+      "execution_time_ms": 341.31,
+      "timestamp": "2025-07-30T06:29:49.465808",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882089401",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:50.517636+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882089541",
+      "status_code": 200,
+      "execution_time_ms": 214.64,
+      "timestamp": "2025-07-30T06:29:49.781339",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882089541",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:50.833129+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882089675",
+      "status_code": 200,
+      "execution_time_ms": 191.65,
+      "timestamp": "2025-07-30T06:29:50.073669",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882089675",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:51.126734+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882089918",
+      "status_code": 200,
+      "execution_time_ms": 308.63,
+      "timestamp": "2025-07-30T06:29:50.482801",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882089918",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:51.534733+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882090050",
+      "status_code": 200,
+      "execution_time_ms": 204.5,
+      "timestamp": "2025-07-30T06:29:50.787878",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882090050",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:51.839675+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882090285",
+      "status_code": 200,
+      "execution_time_ms": 320.37,
+      "timestamp": "2025-07-30T06:29:51.208984",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882090285",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:52.259579+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882090417",
+      "status_code": 200,
+      "execution_time_ms": 239.33,
+      "timestamp": "2025-07-30T06:29:51.549270",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882090417",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:52.600735+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882090574",
+      "status_code": 200,
+      "execution_time_ms": 312.84,
+      "timestamp": "2025-07-30T06:29:51.963309",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882090574",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:53.015110+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882090699",
+      "status_code": 200,
+      "execution_time_ms": 224.14,
+      "timestamp": "2025-07-30T06:29:52.288197",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882090699",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:53.343017+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882090823",
+      "status_code": 200,
+      "execution_time_ms": 327.89,
+      "timestamp": "2025-07-30T06:29:52.717144",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882090823",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:53.769682+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882090999",
+      "status_code": 200,
+      "execution_time_ms": 192.72,
+      "timestamp": "2025-07-30T06:29:53.010732",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882090999",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:54.063525+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882091141",
+      "status_code": 200,
+      "execution_time_ms": 350.65,
+      "timestamp": "2025-07-30T06:29:53.462283",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882091141",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:54.516083+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882091372",
+      "status_code": 200,
+      "execution_time_ms": 205.72,
+      "timestamp": "2025-07-30T06:29:53.768946",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882091372",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:54.821993+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882091524",
+      "status_code": 200,
+      "execution_time_ms": 200.11,
+      "timestamp": "2025-07-30T06:29:54.069551",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882091524",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:55.122677+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882091783",
+      "status_code": 200,
+      "execution_time_ms": 197.6,
+      "timestamp": "2025-07-30T06:29:54.367795",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882091783",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:55.420929+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882091938",
+      "status_code": 200,
+      "execution_time_ms": 193.94,
+      "timestamp": "2025-07-30T06:29:54.662663",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882091938",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:55.715065+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882092069",
+      "status_code": 200,
+      "execution_time_ms": 210.27,
+      "timestamp": "2025-07-30T06:29:54.973659",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882092069",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:55.999843+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882092297",
+      "status_code": 200,
+      "execution_time_ms": 206.68,
+      "timestamp": "2025-07-30T06:29:55.281104",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882092297",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:56.334952+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882092424",
+      "status_code": 200,
+      "execution_time_ms": 205.21,
+      "timestamp": "2025-07-30T06:29:55.587276",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882092424",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:56.640912+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882092579",
+      "status_code": 200,
+      "execution_time_ms": 220.38,
+      "timestamp": "2025-07-30T06:29:55.908533",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882092579",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:56.961532+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882092703",
+      "status_code": 200,
+      "execution_time_ms": 205.08,
+      "timestamp": "2025-07-30T06:29:56.214122",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882092703",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:57.267359+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882092859",
+      "status_code": 200,
+      "execution_time_ms": 235.19,
+      "timestamp": "2025-07-30T06:29:56.549881",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882092859",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:57.602381+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882093009",
+      "status_code": 200,
+      "execution_time_ms": 212.22,
+      "timestamp": "2025-07-30T06:29:56.862606",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882093009",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:57.913667+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882093157",
+      "status_code": 200,
+      "execution_time_ms": 320.79,
+      "timestamp": "2025-07-30T06:29:57.283918",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882093157",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:58.335332+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882093285",
+      "status_code": 200,
+      "execution_time_ms": 221.95,
+      "timestamp": "2025-07-30T06:29:57.606490",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882093285",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:58.656660+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882093415",
+      "status_code": 200,
+      "execution_time_ms": 192.83,
+      "timestamp": "2025-07-30T06:29:57.900341",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882093415",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:58.955488+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882093565",
+      "status_code": 200,
+      "execution_time_ms": 331.22,
+      "timestamp": "2025-07-30T06:29:58.332517",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882093565",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:59.383207+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882093700",
+      "status_code": 200,
+      "execution_time_ms": 213.05,
+      "timestamp": "2025-07-30T06:29:58.646515",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882093700",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:59.699132+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882093825",
+      "status_code": 200,
+      "execution_time_ms": 222.07,
+      "timestamp": "2025-07-30T06:29:58.969137",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882093825",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:29:59.991516+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882094091",
+      "status_code": 200,
+      "execution_time_ms": 229.24,
+      "timestamp": "2025-07-30T06:29:59.298943",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882094091",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:00.350994+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882094224",
+      "status_code": 200,
+      "execution_time_ms": 215.38,
+      "timestamp": "2025-07-30T06:29:59.615195",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882094224",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:00.660883+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882094351",
+      "status_code": 200,
+      "execution_time_ms": 239.68,
+      "timestamp": "2025-07-30T06:29:59.955771",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882094351",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:01.004530+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882094480",
+      "status_code": 200,
+      "execution_time_ms": 229.18,
+      "timestamp": "2025-07-30T06:30:00.285659",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882094480",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:01.333962+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882094603",
+      "status_code": 200,
+      "execution_time_ms": 328.98,
+      "timestamp": "2025-07-30T06:30:00.715544",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882094603",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:01.765377+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882094732",
+      "status_code": 200,
+      "execution_time_ms": 198.78,
+      "timestamp": "2025-07-30T06:30:01.014962",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882094732",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:02.067691+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882094860",
+      "status_code": 200,
+      "execution_time_ms": 236.97,
+      "timestamp": "2025-07-30T06:30:01.352785",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882094860",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:02.402818+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882095097",
+      "status_code": 200,
+      "execution_time_ms": 329.42,
+      "timestamp": "2025-07-30T06:30:01.782749",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882095097",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:02.833356+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882095230",
+      "status_code": 200,
+      "execution_time_ms": 237.49,
+      "timestamp": "2025-07-30T06:30:02.120683",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882095230",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:03.173032+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882095489",
+      "status_code": 200,
+      "execution_time_ms": 271.42,
+      "timestamp": "2025-07-30T06:30:02.492934",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882095489",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:03.544854+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882095624",
+      "status_code": 200,
+      "execution_time_ms": 227.81,
+      "timestamp": "2025-07-30T06:30:02.821568",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882095624",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:03.874111+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882095769",
+      "status_code": 200,
+      "execution_time_ms": 206.14,
+      "timestamp": "2025-07-30T06:30:03.128418",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882095769",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:04.183510+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882095895",
+      "status_code": 200,
+      "execution_time_ms": 204.73,
+      "timestamp": "2025-07-30T06:30:03.433600",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882095895",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:04.479411+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882096033",
+      "status_code": 200,
+      "execution_time_ms": 315.95,
+      "timestamp": "2025-07-30T06:30:03.850465",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882096033",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:04.903448+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882096169",
+      "status_code": 200,
+      "execution_time_ms": 217.94,
+      "timestamp": "2025-07-30T06:30:04.169155",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882096169",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:05.221030+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882096402",
+      "status_code": 200,
+      "execution_time_ms": 212.55,
+      "timestamp": "2025-07-30T06:30:04.482461",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882096402",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:05.535506+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882096640",
+      "status_code": 200,
+      "execution_time_ms": 231.64,
+      "timestamp": "2025-07-30T06:30:04.814691",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882096640",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:05.867016+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882096797",
+      "status_code": 200,
+      "execution_time_ms": 196.8,
+      "timestamp": "2025-07-30T06:30:05.112079",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882096797",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:06.163238+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882097045",
+      "status_code": 200,
+      "execution_time_ms": 235.5,
+      "timestamp": "2025-07-30T06:30:05.448391",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882097045",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:06.497373+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882097177",
+      "status_code": 200,
+      "execution_time_ms": 233.06,
+      "timestamp": "2025-07-30T06:30:05.782121",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882097177",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:06.835594+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882097318",
+      "status_code": 200,
+      "execution_time_ms": 231.14,
+      "timestamp": "2025-07-30T06:30:06.113771",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882097318",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:07.162486+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882097474",
+      "status_code": 200,
+      "execution_time_ms": 192.41,
+      "timestamp": "2025-07-30T06:30:06.406704",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882097474",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:07.460264+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882097606",
+      "status_code": 200,
+      "execution_time_ms": 347.89,
+      "timestamp": "2025-07-30T06:30:06.855296",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882097606",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:07.904541+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882097735",
+      "status_code": 200,
+      "execution_time_ms": 195.08,
+      "timestamp": "2025-07-30T06:30:07.151198",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882097735",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:08.204502+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882097863",
+      "status_code": 200,
+      "execution_time_ms": 312.79,
+      "timestamp": "2025-07-30T06:30:07.564933",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882097863",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:08.614978+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882097997",
+      "status_code": 200,
+      "execution_time_ms": 189.83,
+      "timestamp": "2025-07-30T06:30:07.855566",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882097997",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:08.906267+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882098118",
+      "status_code": 200,
+      "execution_time_ms": 222.83,
+      "timestamp": "2025-07-30T06:30:08.179317",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882098118",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:09.228811+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882098246",
+      "status_code": 200,
+      "execution_time_ms": 310.05,
+      "timestamp": "2025-07-30T06:30:08.589871",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882098246",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:09.639659+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882098380",
+      "status_code": 200,
+      "execution_time_ms": 301.03,
+      "timestamp": "2025-07-30T06:30:08.991582",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882098380",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:10.040968+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882098516",
+      "status_code": 200,
+      "execution_time_ms": 225.76,
+      "timestamp": "2025-07-30T06:30:09.318016",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882098516",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:10.372916+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882098667",
+      "status_code": 200,
+      "execution_time_ms": 237.25,
+      "timestamp": "2025-07-30T06:30:09.656229",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882098667",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:10.711033+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882098898",
+      "status_code": 200,
+      "execution_time_ms": 202.63,
+      "timestamp": "2025-07-30T06:30:09.959749",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882098898",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:11.011284+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882099044",
+      "status_code": 200,
+      "execution_time_ms": 299.52,
+      "timestamp": "2025-07-30T06:30:10.359778",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882099044",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:11.412438+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882099195",
+      "status_code": 200,
+      "execution_time_ms": 313.78,
+      "timestamp": "2025-07-30T06:30:10.774072",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882099195",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:11.827002+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882099450",
+      "status_code": 200,
+      "execution_time_ms": 217.62,
+      "timestamp": "2025-07-30T06:30:11.092306",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882099450",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:12.139902+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882099578",
+      "status_code": 200,
+      "execution_time_ms": 240.78,
+      "timestamp": "2025-07-30T06:30:11.433541",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882099578",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:12.473935+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882099809",
+      "status_code": 200,
+      "execution_time_ms": 333.5,
+      "timestamp": "2025-07-30T06:30:11.867991",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882099809",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:12.919651+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882099972",
+      "status_code": 200,
+      "execution_time_ms": 333.17,
+      "timestamp": "2025-07-30T06:30:12.302123",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882099972",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:13.353774+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882100206",
+      "status_code": 200,
+      "execution_time_ms": 208.47,
+      "timestamp": "2025-07-30T06:30:12.611497",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882100206",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:13.663783+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882100445",
+      "status_code": 200,
+      "execution_time_ms": 206.7,
+      "timestamp": "2025-07-30T06:30:12.919165",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882100445",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:13.973927+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882100579",
+      "status_code": 200,
+      "execution_time_ms": 322.39,
+      "timestamp": "2025-07-30T06:30:13.342214",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882100579",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:14.395285+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882100816",
+      "status_code": 200,
+      "execution_time_ms": 295.27,
+      "timestamp": "2025-07-30T06:30:13.738181",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882100816",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:14.789984+00:00"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882100947",
+      "status_code": 200,
+      "execution_time_ms": 219.7,
+      "timestamp": "2025-07-30T06:30:14.058839",
+      "response": {
+        "statusCode": 200,
+        "body": {
+          "message": "Case deactivated successfully",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753882100947",
+          "active": 0,
+          "deactivated_at": "2025-07-30T13:30:15.112336+00:00"
+        }
+      }
+    }
+  ]
+}

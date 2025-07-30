@@ -1,0 +1,311 @@
+{
+  "test_run_timestamp": "2025-07-30T06:45:34.855274",
+  "total_cases_attempted": 10,
+  "successful_cases": 10,
+  "failed_cases": 0,
+  "average_response_time_ms": 184.5,
+  "successful_case_ids": [
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883132903",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883133216",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883133430",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883133669",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883133913",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883134048",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883134177",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883134332",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883134466",
+    "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883134707"
+  ],
+  "detailed_results": [
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883132903",
+      "status_code": 200,
+      "execution_time_ms": 302.62,
+      "timestamp": "2025-07-30T06:45:33.206205",
+      "response": {
+        "message": "Case and procedure codes created successfully",
+        "user_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b",
+        "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883132903",
+        "procedure_codes": [
+          "63047"
+        ],
+        "status_update": {
+          "success": false,
+          "message": "demo_file and note_file must not be null",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883132903",
+          "demo_file": null,
+          "note_file": null
+        },
+        "pay_amount_update": {
+          "success": true,
+          "pay_amount": 100.0,
+          "pay_category": "LAM",
+          "procedure_codes_found": 1,
+          "message": "Successfully updated pay_amount to 100.00 and pay_category to 'LAM' for case 04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883132903"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883133216",
+      "status_code": 200,
+      "execution_time_ms": 203.63,
+      "timestamp": "2025-07-30T06:45:33.420436",
+      "response": {
+        "message": "Case and procedure codes created successfully",
+        "user_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b",
+        "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883133216",
+        "procedure_codes": [
+          "63047"
+        ],
+        "status_update": {
+          "success": false,
+          "message": "demo_file and note_file must not be null",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883133216",
+          "demo_file": null,
+          "note_file": null
+        },
+        "pay_amount_update": {
+          "success": true,
+          "pay_amount": 100.0,
+          "pay_category": "LAM",
+          "procedure_codes_found": 1,
+          "message": "Successfully updated pay_amount to 100.00 and pay_category to 'LAM' for case 04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883133216"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883133430",
+      "status_code": 200,
+      "execution_time_ms": 227.51,
+      "timestamp": "2025-07-30T06:45:33.658462",
+      "response": {
+        "message": "Case and procedure codes created successfully",
+        "user_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b",
+        "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883133430",
+        "procedure_codes": [
+          "63047"
+        ],
+        "status_update": {
+          "success": false,
+          "message": "demo_file and note_file must not be null",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883133430",
+          "demo_file": null,
+          "note_file": null
+        },
+        "pay_amount_update": {
+          "success": true,
+          "pay_amount": 100.0,
+          "pay_category": "LAM",
+          "procedure_codes_found": 1,
+          "message": "Successfully updated pay_amount to 100.00 and pay_category to 'LAM' for case 04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883133430"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883133669",
+      "status_code": 200,
+      "execution_time_ms": 233.95,
+      "timestamp": "2025-07-30T06:45:33.903060",
+      "response": {
+        "message": "Case and procedure codes created successfully",
+        "user_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b",
+        "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883133669",
+        "procedure_codes": [
+          "63047"
+        ],
+        "status_update": {
+          "success": false,
+          "message": "demo_file and note_file must not be null",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883133669",
+          "demo_file": null,
+          "note_file": null
+        },
+        "pay_amount_update": {
+          "success": true,
+          "pay_amount": 100.0,
+          "pay_category": "LAM",
+          "procedure_codes_found": 1,
+          "message": "Successfully updated pay_amount to 100.00 and pay_category to 'LAM' for case 04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883133669"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883133913",
+      "status_code": 200,
+      "execution_time_ms": 124.27,
+      "timestamp": "2025-07-30T06:45:34.038003",
+      "response": {
+        "message": "Case and procedure codes created successfully",
+        "user_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b",
+        "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883133913",
+        "procedure_codes": [
+          "63047"
+        ],
+        "status_update": {
+          "success": false,
+          "message": "demo_file and note_file must not be null",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883133913",
+          "demo_file": null,
+          "note_file": null
+        },
+        "pay_amount_update": {
+          "success": true,
+          "pay_amount": 100.0,
+          "pay_category": "LAM",
+          "procedure_codes_found": 1,
+          "message": "Successfully updated pay_amount to 100.00 and pay_category to 'LAM' for case 04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883133913"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883134048",
+      "status_code": 200,
+      "execution_time_ms": 118.84,
+      "timestamp": "2025-07-30T06:45:34.167235",
+      "response": {
+        "message": "Case and procedure codes created successfully",
+        "user_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b",
+        "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883134048",
+        "procedure_codes": [
+          "63047"
+        ],
+        "status_update": {
+          "success": false,
+          "message": "demo_file and note_file must not be null",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883134048",
+          "demo_file": null,
+          "note_file": null
+        },
+        "pay_amount_update": {
+          "success": true,
+          "pay_amount": 100.0,
+          "pay_category": "LAM",
+          "procedure_codes_found": 1,
+          "message": "Successfully updated pay_amount to 100.00 and pay_category to 'LAM' for case 04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883134048"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883134177",
+      "status_code": 200,
+      "execution_time_ms": 143.91,
+      "timestamp": "2025-07-30T06:45:34.321512",
+      "response": {
+        "message": "Case and procedure codes created successfully",
+        "user_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b",
+        "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883134177",
+        "procedure_codes": [
+          "63047"
+        ],
+        "status_update": {
+          "success": false,
+          "message": "demo_file and note_file must not be null",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883134177",
+          "demo_file": null,
+          "note_file": null
+        },
+        "pay_amount_update": {
+          "success": true,
+          "pay_amount": 100.0,
+          "pay_category": "LAM",
+          "procedure_codes_found": 1,
+          "message": "Successfully updated pay_amount to 100.00 and pay_category to 'LAM' for case 04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883134177"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883134332",
+      "status_code": 200,
+      "execution_time_ms": 123.73,
+      "timestamp": "2025-07-30T06:45:34.456099",
+      "response": {
+        "message": "Case and procedure codes created successfully",
+        "user_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b",
+        "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883134332",
+        "procedure_codes": [
+          "63047"
+        ],
+        "status_update": {
+          "success": false,
+          "message": "demo_file and note_file must not be null",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883134332",
+          "demo_file": null,
+          "note_file": null
+        },
+        "pay_amount_update": {
+          "success": true,
+          "pay_amount": 100.0,
+          "pay_category": "LAM",
+          "procedure_codes_found": 1,
+          "message": "Successfully updated pay_amount to 100.00 and pay_category to 'LAM' for case 04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883134332"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883134466",
+      "status_code": 200,
+      "execution_time_ms": 229.95,
+      "timestamp": "2025-07-30T06:45:34.696906",
+      "response": {
+        "message": "Case and procedure codes created successfully",
+        "user_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b",
+        "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883134466",
+        "procedure_codes": [
+          "63047"
+        ],
+        "status_update": {
+          "success": false,
+          "message": "demo_file and note_file must not be null",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883134466",
+          "demo_file": null,
+          "note_file": null
+        },
+        "pay_amount_update": {
+          "success": true,
+          "pay_amount": 100.0,
+          "pay_category": "LAM",
+          "procedure_codes_found": 1,
+          "message": "Successfully updated pay_amount to 100.00 and pay_category to 'LAM' for case 04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883134466"
+        }
+      }
+    },
+    {
+      "success": true,
+      "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883134707",
+      "status_code": 200,
+      "execution_time_ms": 136.54,
+      "timestamp": "2025-07-30T06:45:34.843952",
+      "response": {
+        "message": "Case and procedure codes created successfully",
+        "user_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b",
+        "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883134707",
+        "procedure_codes": [
+          "63047"
+        ],
+        "status_update": {
+          "success": false,
+          "message": "demo_file and note_file must not be null",
+          "case_id": "04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883134707",
+          "demo_file": null,
+          "note_file": null
+        },
+        "pay_amount_update": {
+          "success": true,
+          "pay_amount": 100.0,
+          "pay_category": "LAM",
+          "procedure_codes_found": 1,
+          "message": "Successfully updated pay_amount to 100.00 and pay_category to 'LAM' for case 04e884e8-4011-70e9-f3bd-d89fabd15c7b_1753883134707"
+        }
+      }
+    }
+  ]
+}

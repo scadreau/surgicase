@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-07-29 01:57:19
+# Last Modified: 2025-07-30 06:45:40
 # Author: Scott Cadreau
 
 # endpoints/reports/provider_payment_report.py
@@ -11,7 +11,7 @@ from utils.monitoring import track_business_operation, business_metrics
 from utils.report_cleanup import cleanup_old_reports, get_reports_directory_size
 from utils.s3_storage import upload_file_to_s3, generate_s3_key
 from utils.text_formatting import capitalize_name_field
-from fpdf import FPDF
+from fpdf2 import FPDF
 from datetime import datetime
 import os
 import tempfile
