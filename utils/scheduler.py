@@ -1,5 +1,5 @@
 # Created: 2025-01-15
-# Last Modified: 2025-07-30 22:11:23
+# Last Modified: 2025-07-30 22:16:18
 # Author: Scott Cadreau
 
 import schedule
@@ -269,7 +269,7 @@ def setup_weekly_scheduler():
     schedule.every().monday.at("08:00").do(weekly_pending_payment_update)
     
     # Schedule provider payment report for Monday at 08:30 UTC (30 minutes after status update)
-    schedule.every().monday.at("08:30").do(weekly_provider_payment_report)
+    schedule.every().monday.at("09:00").do(weekly_provider_payment_report)
     
     # Schedule NPI data update for Tuesday at 08:00 UTC
     schedule.every().thursday.at("08:00").do(weekly_npi_update)
