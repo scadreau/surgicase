@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-07-30 22:08:02
+# Last Modified: 2025-07-31 01:31:13
 # Author: Scott Cadreau
 
 # endpoints/reports/provider_payment_report.py
@@ -339,11 +339,11 @@ def generate_provider_payment_report(
                         email_type=email_type  # Use parameter: "weekly" for scheduled, "on_demand" for manual
                     )
                     
-                    logger.info(f"Email sending result: {email_result['message']}")
+                    logger.info(f"Email sending result: {email_result['message']}", extra={'user_id': user_id})
                     
                 except Exception as e:
                     # Log email error but don't fail the report generation
-                    logger.error(f"Error sending email notifications: {str(e)}")
+                    logger.error(f"Error sending email notifications: {str(e)}", extra={'user_id': user_id})
                     email_result = {
                         "success": False,
                         "message": f"Email sending failed: {str(e)}",
