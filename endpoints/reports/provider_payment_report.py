@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-07-31 01:31:13
+# Last Modified: 2025-07-31 01:42:45
 # Author: Scott Cadreau
 
 # endpoints/reports/provider_payment_report.py
@@ -12,6 +12,7 @@ from utils.report_cleanup import cleanup_old_reports, get_reports_directory_size
 from utils.s3_storage import upload_file_to_s3, generate_s3_key
 from utils.text_formatting import capitalize_name_field
 from utils.email_service import send_provider_payment_report_emails
+from utils.timezone_utils import format_datetime_for_user
 from fpdf import FPDF
 from datetime import datetime, timedelta
 import os
@@ -42,8 +43,9 @@ def get_upcoming_friday(run_date=None):
     return upcoming_friday
 
 class ProviderPaymentReportPDF(FPDF):
-    def __init__(self):
+    def __init__(self, user_id: Optional[str] = None):
         super().__init__()
+        self.user_id = user_id
 
     def header(self):
         self.set_font("Arial", 'B', 13)
@@ -53,14 +55,26 @@ class ProviderPaymentReportPDF(FPDF):
         
         self.set_font("Arial", '', 11)
         info_height = self.font_size + 1
-        self.cell(0, info_height, f"Report Date: {datetime.now().strftime('%B %d, %Y')}", ln=True, align="L")
+        # Use user's timezone for report date
+        report_date = format_datetime_for_user(
+            datetime.utcnow(), 
+            user_id=self.user_id, 
+            format_string='%B %d, %Y'
+        )
+        self.cell(0, info_height, f"Report Date: {report_date}", ln=True, align="L")
         self.ln(1)
 
     def footer(self):
         self.set_y(-20)
         self.set_font("Arial", 'I', 8)
         footer_height = self.font_size + 1
-        self.cell(0, footer_height, f"Report generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", align="L")
+        # Use user's timezone for footer timestamp
+        footer_timestamp = format_datetime_for_user(
+            datetime.utcnow(), 
+            user_id=self.user_id, 
+            format_string='%Y-%m-%d %H:%M:%S %Z'
+        )
+        self.cell(0, footer_height, f"Report generated on: {footer_timestamp}", align="L")
         self.cell(0, footer_height, f"Page {self.page_no()} of {{nb}}", align="R")
 
     def add_provider_section(self, provider_data, cases_data, is_first_provider=False):
@@ -250,7 +264,7 @@ def generate_provider_payment_report(
                     providers[user_id]['cases'].append(case)
                 
                 # Generate PDF
-                pdf = ProviderPaymentReportPDF()
+                pdf = ProviderPaymentReportPDF(user_id=user_id)
                 pdf.alias_nb_pages()
                 pdf.add_page()
                 
@@ -323,8 +337,12 @@ def generate_provider_payment_report(
                     else:
                         report_date_range = "all dates"
                     
+                    # Store the current UTC datetime for timezone conversion in emails
+                    current_utc = datetime.utcnow()
+                    
                     email_data = {
-                        "creation_date": datetime.now().strftime('%B %d, %Y'),
+                        "creation_date": current_utc.strftime('%B %d, %Y'),  # Fallback for templates that expect string
+                        "creation_date_utc": current_utc,  # UTC datetime for timezone conversion
                         "report_date": report_date_range,
                         "total_providers": len(providers),
                         "total_cases": total_cases,

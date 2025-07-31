@@ -1,5 +1,5 @@
 # Created: 2025-07-30 14:30:30
-# Last Modified: 2025-07-30 22:00:21
+# Last Modified: 2025-07-31 01:42:45
 # Author: Scott Cadreau
 
 import boto3
@@ -13,6 +13,7 @@ from email import encoders
 import os
 import pymysql.cursors
 from botocore.exceptions import ClientError
+from utils.timezone_utils import format_datetime_for_user
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -716,6 +717,14 @@ def send_provider_payment_report_emails(
                 email_variables = template_variables.copy()
                 email_variables['first_name'] = recipient.get('first_name', 'Valued Partner')
                 email_variables['last_name'] = recipient.get('last_name', '')
+                
+                # Convert creation_date to recipient's timezone if it's available
+                if 'creation_date_utc' in report_data:
+                    email_variables['creation_date'] = format_datetime_for_user(
+                        report_data['creation_date_utc'],
+                        email_address=recipient['email_address'],
+                        format_string='%B %d, %Y'
+                    )
                 
                 # Format email content
                 subject = format_email_template(template_config['subject'], email_variables)
