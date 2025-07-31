@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-27 02:01:11
+# Last Modified: 2025-07-31 09:46:00
 # Author: Scott Cadreau
 
 # core/models.py
@@ -27,6 +27,7 @@ class UserCreate(BaseModel):
     referred_by_user: str = ""
     message_pref: str
     states_licensed: str
+    timezone: Optional[str] = None
     documents: Optional[List[UserDocument]] = None
 
 class UserUpdate(BaseModel):
@@ -44,6 +45,7 @@ class UserUpdate(BaseModel):
     referred_by_user: Optional[str] = None
     message_pref: Optional[str] = None
     states_licensed: Optional[str] = None
+    timezone: Optional[str] = None
     documents: Optional[List[UserDocument]] = None
     last_login_dt: Optional[datetime] = None
     max_case_status: Optional[int] = None

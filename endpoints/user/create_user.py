@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-29 02:21:21
+# Last Modified: 2025-07-31 09:47:06
 # Author: Scott Cadreau
 
 # endpoints/user/create_user.py
@@ -40,11 +40,11 @@ def add_user(request: Request, user: UserCreate):
             # Insert new user
             cursor.execute("""
                 INSERT INTO user_profile (
-                    user_id, user_email, first_name, last_name, addr1, addr2, city, state, zipcode, telephone, user_npi, referred_by_user, message_pref, states_licensed
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    user_id, user_email, first_name, last_name, addr1, addr2, city, state, zipcode, telephone, user_npi, referred_by_user, message_pref, states_licensed, timezone
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 user.user_id, user.user_email, user.first_name, user.last_name, user.addr1, user.addr2,
-                user.city, user.state, user.zipcode, user.telephone, user.user_npi, user.referred_by_user, user.message_pref, user.states_licensed
+                user.city, user.state, user.zipcode, user.telephone, user.user_npi, user.referred_by_user, user.message_pref, user.states_licensed, user.timezone
             ))
             # Insert user documents if provided
             if user.documents:
