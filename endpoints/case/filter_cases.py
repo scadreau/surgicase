@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-29 02:23:17
+# Last Modified: 2025-07-31 18:47:55
 # Author: Scott Cadreau
 
 # endpoints/case/filter_cases.py
@@ -62,7 +62,7 @@ def get_cases(request: Request, user_id: str = Query(..., description="The user 
                     FROM cases c
                     LEFT JOIN surgeon_list s ON c.surgeon_id = s.surgeon_id
                     LEFT JOIN facility_list f ON c.facility_id = f.facility_id
-                    WHERE c.user_id = %s and c.active = 1
+                    WHERE c.user_id = %s and c.active = 1 order by case_id desc
                 """
                 params = [user_id]
                 
