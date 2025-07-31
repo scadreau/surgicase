@@ -1,6 +1,13 @@
 # Created: 2025-07-31 01:40:21
-# Last Modified: 2025-07-31 01:42:45
+# Last Modified: 2025-07-31 02:02:25
 # Author: Scott Cadreau
+
+# Timezone utility functions for converting UTC dates to user timezones
+# 
+# Database Requirements:
+# - user_profile.timezone field should contain IANA timezone identifiers
+# - Examples: 'America/New_York', 'America/Chicago', 'America/Los_Angeles', 'Europe/London'
+# - Field can be NULL or empty (defaults to 'America/New_York')
 
 import pytz
 from datetime import datetime
@@ -20,11 +27,12 @@ def get_user_timezone(user_id: Optional[str] = None, email_address: Optional[str
         email_address: Email address to look up timezone for (alternative to user_id)
         
     Returns:
-        User's timezone string (defaults to 'US/Eastern' if not found or empty)
+        User's timezone string in IANA format (defaults to 'America/New_York' if not found or empty)
+        Examples: 'America/New_York', 'America/Chicago', 'America/Los_Angeles', 'Europe/London'
     """
     if not user_id and not email_address:
-        logger.warning("No user_id or email_address provided, defaulting to EST")
-        return 'US/Eastern'
+        logger.warning("No user_id or email_address provided, defaulting to America/New_York")
+        return 'America/New_York'
     
     conn = None
     try:
@@ -47,13 +55,13 @@ def get_user_timezone(user_id: Optional[str] = None, email_address: Optional[str
                 if timezone:
                     return timezone
             
-            # Default to EST if timezone is null, empty, or blank
-            logger.info(f"No timezone found for user, defaulting to EST")
-            return 'US/Eastern'
+            # Default to America/New_York if timezone is null, empty, or blank
+            logger.info(f"No timezone found for user, defaulting to America/New_York")
+            return 'America/New_York'
             
     except Exception as e:
         logger.error(f"Error fetching user timezone: {str(e)}")
-        return 'US/Eastern'
+        return 'America/New_York'
     finally:
         if conn:
             close_db_connection(conn)
@@ -64,7 +72,7 @@ def convert_utc_to_user_timezone(utc_datetime: datetime, user_timezone: str) -> 
     
     Args:
         utc_datetime: UTC datetime object
-        user_timezone: User's timezone string (e.g., 'US/Eastern', 'US/Pacific')
+        user_timezone: User's timezone string in IANA format (e.g., 'America/New_York', 'America/Los_Angeles')
         
     Returns:
         Datetime object converted to user's timezone
@@ -83,11 +91,11 @@ def convert_utc_to_user_timezone(utc_datetime: datetime, user_timezone: str) -> 
         
     except Exception as e:
         logger.error(f"Error converting timezone from UTC to {user_timezone}: {str(e)}")
-        # Fallback to EST if conversion fails
-        est_tz = pytz.timezone('US/Eastern')
+        # Fallback to America/New_York if conversion fails
+        fallback_tz = pytz.timezone('America/New_York')
         if utc_datetime.tzinfo is None:
             utc_datetime = pytz.utc.localize(utc_datetime)
-        return utc_datetime.astimezone(est_tz)
+        return utc_datetime.astimezone(fallback_tz)
 
 def format_datetime_for_user(utc_datetime: datetime, user_id: Optional[str] = None, 
                            email_address: Optional[str] = None, 
@@ -173,7 +181,7 @@ def get_user_timezone_for_email_recipients(report_name: str) -> dict:
                 if timezone and timezone.strip():
                     timezone_map[email] = timezone.strip()
                 else:
-                    timezone_map[email] = 'US/Eastern'  # Default to EST
+                    timezone_map[email] = 'America/New_York'  # Default to Eastern Time
                     
             return timezone_map
             

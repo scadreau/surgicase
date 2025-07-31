@@ -31,3 +31,5 @@ The aws cli user has access to all aws functionality
 Do not use environment variables.  If we need to create a new variable, we will store it in AWS Secrets
 
 Do not try to start or restart the server.  Just pause and tell me to update and reload it.
+
+If you cannot find the schema in the current table_structures_<date_time>.sql file, run the utils/get_table_structures.py command to get the current schemas
