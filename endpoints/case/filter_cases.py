@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-31 18:47:55
+# Last Modified: 2025-07-31 18:59:19
 # Author: Scott Cadreau
 
 # endpoints/case/filter_cases.py
@@ -56,12 +56,14 @@ def get_cases(request: Request, user_id: str = Query(..., description="The user 
                     SELECT 
                         c.user_id, c.case_id, c.case_date, c.patient_first, c.patient_last, 
                         c.ins_provider, c.surgeon_id, c.facility_id, c.case_status, 
+                        csl.case_status_desc,
                         c.demo_file, c.note_file, c.misc_file, c.pay_amount,
                         CONCAT(s.first_name, ' ', s.last_name) as surgeon_name,
                         f.facility_name
                     FROM cases c
                     LEFT JOIN surgeon_list s ON c.surgeon_id = s.surgeon_id
                     LEFT JOIN facility_list f ON c.facility_id = f.facility_id
+                    LEFT JOIN case_status_list csl ON c.case_status = csl.case_status
                     WHERE c.user_id = %s and c.active = 1 order by case_id desc
                 """
                 params = [user_id]
@@ -96,6 +98,15 @@ def get_cases(request: Request, user_id: str = Query(..., description="The user 
                     original_case_status = case_data["case_status"]
                     if original_case_status > max_case_status:
                         case_data["case_status"] = max_case_status
+                        # Update case_status_desc to match the modified case_status
+                        cursor.execute("""
+                            SELECT case_status_desc 
+                            FROM case_status_list 
+                            WHERE case_status = %s
+                        """, (max_case_status,))
+                        status_desc_result = cursor.fetchone()
+                        if status_desc_result:
+                            case_data["case_status_desc"] = status_desc_result["case_status_desc"]
                     
                     # Convert datetime to ISO format
                     if case_data["case_date"]:
