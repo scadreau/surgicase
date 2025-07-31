@@ -1,5 +1,5 @@
 # Created: 2025-07-15 11:54:13
-# Last Modified: 2025-07-27 03:34:35
+# Last Modified: 2025-07-31 19:02:00
 # Author: Scott Cadreau
 
 # endpoints/backoffice/get_cases_by_status.py
@@ -81,12 +81,14 @@ def get_cases_by_status(
                     SELECT 
                         c.user_id, c.case_id, c.case_date, c.patient_first, c.patient_last, 
                         c.ins_provider, c.surgeon_id, c.facility_id, c.case_status, 
+                        csl.case_status_desc,
                         c.demo_file, c.note_file, c.misc_file, c.pay_amount,
                         CONCAT(s.first_name, ' ', s.last_name) as surgeon_name,
                         f.facility_name
                     FROM cases c
                     LEFT JOIN surgeon_list s ON c.surgeon_id = s.surgeon_id
                     LEFT JOIN facility_list f ON c.facility_id = f.facility_id
+                    LEFT JOIN case_status_list csl ON c.case_status = csl.case_status
                     WHERE c.active = 1
                 """
                 params = []
