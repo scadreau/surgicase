@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-07-31 02:32:10
+# Last Modified: 2025-07-31 13:10:08
 # Author: Scott Cadreau
 
 # endpoints/reports/provider_payment_report.py
@@ -50,7 +50,7 @@ class ProviderPaymentReportPDF(FPDF):
     def header(self):
         self.set_font("Arial", 'B', 13)
         header_height = self.font_size + 2
-        self.cell(0, header_height, "All-Stars Surgical Provider Payment Report", ln=True, align="C")
+        self.cell(0, header_height, "All-Stars Surgical Assist - Provider Payment Report", ln=True, align="C")
         self.ln(1)
         
         self.set_font("Arial", '', 11)
