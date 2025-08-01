@@ -17,6 +17,7 @@ from endpoints.backoffice.bulk_update_case_status import bulk_update_case_status
 from fastapi import Request
 from unittest.mock import Mock
 from utils.extract_npi_data import weekly_npi_data_update
+from utils.db_backup import perform_database_backup, cleanup_old_backups
 
 logger = logging.getLogger(__name__)
 
@@ -253,11 +254,53 @@ def weekly_provider_payment_report():
     except Exception as e:
         logger.error(f"❌ Error in weekly provider payment report job: {str(e)}")
 
+def daily_database_backup():
+    """
+    Daily scheduled function to backup database tables.
+    
+    This function:
+    1. Creates mysqldump backup of all tables except npi* and search_* tables
+    2. Compresses the backup using gzip
+    3. Stores backup in ~/vol2/db_backups directory
+    4. Uploads backup to S3 bucket under /private/db_backups
+    5. Cleans up old backup files (keeps 7 days)
+    """
+    logger.info("Starting daily database backup job...")
+    
+    try:
+        # Perform database backup
+        backup_result = perform_database_backup()
+        
+        if backup_result['status'] == 'success':
+            logger.info("✅ Database backup completed successfully")
+            logger.info(f"📄 Backup file: {backup_result['backup_filename']}")
+            logger.info(f"📊 Tables backed up: {backup_result['tables_backed_up']}")
+            logger.info(f"💾 File size: {backup_result['file_size_mb']:.2f} MB")
+            logger.info(f"⏱️ Execution time: {backup_result['execution_time_seconds']:.2f} seconds")
+            
+            # Log S3 upload status
+            if backup_result['s3_upload']['success']:
+                logger.info(f"☁️ S3 upload successful: {backup_result['s3_upload']['s3_url']}")
+            else:
+                logger.warning(f"⚠️ S3 upload failed: {backup_result['s3_upload']['message']}")
+            
+            # Clean up old backups
+            cleanup_result = cleanup_old_backups(days_to_keep=7)
+            if cleanup_result['status'] == 'success' and cleanup_result['files_deleted'] > 0:
+                logger.info(f"🧹 Cleaned up {cleanup_result['files_deleted']} old backup files")
+            
+        elif backup_result['status'] == 'error':
+            logger.error(f"❌ Database backup failed: {backup_result['error']}")
+            
+    except Exception as e:
+        logger.error(f"❌ Error in daily database backup job: {str(e)}")
+
 def setup_weekly_scheduler():
     """
-    Set up the weekly scheduler for case status updates and NPI data updates.
+    Set up the weekly scheduler for case status updates, NPI data updates, and daily backups.
     
-    Schedules all weekly update functions:
+    Schedules all update functions:
+    - daily_database_backup: Every day at 08:00 UTC (database backup)
     - weekly_pending_payment_update: Monday at 08:00 UTC (status 10 -> 15)
     - weekly_provider_payment_report: Monday at 08:30 UTC (generate report + send emails)
     - weekly_npi_update: Tuesday at 08:00 UTC (NPI data refresh)
@@ -265,6 +308,9 @@ def setup_weekly_scheduler():
     
     To change days/times: modify the schedule lines below
     """
+    # Schedule daily database backup at 08:00 UTC
+    schedule.every().day.at("08:00").do(daily_database_backup)
+    
     # Schedule pending payment update for Monday at 08:00 UTC
     schedule.every().monday.at("08:00").do(weekly_pending_payment_update)
     
@@ -277,7 +323,8 @@ def setup_weekly_scheduler():
     # Schedule paid update for Thursday at 08:00 UTC
     schedule.every().thursday.at("08:00").do(weekly_paid_update)
     
-    logger.info("Weekly scheduler configured:")
+    logger.info("Scheduler configured:")
+    logger.info("  - Database backup: Daily at 08:00 UTC")
     logger.info("  - Pending payment update: Monday at 08:00 UTC")
     logger.info("  - Provider payment report: Monday at 08:30 UTC")
     logger.info("  - NPI data update: Thursday at 08:00 UTC")
@@ -350,4 +397,11 @@ def run_update_now():
     Kept for backward compatibility - runs the pending payment update.
     """
     logger.info("Running case status update immediately...")
-    weekly_pending_payment_update() 
+    weekly_pending_payment_update()
+
+def run_backup_now():
+    """
+    Utility function to run the database backup immediately (for testing).
+    """
+    logger.info("Running database backup immediately...")
+    daily_database_backup() 
