@@ -1,5 +1,5 @@
 # Created: 2025-01-15
-# Last Modified: 2025-07-30 22:16:18
+# Last Modified: 2025-08-03 15:02:17
 # Author: Scott Cadreau
 
 import schedule
@@ -318,7 +318,7 @@ def setup_weekly_scheduler():
     schedule.every().monday.at("09:00").do(weekly_provider_payment_report)
     
     # Schedule NPI data update for Tuesday at 08:00 UTC
-    schedule.every().thursday.at("08:00").do(weekly_npi_update)
+    schedule.every().tuesday.at("08:00").do(weekly_npi_update)
     
     # Schedule paid update for Thursday at 08:00 UTC
     schedule.every().thursday.at("08:00").do(weekly_paid_update)
@@ -327,7 +327,7 @@ def setup_weekly_scheduler():
     logger.info("  - Database backup: Daily at 08:00 UTC")
     logger.info("  - Pending payment update: Monday at 08:00 UTC")
     logger.info("  - Provider payment report: Monday at 08:30 UTC")
-    logger.info("  - NPI data update: Thursday at 08:00 UTC")
+    logger.info("  - NPI data update: Tuesday at 08:00 UTC")
     logger.info("  - Paid update: Thursday at 08:00 UTC")
 
 def run_scheduler():

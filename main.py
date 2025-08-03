@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-31 02:15:39
+# Last Modified: 2025-08-03 15:03:10
 # Author: Scott Cadreau
 
 # main.py
@@ -39,6 +39,12 @@ from endpoints.health import router as health_router
 from endpoints.metrics import router as metrics_router
 
 from endpoints.backoffice.get_cases_by_status import router as get_cases_by_status_router
+
+# Import scheduler functionality
+import os
+import boto3
+import json
+import logging
 from endpoints.backoffice.get_users import router as get_users_router
 from endpoints.backoffice.case_dashboard_data import router as case_dashboard_data_router
 from endpoints.backoffice.user_dashboard_data import router as user_dashboard_data_router
@@ -53,6 +59,21 @@ from endpoints.exports.case_export import router as case_export_router
 
 # Import monitoring utilities
 from utils.monitoring import monitor_request, system_monitor, db_monitor, logger
+
+def get_main_config() -> dict:
+    """
+    Fetch main configuration from AWS Secrets Manager
+    """
+    try:
+        region = os.environ.get("AWS_REGION", "us-east-1")
+        client = boto3.client("secretsmanager", region_name=region)
+        response = client.get_secret_value(SecretId="surgicase/main")
+        secret = json.loads(response["SecretString"])
+        return secret
+    except Exception as e:
+        logging.error(f"Error fetching main configuration from Secrets Manager: {str(e)}")
+        # Return default configuration if secrets are unavailable
+        return {"ENABLE_SCHEDULER": "true"}
 
 # Create FastAPI instance
 app = FastAPI(
@@ -125,15 +146,26 @@ app.include_router(provider_payment_report_router, tags=["reports"])
 app.include_router(quickbooks_export_router, tags=["exports"])
 app.include_router(case_export_router, tags=["exports"])
 
-if __name__ == "__main__":
-    import uvicorn
-    import os
+# Start the scheduler service in background
+# Handles: Case status updates (Mon/Thu), NPI data updates (Tue)
+# Configuration stored in AWS Secrets Manager: surgicase/main
+try:
+    main_config = get_main_config()
+    enable_scheduler = main_config.get("ENABLE_SCHEDULER", "true").lower() == "true"
     
-    # Optional: Start the scheduler service in background
-    # Handles: Case status updates (Mon/Thu), NPI data updates (Tue)
-    # Set ENABLE_SCHEDULER=true environment variable to enable
-    if os.getenv("ENABLE_SCHEDULER", "false").lower() == "true":
+    if enable_scheduler:
         from utils.scheduler import run_scheduler_in_background
         run_scheduler_in_background()
-    
+        logger.info("Scheduler enabled via AWS Secrets Manager configuration")
+    else:
+        logger.info("Scheduler disabled via AWS Secrets Manager configuration")
+except Exception as e:
+    logger.error(f"Failed to initialize scheduler: {str(e)}")
+    # Fallback: enable scheduler if configuration cannot be retrieved
+    from utils.scheduler import run_scheduler_in_background
+    run_scheduler_in_background()
+    logger.warning("Scheduler enabled as fallback due to configuration error")
+
+if __name__ == "__main__":
+    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
