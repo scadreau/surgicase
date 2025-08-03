@@ -1,9 +1,9 @@
 # Created: 2025-01-27
-# Last Modified: 2025-07-30 17:18:45
+# Last Modified: 2025-08-03 16:46:53
 
 # SurgiCase Management System
 
-A comprehensive FastAPI-based REST API for surgical case management, designed for healthcare providers to manage users, cases, facilities, and surgeons with integrated monitoring, S3 storage, automated scheduling, and QuickBooks export capabilities.
+A comprehensive FastAPI-based REST API for surgical case management, designed for healthcare providers to manage users, cases, facilities, and surgeons with integrated monitoring, S3 storage, automated scheduling, password-protected individual provider reports, and QuickBooks export capabilities.
 
 ## 🏥 Overview
 
@@ -12,6 +12,7 @@ SurgiCase is a full-featured surgical case management system that provides:
 - **User & Case Management**: Complete CRUD operations for users, cases, facilities, and surgeons
 - **Healthcare Integration**: NPI validation, CPT codes, and medical document management
 - **Automated Workflows**: Scheduled status updates and data synchronization
+- **Secure Reporting**: Password-protected individual provider reports with data isolation
 - **Cloud Storage**: S3 integration for secure document and report storage
 - **Financial Integration**: QuickBooks export for accounting and billing
 - **Comprehensive Monitoring**: Prometheus metrics, structured logging, and health checks
@@ -40,6 +41,7 @@ SurgiCase is a full-featured surgical case management system that provides:
 
 ### Financial & Reporting
 - **Provider Payment Reports**: Comprehensive payment tracking and reporting
+- **Individual Provider Reports**: Password-protected PDFs sent to each provider with only their cases
 - **QuickBooks Integration**: Direct export to QuickBooks for accounting
 - **Financial Metrics**: Payment tracking and business intelligence
 - **Export Capabilities**: CSV and IIF format exports
@@ -71,6 +73,7 @@ fastapi
 uvicorn
 fpdf2
 Pillow
+pypdf
 prometheus-fastapi-instrumentator
 schedule
 pydantic
@@ -202,7 +205,8 @@ The application will be available at:
 - `GET /casedashboarddata` - Dashboard data (admin only)
 
 ### Reports & Exports
-- `GET /provider_payment_report` - Provider payment report
+- `GET /provider_payment_report` - Consolidated provider payment report
+- `GET /individual_provider_reports` - Individual password-protected provider reports
 - `GET /quickbooks-vendors-csv` - QuickBooks vendors export
 - `GET /quickbooks-transactions-iif` - QuickBooks transactions export
 
@@ -322,6 +326,8 @@ This allows automatic monitoring of additional SurgiCase instances as the system
 
 ### Weekly Automation
 - **Monday 08:00 UTC**: Pending payment updates (status 10 → 15)
+- **Monday 09:00 UTC**: Consolidated provider payment report generation and email
+- **Monday 10:00 UTC**: Individual password-protected provider reports sent to each provider
 - **Tuesday 08:00 UTC**: NPI data synchronization from CMS
 - **Thursday 08:00 UTC**: Payment completion updates (status 15 → 20)
 
@@ -340,7 +346,8 @@ This allows automatic monitoring of additional SurgiCase instances as the system
 - Secure encryption (AES256)
 
 ### Report Storage
-- Provider payment reports
+- Consolidated provider payment reports
+- Individual password-protected provider reports
 - QuickBooks export files
 - System logs and metrics
 - Backup and archival data
@@ -356,6 +363,20 @@ This allows automatic monitoring of additional SurgiCase instances as the system
 - Vendor setup with NPI as Tax ID
 - Transaction details with procedure codes
 - 1099 reporting compliance
+
+## 🔐 Password-Protected Reports
+
+### Individual Provider Reports
+- Each provider receives a password-protected PDF containing only their cases
+- Password format: `lastname_npi` (e.g., "smith_1234567890")
+- Passwords are communicated securely via email
+- Reports are generated weekly and stored in S3 with metadata
+
+### Security Features
+- AES encryption for PDF protection
+- Provider data isolation ensures no cross-provider data exposure
+- Temporary file cleanup prevents unprotected PDF persistence
+- Unique passwords per provider for enhanced security
 
 ## 🧪 Testing
 
@@ -421,6 +442,8 @@ surgicase/
 ### Data Protection
 - AWS Secrets Manager for credential storage
 - S3 encryption for document storage
+- Password-protected PDF reports with provider-specific passwords
+- Provider data isolation (each provider sees only their own cases)
 - Database connection security
 - Input validation and sanitization
 
@@ -494,7 +517,8 @@ For support and questions:
 
 ## 🔄 Version History
 
-- **v0.8.0**: Current version with comprehensive monitoring, S3 integration, and QuickBooks export
+- **v0.8.1**: Current version with individual password-protected provider reports and enhanced security
+- **v0.8.0**: Comprehensive monitoring, S3 integration, and QuickBooks export
 - **v0.7.0**: Added scheduling and automation features
 - **v0.6.0**: Implemented S3 integration and enhanced reporting
 - **v0.5.0**: Added monitoring and metrics

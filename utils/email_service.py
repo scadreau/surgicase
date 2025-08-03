@@ -1,5 +1,5 @@
 # Created: 2025-07-30 14:30:30
-# Last Modified: 2025-07-31 01:42:45
+# Last Modified: 2025-08-03 16:55:40
 # Author: Scott Cadreau
 
 import boto3
@@ -596,6 +596,134 @@ def get_email_templates(aws_region: str = "us-east-1") -> Dict[str, Any]:
         logger.error(f"Error fetching email templates from Secrets Manager: {str(e)}")
         raise
 
+def update_email_templates(templates: Dict[str, Any], aws_region: str = "us-east-1") -> bool:
+    """
+    Update email templates in AWS Secrets Manager
+    
+    Args:
+        templates: Dictionary containing email templates to save
+        aws_region: AWS region where the secret is stored
+        
+    Returns:
+        True if successful, False otherwise
+        
+    Raises:
+        Exception: If templates cannot be updated
+    """
+    try:
+        client = boto3.client('secretsmanager', region_name=aws_region)
+        response = client.update_secret(
+            SecretId='surgicase/email_templates',
+            SecretString=json.dumps(templates, indent=2)
+        )
+        logger.info("Successfully updated email templates in AWS Secrets Manager")
+        return True
+    except Exception as e:
+        logger.error(f"Error updating email templates in Secrets Manager: {str(e)}")
+        raise
+
+def add_individual_provider_templates(aws_region: str = "us-east-1") -> bool:
+    """
+    Add individual provider payment report templates to AWS Secrets Manager
+    
+    Args:
+        aws_region: AWS region where the secret is stored
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        # Get current templates
+        templates = get_email_templates(aws_region)
+        
+        # Define individual provider templates
+        individual_templates = {
+            "individual_provider_payment_report_weekly": {
+                "subject": "Your Personal Payment Report - {creation_date}",
+                "body": """Dear {provider_name},
+
+Please find your personal payment report attached for review. This report contains your cases with case status "Pending Payment" and is password-protected for your security.
+
+Report Details:
+• Report Date: {creation_date}
+• Provider: {provider_name}
+• NPI: {npi}
+• Total Cases: {case_count}
+• Total Amount: {total_amount}
+
+IMPORTANT SECURITY INFORMATION:
+Your report is password-protected. To open the PDF, use the following password:
+Password: {password}
+
+Please keep this password secure and do not share it with others. The report contains confidential patient and financial information.
+
+If you have any questions about your payment report or need assistance accessing the document, please contact our office.
+
+Best regards,
+SurgiCase Team
+
+---
+This is an automated message from the SurgiCase system.
+Report filename: {filename}
+Generated on: {creation_date}"""
+            },
+            "individual_provider_payment_report_on_demand": {
+                "subject": "Your Personal Payment Report - {creation_date}",
+                "body": """Dear {provider_name},
+
+Please find your personal payment report attached for review. This report contains your cases with case status "Pending Payment" and is password-protected for your security.
+
+Report Details:
+• Report Date: {creation_date}
+• Provider: {provider_name}
+• NPI: {npi}
+• Total Cases: {case_count}
+• Total Amount: {total_amount}
+
+IMPORTANT SECURITY INFORMATION:
+Your report is password-protected. To open the PDF, use the following password:
+Password: {password}
+
+Please keep this password secure and do not share it with others. The report contains confidential patient and financial information.
+
+If you have any questions about your payment report or need assistance accessing the document, please contact our office.
+
+Best regards,
+SurgiCase Team
+
+---
+This is an automated message from the SurgiCase system.
+Report filename: {filename}
+Generated on: {creation_date}"""
+            }
+        }
+        
+        # Add individual templates to the existing templates
+        templates['email_templates'].update(individual_templates)
+        
+        # Update the secret
+        update_email_templates(templates, aws_region)
+        
+        logger.info("Successfully added individual provider payment report templates to AWS Secrets Manager")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error adding individual provider templates: {str(e)}")
+        raise
+
+def initialize_individual_provider_templates():
+    """
+    One-time function to initialize individual provider templates in AWS Secrets Manager
+    Call this once to set up the templates
+    """
+    try:
+        add_individual_provider_templates()
+        print("Individual provider payment report templates have been successfully added to AWS Secrets Manager!")
+        return True
+    except Exception as e:
+        print(f"Error initializing templates: {str(e)}")
+        return False
+
 def get_report_email_recipients(report_name: str) -> List[Dict[str, str]]:
     """
     Query the report_email_list table for recipients of a specific report
@@ -786,4 +914,101 @@ def send_provider_payment_report_emails(
             "emails_sent": 0,
             "total_recipients": 0,
             "results": []
+        }
+
+def send_individual_provider_payment_report_email(
+    provider_email: str,
+    provider_info: dict,
+    report_path: str,
+    report_filename: str,
+    email_data: dict,
+    email_type: str = "weekly",
+    aws_region: str = "us-east-1"
+) -> Dict[str, Any]:
+    """
+    Send individual provider payment report to a specific provider
+    
+    Args:
+        provider_email: Provider's email address
+        provider_info: Provider information dictionary
+        report_path: Local path to the password-protected PDF report
+        report_filename: Name of the PDF file
+        email_data: Dictionary containing email template variables
+        email_type: Type of email template to use ("weekly" or "on_demand")
+        aws_region: AWS region for services
+        
+    Returns:
+        Dictionary with email sending results
+    """
+    try:
+        # Get email templates
+        templates = get_email_templates(aws_region)
+        
+        # Use individual provider template based on email_type
+        template_key = f"individual_provider_payment_report_{email_type}"
+        
+        # Check if individual template exists in AWS secrets
+        if template_key not in templates['email_templates']:
+            # Add the templates to AWS secrets if they don't exist
+            logger.info(f"Individual provider templates not found in AWS secrets. Adding them now...")
+            add_individual_provider_templates(aws_region)
+            # Refresh templates after adding
+            templates = get_email_templates(aws_region)
+        
+        # Get the individual template from AWS secrets
+        individual_template = templates['email_templates'][template_key]
+        
+        # Prepare template variables
+        template_variables = {
+            "provider_name": email_data.get('provider_name', 'Valued Provider'),
+            "npi": email_data.get('npi', ''),
+            "creation_date": email_data.get('creation_date', ''),
+            "filename": email_data.get('filename', ''),
+            "password": email_data.get('password', ''),
+            "total_amount": email_data.get('total_amount', ''),
+            "case_count": email_data.get('case_count', ''),
+            "first_name": provider_info.get('first_name', 'Valued'),
+            "last_name": provider_info.get('last_name', 'Provider')
+        }
+        
+        # Format email content
+        subject = format_email_template(individual_template['subject'], template_variables)
+        body = format_email_template(individual_template['body'], template_variables)
+        
+        # Create attachment
+        attachment = create_attachment_from_file(report_path, report_filename)
+        
+        # Send email using existing send_email function
+        result = send_email(
+            to_addresses=provider_email,
+            subject=subject,
+            body=body,
+            attachments=[attachment],
+            from_address="SurgiCase Reports <noreply@metoraymedical.com>",
+            aws_region=aws_region
+        )
+        
+        if result.get('success'):
+            logger.info(f"Successfully sent individual provider report to {provider_email}")
+            return {
+                "success": True,
+                "message": f"Individual provider report sent to {provider_email}",
+                "message_id": result.get('message_id'),
+                "recipient": provider_email
+            }
+        else:
+            logger.error(f"Failed to send individual provider report to {provider_email}: {result.get('error', 'Unknown error')}")
+            return {
+                "success": False,
+                "message": f"Failed to send email to {provider_email}: {result.get('error', 'Unknown error')}",
+                "recipient": provider_email
+            }
+        
+    except Exception as e:
+        error_msg = f"Error sending individual provider payment report to {provider_email}: {str(e)}"
+        logger.error(error_msg)
+        return {
+            "success": False,
+            "message": error_msg,
+            "recipient": provider_email
         }

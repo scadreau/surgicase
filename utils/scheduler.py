@@ -1,5 +1,5 @@
 # Created: 2025-01-15
-# Last Modified: 2025-08-03 15:02:17
+# Last Modified: 2025-08-03 16:41:58
 # Author: Scott Cadreau
 
 import schedule
@@ -254,6 +254,70 @@ def weekly_provider_payment_report():
     except Exception as e:
         logger.error(f"❌ Error in weekly provider payment report job: {str(e)}")
 
+def weekly_individual_provider_reports():
+    """
+    Weekly scheduled function to generate individual password-protected provider reports.
+    
+    This function:
+    1. Calls the individual provider reports endpoint with weekly email type
+    2. Generates individual PDF reports for each provider with cases status=15
+    3. Password protects each PDF with provider_lastname_npi format
+    4. Emails each provider only their own cases
+    5. Uses individual provider email template with password information
+    
+    Runs 1 hour after weekly_provider_payment_report to ensure consolidated report is sent first.
+    """
+    logger.info("Starting weekly individual provider reports job...")
+    
+    try:
+        # Call the individual provider reports endpoint with weekly email type
+        response = requests.get(
+            'http://localhost:8000/individual_provider_reports?email_type=weekly',
+            timeout=600  # 10 minute timeout for individual report generation (longer than consolidated)
+        )
+        
+        if response.status_code == 200:
+            logger.info("✅ Weekly individual provider reports generated successfully")
+            
+            # Parse response JSON for detailed results
+            try:
+                result_data = response.json()
+                providers_processed = result_data.get('providers_processed', 0)
+                reports_generated = result_data.get('reports_generated', 0)
+                emails_sent = result_data.get('emails_sent', 0)
+                errors = result_data.get('errors', [])
+                
+                logger.info(f"📊 Individual provider reports summary:")
+                logger.info(f"  Providers processed: {providers_processed}")
+                logger.info(f"  Reports generated: {reports_generated}")
+                logger.info(f"  Emails sent: {emails_sent}")
+                
+                if errors:
+                    logger.warning(f"⚠️ {len(errors)} providers had errors:")
+                    for error in errors[:5]:  # Log first 5 errors
+                        logger.warning(f"  Provider {error.get('provider', 'unknown')}: {error.get('error', 'unknown error')}")
+                    if len(errors) > 5:
+                        logger.warning(f"  ... and {len(errors) - 5} more errors")
+                else:
+                    logger.info("  No errors reported")
+                
+                logger.info("Weekly individual provider reports job completed successfully")
+                
+            except Exception as json_error:
+                logger.warning(f"Could not parse response JSON: {str(json_error)}")
+                logger.info("✅ Weekly individual provider reports completed (response parsing failed)")
+            
+        else:
+            logger.error(f"❌ Individual provider reports failed with status {response.status_code}")
+            logger.error(f"Response: {response.text[:500]}")  # Log first 500 chars of error
+            
+    except requests.exceptions.Timeout:
+        logger.error("❌ Individual provider reports timed out (>10 minutes)")
+    except requests.exceptions.ConnectionError:
+        logger.error("❌ Cannot connect to API server for individual provider reports")
+    except Exception as e:
+        logger.error(f"❌ Error in weekly individual provider reports job: {str(e)}")
+
 def daily_database_backup():
     """
     Daily scheduled function to backup database tables.
@@ -302,7 +366,8 @@ def setup_weekly_scheduler():
     Schedules all update functions:
     - daily_database_backup: Every day at 08:00 UTC (database backup)
     - weekly_pending_payment_update: Monday at 08:00 UTC (status 10 -> 15)
-    - weekly_provider_payment_report: Monday at 08:30 UTC (generate report + send emails)
+    - weekly_provider_payment_report: Monday at 09:00 UTC (generate consolidated report + send emails)
+    - weekly_individual_provider_reports: Monday at 10:00 UTC (generate individual provider reports + send emails)
     - weekly_npi_update: Tuesday at 08:00 UTC (NPI data refresh)
     - weekly_paid_update: Thursday at 08:00 UTC (status 15 -> 20)
     
@@ -314,8 +379,11 @@ def setup_weekly_scheduler():
     # Schedule pending payment update for Monday at 08:00 UTC
     schedule.every().monday.at("08:00").do(weekly_pending_payment_update)
     
-    # Schedule provider payment report for Monday at 08:30 UTC (30 minutes after status update)
+    # Schedule consolidated provider payment report for Monday at 09:00 UTC (1 hour after status update)
     schedule.every().monday.at("09:00").do(weekly_provider_payment_report)
+    
+    # Schedule individual provider reports for Monday at 10:00 UTC (1 hour after consolidated report)
+    schedule.every().monday.at("10:00").do(weekly_individual_provider_reports)
     
     # Schedule NPI data update for Tuesday at 08:00 UTC
     schedule.every().tuesday.at("08:00").do(weekly_npi_update)
@@ -326,7 +394,8 @@ def setup_weekly_scheduler():
     logger.info("Scheduler configured:")
     logger.info("  - Database backup: Daily at 08:00 UTC")
     logger.info("  - Pending payment update: Monday at 08:00 UTC")
-    logger.info("  - Provider payment report: Monday at 08:30 UTC")
+    logger.info("  - Consolidated provider payment report: Monday at 09:00 UTC")
+    logger.info("  - Individual provider reports: Monday at 10:00 UTC")
     logger.info("  - NPI data update: Tuesday at 08:00 UTC")
     logger.info("  - Paid update: Thursday at 08:00 UTC")
 
@@ -404,4 +473,18 @@ def run_backup_now():
     Utility function to run the database backup immediately (for testing).
     """
     logger.info("Running database backup immediately...")
-    daily_database_backup() 
+    daily_database_backup()
+
+def run_individual_provider_reports_now():
+    """
+    Utility function to run the individual provider reports immediately (for testing).
+    """
+    logger.info("Running individual provider reports immediately...")
+    weekly_individual_provider_reports()
+
+def run_provider_payment_report_now():
+    """
+    Utility function to run the consolidated provider payment report immediately (for testing).
+    """
+    logger.info("Running consolidated provider payment report immediately...")
+    weekly_provider_payment_report() 

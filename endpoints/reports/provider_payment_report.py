@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-07-31 13:12:30
+# Last Modified: 2025-08-03 16:41:58
 # Author: Scott Cadreau
 
 # endpoints/reports/provider_payment_report.py
@@ -19,6 +19,7 @@ import os
 import tempfile
 import logging
 from typing import Optional
+from pypdf import PdfReader, PdfWriter
 
 logger = logging.getLogger(__name__)
 
@@ -175,6 +176,58 @@ class ProviderPaymentReportPDF(FPDF):
         self.cell(0, 8, f"Total Providers: {provider_count}", ln=True)
         self.cell(0, 8, f"Total Cases: {case_count}", ln=True)
         self.cell(0, 8, f"Total Amount: ${total_amount:.2f}", ln=True)
+
+def password_protect_pdf(input_path: str, output_path: str, password: str) -> bool:
+    """
+    Password protect a PDF file using pypdf
+    
+    Args:
+        input_path: Path to the input PDF file
+        output_path: Path to save the password-protected PDF
+        password: Password to protect the PDF with
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        reader = PdfReader(input_path)
+        writer = PdfWriter()
+        
+        # Add all pages from the reader to the writer
+        for page in reader.pages:
+            writer.add_page(page)
+        
+        # Encrypt the PDF with the password
+        writer.encrypt(password)
+        
+        # Write the password-protected PDF
+        with open(output_path, "wb") as output_file:
+            writer.write(output_file)
+        
+        logger.info(f"Successfully password-protected PDF: {output_path}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error password protecting PDF: {str(e)}")
+        return False
+
+def generate_provider_password(last_name: str, npi: str) -> str:
+    """
+    Generate password for provider using last_name_npi format
+    
+    Args:
+        last_name: Provider's last name
+        npi: Provider's NPI number
+        
+    Returns:
+        Generated password in lowercase
+    """
+    if not last_name or not npi:
+        raise ValueError("Both last_name and npi are required for password generation")
+    
+    # Convert to lowercase and create password
+    password = f"{last_name.lower()}_{npi}"
+    return password
 
 @router.get("/provider_payment_report")
 @track_business_operation("generate", "provider_payment_report")
@@ -409,4 +462,431 @@ def generate_provider_payment_report(
         raise HTTPException(
             status_code=500,
             detail=f"Error generating report: {str(e)}"
-        ) 
+        )
+
+@router.get("/individual_provider_reports")
+@track_business_operation("generate", "individual_provider_reports")
+def generate_individual_provider_reports_endpoint(
+    start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    email_type: Optional[str] = Query("weekly", description="Email template type: 'weekly' or 'on_demand'")
+):
+    """
+    Generate individual password-protected PDF reports for each provider
+    and send them via email. Each provider receives only their own cases.
+    """
+    try:
+        # Record business operation start
+        business_metrics.record_utility_operation("individual_provider_reports", "start")
+        
+        # Clean up old reports first
+        cleanup_old_reports()
+        
+        # Generate individual reports for all providers
+        result = generate_individual_provider_reports(
+            start_date=start_date,
+            end_date=end_date,
+            email_type=email_type
+        )
+        
+        if result["success"]:
+            business_metrics.record_utility_operation("individual_provider_reports", "success")
+        else:
+            business_metrics.record_utility_operation("individual_provider_reports", "error")
+        
+        return {
+            "message": result["message"],
+            "success": result["success"],
+            "providers_processed": result["providers_processed"],
+            "reports_generated": result["reports_generated"],
+            "emails_sent": result["emails_sent"],
+            "errors": result["errors"]
+        }
+        
+    except Exception as e:
+        business_metrics.record_utility_operation("individual_provider_reports", "error")
+        logger.error(f"Error in individual provider reports endpoint: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating individual provider reports: {str(e)}"
+        )
+
+def generate_individual_provider_reports(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    email_type: str = "weekly"
+) -> dict:
+    """
+    Generate individual password-protected PDF reports for each provider
+    and send them via email
+    
+    Args:
+        start_date: Start date filter (YYYY-MM-DD)
+        end_date: End date filter (YYYY-MM-DD)
+        email_type: Email template type
+        
+    Returns:
+        Dictionary with generation results
+    """
+    try:
+        conn = get_db_connection()
+        results = {
+            "success": True,
+            "message": "Individual provider reports generated successfully",
+            "providers_processed": 0,
+            "reports_generated": 0,
+            "emails_sent": 0,
+            "errors": []
+        }
+        
+        try:
+            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                # Get all providers who have cases with case_status=15
+                sql = """
+                    SELECT DISTINCT
+                        c.user_id,
+                        up.first_name,
+                        up.last_name,
+                        up.user_npi,
+                        up.user_email
+                    FROM cases c
+                    INNER JOIN user_profile up ON c.user_id = up.user_id
+                    WHERE c.case_status = 15
+                    AND c.active = 1 
+                    AND up.active = 1
+                """
+                params = []
+                
+                # Add date filters if provided
+                if start_date:
+                    sql += " AND c.case_date >= %s"
+                    params.append(start_date)
+                if end_date:
+                    sql += " AND c.case_date <= %s"
+                    params.append(end_date)
+                
+                sql += " ORDER BY up.last_name, up.first_name"
+                
+                cursor.execute(sql, params)
+                providers = cursor.fetchall()
+                
+                if not providers:
+                    logger.info("No providers found with cases matching the criteria")
+                    results["message"] = "No providers found with cases"
+                    return results
+                
+                logger.info(f"Found {len(providers)} providers to process")
+                results["providers_processed"] = len(providers)
+                
+                # Generate individual report for each provider
+                for provider in providers:
+                    try:
+                        user_id = provider['user_id']
+                        first_name = provider['first_name'] or ''
+                        last_name = provider['last_name'] or ''
+                        npi = provider['user_npi'] or ''
+                        email = provider['user_email'] or ''
+                        
+                        # Skip if missing critical information
+                        if not last_name or not npi or not email:
+                            error_msg = f"Provider {user_id} missing required info (last_name: {bool(last_name)}, npi: {bool(npi)}, email: {bool(email)})"
+                            logger.warning(error_msg)
+                            results["errors"].append({
+                                "provider": user_id,
+                                "error": error_msg
+                            })
+                            continue
+                        
+                        # Generate individual provider report
+                        report_result = generate_single_provider_report(
+                            user_id=user_id,
+                            start_date=start_date,
+                            end_date=end_date,
+                            email_type=email_type,
+                            provider_info=provider
+                        )
+                        
+                        if report_result["success"]:
+                            results["reports_generated"] += 1
+                            if report_result.get("email_sent"):
+                                results["emails_sent"] += 1
+                        else:
+                            results["errors"].append({
+                                "provider": user_id,
+                                "error": report_result.get("error", "Unknown error")
+                            })
+                        
+                    except Exception as e:
+                        error_msg = f"Error processing provider {provider.get('user_id', 'unknown')}: {str(e)}"
+                        logger.error(error_msg)
+                        results["errors"].append({
+                            "provider": provider.get('user_id', 'unknown'),
+                            "error": error_msg
+                        })
+                
+                # Update final success status
+                if results["errors"]:
+                    results["success"] = len(results["errors"]) < results["providers_processed"]
+                    if not results["success"]:
+                        results["message"] = "Failed to generate reports for all providers"
+                    else:
+                        results["message"] = f"Generated {results['reports_generated']} reports with {len(results['errors'])} errors"
+                
+                logger.info(f"Individual provider reports completed: {results['reports_generated']} generated, {results['emails_sent']} emailed, {len(results['errors'])} errors")
+                return results
+                
+        finally:
+            close_db_connection(conn)
+            
+    except Exception as e:
+        logger.error(f"Error in generate_individual_provider_reports: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Failed to generate individual provider reports: {str(e)}",
+            "providers_processed": 0,
+            "reports_generated": 0,
+            "emails_sent": 0,
+            "errors": [{"provider": "system", "error": str(e)}]
+        }
+
+def generate_single_provider_report(
+    user_id: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    email_type: str = "weekly",
+    provider_info: Optional[dict] = None
+) -> dict:
+    """
+    Generate a single provider's password-protected report and send via email
+    
+    Args:
+        user_id: Provider's user ID
+        start_date: Start date filter
+        end_date: End date filter
+        email_type: Email template type
+        provider_info: Provider information dict (to avoid extra DB query)
+        
+    Returns:
+        Dictionary with generation results
+    """
+    try:
+        conn = get_db_connection()
+        
+        try:
+            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                # Build the main query for this specific provider
+                sql = """
+                    SELECT 
+                        c.user_id,
+                        c.case_id,
+                        c.case_date,
+                        c.patient_first,
+                        c.patient_last,
+                        c.pay_amount,
+                        c.pay_category,
+                        up.first_name,
+                        up.last_name,
+                        up.user_npi
+                    FROM cases c
+                    INNER JOIN user_profile up ON c.user_id = up.user_id
+                    WHERE c.case_status = 15
+                    AND c.active = 1 
+                    AND up.active = 1
+                    AND c.user_id = %s
+                """
+                params = [user_id]
+                
+                # Add date filters if provided
+                if start_date:
+                    sql += " AND c.case_date >= %s"
+                    params.append(start_date)
+                if end_date:
+                    sql += " AND c.case_date <= %s"
+                    params.append(end_date)
+                
+                # Order by case_date
+                sql += " ORDER BY c.case_date"
+                
+                cursor.execute(sql, params)
+                cases = cursor.fetchall()
+                
+                if not cases:
+                    return {
+                        "success": False,
+                        "error": f"No cases found for provider {user_id}",
+                        "provider": user_id,
+                        "email_sent": False
+                    }
+                
+                # Get procedure codes for each case
+                for case in cases:
+                    cursor.execute(
+                        "SELECT procedure_code FROM case_procedure_codes WHERE case_id = %s",
+                        (case['case_id'],)
+                    )
+                    procedure_codes = [row['procedure_code'] for row in cursor.fetchall()]
+                    case['procedures'] = procedure_codes
+                
+                # Generate PDF for this provider only
+                provider_data = {
+                    'provider_data': {
+                        'first_name': cases[0]['first_name'],
+                        'last_name': cases[0]['last_name'],
+                        'user_npi': cases[0]['user_npi']
+                    },
+                    'cases': cases
+                }
+                
+                # Create PDF
+                pdf = ProviderPaymentReportPDF(user_id=user_id)
+                pdf.add_page()
+                
+                # Add provider section
+                total_amount = pdf.add_provider_section(
+                    provider_data['provider_data'], 
+                    provider_data['cases'], 
+                    is_first_provider=True
+                )
+                
+                # Generate unique filename
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                npi = provider_info['user_npi']
+                date_str = datetime.now().strftime('%Y%m%d')
+                filename = f"provider_payment_report_{npi}_{date_str}.pdf"
+                
+                # Get reports directory
+                reports_dir = "reports"
+                os.makedirs(reports_dir, exist_ok=True)
+                
+                # Temporary unprotected file
+                temp_filename = f"temp_{filename}"
+                temp_filepath = os.path.join(reports_dir, temp_filename)
+                
+                # Save unprotected PDF first
+                pdf.output(temp_filepath)
+                
+                # Generate password
+                password = generate_provider_password(
+                    provider_info['last_name'],
+                    provider_info['user_npi']
+                )
+                
+                # Create password-protected version
+                protected_filepath = os.path.join(reports_dir, filename)
+                
+                # Password protect the PDF
+                if not password_protect_pdf(temp_filepath, protected_filepath, password):
+                    raise Exception("Failed to password protect PDF")
+                
+                # Clean up temporary unprotected file
+                try:
+                    os.remove(temp_filepath)
+                except Exception as e:
+                    logger.warning(f"Could not remove temporary file {temp_filepath}: {str(e)}")
+                
+                # Upload to S3
+                try:
+                    s3_key = generate_s3_key('individual-provider-payment', filename)
+                    s3_result = upload_file_to_s3(
+                        file_path=protected_filepath,
+                        s3_key=s3_key,
+                        metadata={
+                            'report_type': 'individual_provider_payment',
+                            'provider_id': user_id,
+                            'npi': npi,
+                            'creation_date': datetime.now().isoformat(),
+                            'case_count': str(len(cases)),
+                            'total_amount': str(total_amount)
+                        }
+                    )
+                except Exception as e:
+                    logger.error(f"S3 upload failed for {filename}: {str(e)}")
+                    s3_result = {"success": False, "message": str(e)}
+                
+                # Send email to provider
+                email_sent = send_individual_provider_email(
+                    provider_info=provider_info,
+                    report_path=protected_filepath,
+                    report_filename=filename,
+                    password=password,
+                    email_type=email_type,
+                    total_amount=total_amount,
+                    case_count=len(cases)
+                )
+                
+                return {
+                    "success": True,
+                    "message": f"Report generated for provider {user_id}",
+                    "report_path": protected_filepath,
+                    "email_sent": email_sent,
+                    "provider": user_id,
+                    "case_count": len(cases),
+                    "total_amount": total_amount,
+                    "s3_upload": s3_result
+                }
+                
+        finally:
+            close_db_connection(conn)
+        
+    except Exception as e:
+        logger.error(f"Error generating single provider report for {user_id}: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "provider": user_id,
+            "email_sent": False
+        }
+
+def send_individual_provider_email(
+    provider_info: dict,
+    report_path: str,
+    report_filename: str,
+    password: str,
+    email_type: str = "weekly",
+    total_amount: float = 0.0,
+    case_count: int = 0
+) -> bool:
+    """
+    Send individual provider report email
+    
+    Args:
+        provider_info: Provider information dictionary
+        report_path: Path to the password-protected PDF
+        report_filename: Name of the PDF file
+        password: PDF password
+        email_type: Email template type
+        total_amount: Total payment amount for this provider
+        case_count: Number of cases for this provider
+        
+    Returns:
+        True if email sent successfully, False otherwise
+    """
+    try:
+        from utils.email_service import send_individual_provider_payment_report_email
+        
+        # Prepare email data
+        email_data = {
+            "provider_name": f"{provider_info.get('first_name', '')} {provider_info.get('last_name', '')}".strip(),
+            "npi": provider_info.get('user_npi', ''),
+            "creation_date": datetime.now().strftime('%B %d, %Y'),
+            "filename": report_filename,
+            "password": password,
+            "total_amount": f"${total_amount:.2f}",
+            "case_count": str(case_count)
+        }
+        
+        # Send email
+        result = send_individual_provider_payment_report_email(
+            provider_email=provider_info['user_email'],
+            provider_info=provider_info,
+            report_path=report_path,
+            report_filename=report_filename,
+            email_data=email_data,
+            email_type=email_type
+        )
+        
+        return result.get('success', False)
+        
+    except Exception as e:
+        logger.error(f"Error sending email to provider {provider_info.get('user_id', 'unknown')}: {str(e)}")
+        return False 
