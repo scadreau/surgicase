@@ -1,5 +1,5 @@
 # Created: 2025-07-15 11:54:13
-# Last Modified: 2025-07-31 19:02:00
+# Last Modified: 2025-08-04 11:20:26
 # Author: Scott Cadreau
 
 # endpoints/backoffice/get_cases_by_status.py
@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 import pymysql.cursors
 from core.database import get_db_connection, close_db_connection
 from utils.monitoring import track_business_operation, business_metrics
+from utils.text_formatting import capitalize_name_field
 import time
 from datetime import datetime
 
@@ -76,7 +77,7 @@ def get_cases_by_status(
                     error_message = "User does not have permission to access all cases"
                     raise HTTPException(status_code=403, detail="User does not have permission to access all cases.")
 
-                # Build query for all cases with surgeon and facility names
+                # Build query for all cases with surgeon, facility, and provider names
                 sql = """
                     SELECT 
                         c.user_id, c.case_id, c.case_date, c.patient_first, c.patient_last, 
@@ -84,11 +85,14 @@ def get_cases_by_status(
                         csl.case_status_desc,
                         c.demo_file, c.note_file, c.misc_file, c.pay_amount,
                         CONCAT(s.first_name, ' ', s.last_name) as surgeon_name,
-                        f.facility_name
+                        f.facility_name,
+                        up.first_name as provider_first_name,
+                        up.last_name as provider_last_name
                     FROM cases c
                     LEFT JOIN surgeon_list s ON c.surgeon_id = s.surgeon_id
                     LEFT JOIN facility_list f ON c.facility_id = f.facility_id
                     LEFT JOIN case_status_list csl ON c.case_status = csl.case_status
+                    LEFT JOIN user_profile up ON c.user_id = up.user_id
                     WHERE c.active = 1
                 """
                 params = []
@@ -116,6 +120,25 @@ def get_cases_by_status(
                     # Convert datetime to ISO format if it's a datetime object
                     if case_data["case_date"] and hasattr(case_data["case_date"], 'isoformat'):
                         case_data["case_date"] = case_data["case_date"].isoformat()
+                    
+                    # Apply proper capitalization to provider names and combine them
+                    provider_first = case_data.get("provider_first_name")
+                    provider_last = case_data.get("provider_last_name")
+                    
+                    if provider_first or provider_last:
+                        # Apply capitalization to each name component
+                        capitalized_first = capitalize_name_field(provider_first) if provider_first else ""
+                        capitalized_last = capitalize_name_field(provider_last) if provider_last else ""
+                        
+                        # Combine into full provider name
+                        provider_name_parts = [part for part in [capitalized_first, capitalized_last] if part.strip()]
+                        case_data["provider_name"] = " ".join(provider_name_parts) if provider_name_parts else None
+                    else:
+                        case_data["provider_name"] = None
+                    
+                    # Remove the separate first/last name fields from the response
+                    case_data.pop("provider_first_name", None)
+                    case_data.pop("provider_last_name", None)
                     
                     # fetch procedure codes with descriptions - JOIN with procedure_codes table
                     cursor.execute("""

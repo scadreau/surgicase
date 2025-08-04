@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-08-03 16:41:58
+# Last Modified: 2025-08-04 15:47:00
 # Author: Scott Cadreau
 
 # endpoints/reports/provider_payment_report.py
@@ -264,6 +264,7 @@ def generate_provider_payment_report(
                     WHERE c.case_status = 15
                     AND c.active = 1 
                     AND up.active = 1
+                    AND c.user_id NOT IN ('04e884e8-4011-70e9-f3bd-d89fabd15c7b', '94883428-50c1-7049-9d3d-e095ca81f174')
                 """
                 params = []
                 
@@ -554,6 +555,7 @@ def generate_individual_provider_reports(
                     WHERE c.case_status = 15
                     AND c.active = 1 
                     AND up.active = 1
+                    AND c.user_id NOT IN ('04e884e8-4011-70e9-f3bd-d89fabd15c7b', '94883428-50c1-7049-9d3d-e095ca81f174')
                 """
                 params = []
                 
@@ -693,6 +695,7 @@ def generate_single_provider_report(
                     AND c.active = 1 
                     AND up.active = 1
                     AND c.user_id = %s
+                    AND c.user_id NOT IN ('04e884e8-4011-70e9-f3bd-d89fabd15c7b', '94883428-50c1-7049-9d3d-e095ca81f174')
                 """
                 params = [user_id]
                 
