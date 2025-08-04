@@ -1,5 +1,5 @@
 # Created: 2025-01-15
-# Last Modified: 2025-08-03 16:41:58
+# Last Modified: 2025-08-04 10:10:00
 # Author: Scott Cadreau
 
 import schedule
@@ -409,9 +409,8 @@ def run_scheduler():
     """
     global shutdown_requested
     
-    # Set up signal handlers for graceful shutdown
-    signal.signal(signal.SIGTERM, signal_handler)
-    signal.signal(signal.SIGINT, signal_handler)
+    # Note: Signal handlers can only be set up in the main thread
+    # When running in background, we rely on the daemon thread behavior
     
     setup_weekly_scheduler()
     

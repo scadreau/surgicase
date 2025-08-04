@@ -1,5 +1,5 @@
 # Created: 2025-07-30 14:30:30
-# Last Modified: 2025-08-03 16:55:40
+# Last Modified: 2025-08-04 10:17:40
 # Author: Scott Cadreau
 
 import boto3
@@ -14,6 +14,7 @@ import os
 import pymysql.cursors
 from botocore.exceptions import ClientError
 from utils.timezone_utils import format_datetime_for_user
+from datetime import datetime
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -90,6 +91,111 @@ def _get_default_from_address(aws_region: str = "us-east-1") -> str:
     except Exception as e:
         raise ValueError(f"Failed to retrieve default from address from AWS Secrets Manager: {str(e)}")
 
+def log_email_to_database(
+    to_addresses: List[str],
+    subject: str,
+    body: str,
+    from_address: str,
+    message_id: Optional[str] = None,
+    cc_addresses: Optional[List[str]] = None,
+    bcc_addresses: Optional[List[str]] = None,
+    attachments: Optional[List[EmailAttachment]] = None,
+    email_type: Optional[str] = None,
+    report_type: Optional[str] = None,
+    status: str = "sent",
+    error_message: Optional[str] = None,
+    aws_region: str = "us-east-1"
+) -> bool:
+    """
+    Log email details to the email_log database table
+    
+    Args:
+        to_addresses: List of recipient email addresses
+        subject: Email subject
+        body: Email body content
+        from_address: Sender email address
+        message_id: AWS SES Message ID (if successful)
+        cc_addresses: CC recipients
+        bcc_addresses: BCC recipients
+        attachments: List of email attachments
+        email_type: Type of email being sent
+        report_type: Type of report if applicable
+        status: Email status (sent, failed, etc.)
+        error_message: Error details if failed
+        aws_region: AWS region used
+        
+    Returns:
+        True if logging successful, False otherwise
+    """
+    # Import here to avoid circular imports
+    from core.database import get_db_connection, close_db_connection
+    
+    conn = None
+    try:
+        conn = get_db_connection()
+        
+        # Prepare attachment info
+        attachments_count = len(attachments) if attachments else 0
+        attachment_filenames = None
+        if attachments:
+            attachment_filenames = ', '.join([att.filename for att in attachments])
+        
+        # Truncate body for preview (first 500 characters)
+        body_preview = body[:500] if body else None
+        
+        # Convert address lists to comma-separated strings
+        to_address_primary = to_addresses[0] if to_addresses else ""
+        cc_addresses_str = ', '.join(cc_addresses) if cc_addresses else None
+        bcc_addresses_str = ', '.join(bcc_addresses) if bcc_addresses else None
+        
+        with conn.cursor() as cursor:
+            sql = """
+                INSERT INTO email_log (
+                    message_id, to_address, cc_addresses, bcc_addresses, 
+                    from_address, subject, body_preview, attachments_count,
+                    attachment_filenames, email_type, report_type, status,
+                    error_message, aws_region
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                )
+            """
+            
+            cursor.execute(sql, (
+                message_id, to_address_primary, cc_addresses_str, bcc_addresses_str,
+                from_address, subject, body_preview, attachments_count,
+                attachment_filenames, email_type, report_type, status,
+                error_message, aws_region
+            ))
+            
+            conn.commit()
+            
+            # Log additional recipients if there are multiple TO addresses
+            if len(to_addresses) > 1:
+                for additional_to in to_addresses[1:]:
+                    cursor.execute(sql, (
+                        message_id, additional_to, cc_addresses_str, bcc_addresses_str,
+                        from_address, subject, body_preview, attachments_count,
+                        attachment_filenames, email_type, report_type, status,
+                        error_message, aws_region
+                    ))
+                conn.commit()
+            
+            logger.info(f"Email logged to database: {len(to_addresses)} recipients, message_id: {message_id}")
+            return True
+            
+    except Exception as e:
+        logger.error(f"Failed to log email to database: {str(e)}")
+        if conn:
+            try:
+                conn.rollback()
+            except:
+                pass
+        return False
+        
+    finally:
+        if conn:
+            close_db_connection(conn)
+
 def send_email(
     to_addresses: Union[str, List[str]],
     subject: str,
@@ -99,7 +205,9 @@ def send_email(
     cc_addresses: Optional[Union[str, List[str]]] = None,
     bcc_addresses: Optional[Union[str, List[str]]] = None,
     body_html: Optional[str] = None,
-    aws_region: str = "us-east-1"
+    aws_region: str = "us-east-1",
+    email_type: Optional[str] = None,
+    report_type: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Send an email using AWS Simple Email Service (SES)
@@ -114,6 +222,8 @@ def send_email(
         bcc_addresses: Email address(es) to BCC. Can be a string or list of strings
         body_html: HTML version of the email body (optional)
         aws_region: AWS region for SES service (default: us-east-1)
+        email_type: Type of email being sent (for logging purposes)
+        report_type: Type of report if applicable (for logging purposes)
     
     Returns:
         Dict containing success status and message ID or error details
@@ -149,20 +259,75 @@ def send_email(
         
         # If no attachments and no HTML, use simple send_email
         if not attachments and not body_html:
-            return _send_simple_email(
+            result = _send_simple_email(
                 ses_client, to_addresses, subject, body, from_address,
                 cc_addresses, bcc_addresses
             )
+            
+            # Log successful email to database
+            if result.get("success"):
+                log_email_to_database(
+                    to_addresses=to_addresses,
+                    subject=subject,
+                    body=body,
+                    from_address=from_address,
+                    message_id=result.get("message_id"),
+                    cc_addresses=cc_addresses,
+                    bcc_addresses=bcc_addresses,
+                    attachments=attachments,
+                    email_type=email_type,
+                    report_type=report_type,
+                    status="sent",
+                    aws_region=aws_region
+                )
+            
+            return result
         
         # For attachments or HTML, use send_raw_email
-        return _send_raw_email(
+        result = _send_raw_email(
             ses_client, to_addresses, subject, body, from_address,
             attachments, cc_addresses, bcc_addresses, body_html
         )
         
+        # Log successful email to database
+        if result.get("success"):
+            log_email_to_database(
+                to_addresses=to_addresses,
+                subject=subject,
+                body=body,
+                from_address=from_address,
+                message_id=result.get("message_id"),
+                cc_addresses=cc_addresses,
+                bcc_addresses=bcc_addresses,
+                attachments=attachments,
+                email_type=email_type,
+                report_type=report_type,
+                status="sent",
+                aws_region=aws_region
+            )
+        
+        return result
+        
     except ClientError as e:
         error_msg = f"AWS SES error: {e.response['Error']['Message']}"
         logger.error(error_msg)
+        
+        # Log failed email to database
+        log_email_to_database(
+            to_addresses=to_addresses,
+            subject=subject,
+            body=body,
+            from_address=from_address or "unknown",
+            cc_addresses=cc_addresses,
+            bcc_addresses=bcc_addresses,
+            attachments=attachments,
+            email_type=email_type,
+            report_type=report_type,
+            status="failed",
+            error_message=error_msg,
+            aws_region=aws_region
+        )
+        
         return {
             "success": False,
             "error": error_msg,
@@ -171,6 +336,23 @@ def send_email(
     except Exception as e:
         error_msg = f"Email sending failed: {str(e)}"
         logger.error(error_msg)
+        
+        # Log failed email to database
+        log_email_to_database(
+            to_addresses=to_addresses,
+            subject=subject,
+            body=body,
+            from_address=from_address or "unknown",
+            cc_addresses=cc_addresses,
+            bcc_addresses=bcc_addresses,
+            attachments=attachments,
+            email_type=email_type,
+            report_type=report_type,
+            status="failed",
+            error_message=error_msg,
+            aws_region=aws_region
+        )
+        
         return {
             "success": False,
             "error": error_msg
@@ -865,7 +1047,9 @@ def send_provider_payment_report_emails(
                     body=body,
                     attachments=[attachment],
                     from_address="SurgiCase Automation <noreply@metoraymedical.com>",
-                    aws_region=aws_region
+                    aws_region=aws_region,
+                    email_type="provider_payment_report",
+                    report_type=f"provider_payment_report_{email_type}"
                 )
                 
                 # Format result for consistency
@@ -985,7 +1169,9 @@ def send_individual_provider_payment_report_email(
             body=body,
             attachments=[attachment],
             from_address="SurgiCase Reports <noreply@metoraymedical.com>",
-            aws_region=aws_region
+            aws_region=aws_region,
+            email_type="individual_provider_payment_report",
+            report_type=f"individual_provider_payment_report_{email_type}"
         )
         
         if result.get('success'):
