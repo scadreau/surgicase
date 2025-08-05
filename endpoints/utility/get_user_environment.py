@@ -1,5 +1,5 @@
 # Created: 2025-07-24 17:54:30
-# Last Modified: 2025-07-24 19:46:12
+# Last Modified: 2025-08-05 19:39:11
 # Author: Scott Cadreau
 # Assisted by: Claude 4 Sonnet
 
@@ -184,6 +184,28 @@ def get_user_facilities(user_id: str, conn) -> list:
         facilities = cursor.fetchall()
         return facilities
 
+def get_available_user_types(user_type: int, conn) -> list:
+    """
+    Get list of user types that are <= the user's current user type.
+    
+    Args:
+        user_type: The user's current user type level
+        conn: Database connection
+        
+    Returns:
+        list: List of user type records that the user can access/assign
+    """
+    with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+        cursor.execute("""
+            SELECT user_type, user_type_desc 
+            FROM user_type_list 
+            WHERE user_type <= %s
+            ORDER BY user_type
+        """, (user_type,))
+        
+        user_types = cursor.fetchall()
+        return user_types
+
 @router.get("/user_environment")
 @track_business_operation("get", "user_environment")
 def get_user_environment(request: Request, user_id: str = Query(..., description="The user ID to get environment for")):
@@ -194,6 +216,8 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
     Returns:
         - User profile information
         - Available case statuses based on user permissions
+        - User's surgeons and facilities
+        - Available user types (≤ current user's type)
         - User access levels and capabilities
     """
     conn = None
@@ -234,6 +258,9 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
             surgeons = get_user_surgeons(user_id, conn)
             facilities = get_user_facilities(user_id, conn)
             
+            # Get available user types for the user
+            available_user_types = get_available_user_types(user_type, conn)
+            
             # Find max_case_status_desc from the case_statuses array
             max_case_status_desc = None
             for case_status in case_status_info["case_statuses"]:
@@ -252,6 +279,7 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
             "case_statuses": case_status_info["case_statuses"],
             "surgeons": surgeons,
             "facilities": facilities,
+            "user_types": available_user_types,
             "permissions": {
                 "user_type": user_type,
                 "user_type_desc": user_profile.get("user_type_desc"),
@@ -268,6 +296,7 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
                 "document_count": len(user_profile.get("documents", [])),
                 "surgeon_count": len(surgeons),
                 "facility_count": len(facilities),
+                "user_types_count": len(available_user_types),
                 "last_login_updated": login_updated
             }
         }
