@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-29 02:21:17
+# Last Modified: 2025-08-05 20:27:43
 # Author: Scott Cadreau
 
 # endpoints/user/delete_user.py
@@ -9,11 +9,48 @@ import pymysql.cursors
 import json
 import datetime as dt
 import time
+import boto3
 from core.database import get_db_connection, close_db_connection, is_connection_valid
 from utils.monitoring import track_business_operation, business_metrics
 from utils.archive_deleted_user import archive_deleted_user
 
 router = APIRouter()
+
+def delete_cognito_user(user_id: str) -> bool:
+    """
+    Delete user from Cognito User Pool
+    
+    Args:
+        user_id (str): The Cognito user ID to delete
+        
+    Returns:
+        bool: True if deletion successful or user not found, False if deletion failed
+        
+    Raises:
+        Exception: If there's a network/permission error during deletion
+    """
+    try:
+        # Initialize Cognito Identity Provider client
+        cognito_client = boto3.client('cognito-idp', region_name='us-east-1')
+        
+        # Attempt to delete the user from the user pool
+        cognito_client.admin_delete_user(
+            UserPoolId='us-east-1_whzpZgWwq',
+            Username=user_id
+        )
+        
+        print(f"INFO: Successfully deleted user from Cognito - user_id: {user_id}")
+        return True
+        
+    except cognito_client.exceptions.UserNotFoundException:
+        # User doesn't exist in Cognito - this is acceptable, continue with soft delete
+        print(f"INFO: User not found in Cognito, continuing with database deletion - user_id: {user_id}")
+        return True
+        
+    except Exception as e:
+        # Any other error is a failure that should trigger rollback
+        print(f"ERROR: Failed to delete user from Cognito - user_id: {user_id}, error: {str(e)}")
+        raise Exception(f"Cognito user deletion failed: {str(e)}")
 
 @router.delete("/user")
 @track_business_operation("delete", "user")
@@ -127,13 +164,46 @@ def delete_user(request: Request, user_id: str = Query(..., description="The use
                 }
                 return response_data
 
+            # Delete user from Cognito User Pool (only after successful archive)
+            try:
+                delete_cognito_user(user_id)
+                business_metrics.record_user_operation("delete", "cognito_success", user_id)
+            except Exception as cognito_error:
+                # If Cognito deletion fails, we need to rollback everything
+                print(f"ERROR: Cognito deletion failed for user {user_id}: {str(cognito_error)}")
+                
+                # Rollback the soft delete by setting active = 1
+                try:
+                    cursor.execute("""UPDATE user_profile SET active = 1 WHERE user_id = %s""", (user_id,))
+                    conn.commit()
+                    print(f"INFO: Rolled back user soft delete due to Cognito failure - user_id: {user_id}")
+                except Exception as rollback_error:
+                    print(f"CRITICAL: Failed to rollback user soft delete - user_id: {user_id}, error: {str(rollback_error)}")
+             
+                # Record failed user deletion due to Cognito failure
+                business_metrics.record_user_operation("delete", "cognito_failed", user_id)
+                
+                response_status = 500
+                error_message = f"User deletion failed during Cognito operations: {str(cognito_error)}"
+                response_data = {
+                    "statusCode": 500,
+                    "body": {
+                        "error": f"User deletion failed during Cognito operations: {str(cognito_error)}",
+                        "user_id": user_id,
+                        "details": "User has been restored to active status. Archive operations may need manual cleanup."
+                    }
+                }
+                return response_data
+
         response_data = {
             "statusCode": 200,
             "body": {
                 "message": "User deactivated successfully",
                 "user_id": user_id,
                 "active": 0,
-                "deactivated_at": dt.datetime.now(dt.timezone.utc).isoformat() 
+                "deactivated_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+                "cognito_deleted": True,
+                "archived": True
             }
         }
         return response_data
