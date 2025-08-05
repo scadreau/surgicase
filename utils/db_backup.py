@@ -1,5 +1,5 @@
-# Created: 
-# Last Modified: 
+# Created: 2025-08-01 20:06:31
+# Last Modified: 2025-08-05 22:53:23
 # Author: Scott Cadreau
 
 """
@@ -29,6 +29,7 @@ sys.path.append(project_root)
 
 from core.database import get_db_connection, close_db_connection, get_db_credentials
 from utils.s3_storage import upload_file_to_s3, get_s3_config
+from utils.encryption import encrypt_backup_file
 
 # Import monitoring utilities - fallback if not available
 try:
@@ -177,13 +178,15 @@ def compress_backup_file(backup_file_path: str) -> str:
         # If compression fails, return original file path
         return backup_file_path
 
-def upload_backup_to_s3(local_file_path: str, backup_filename: str) -> Dict[str, Any]:
+def upload_backup_to_s3(local_file_path: str, backup_filename: str, 
+                        encryption_info_path: str = None) -> Dict[str, Any]:
     """
-    Upload backup file to S3 bucket under /private/db_backups.
+    Upload encrypted backup file and encryption info to S3 bucket under /private/db_backups.
     
     Args:
         local_file_path: Path to the local backup file
         backup_filename: Name of the backup file
+        encryption_info_path: Path to encryption info file (optional)
         
     Returns:
         Dict with upload results
@@ -192,17 +195,39 @@ def upload_backup_to_s3(local_file_path: str, backup_filename: str) -> Dict[str,
         # Generate S3 key for private db backups
         s3_key = f"private/db_backups/{backup_filename}"
         
-        # Upload to S3
+        # Upload encrypted backup to S3 with KMS server-side encryption
         result = upload_file_to_s3(
             file_path=local_file_path,
             s3_key=s3_key,
-            content_type='application/gzip',
+            content_type='application/octet-stream',  # Encrypted binary data
             metadata={
-                'backup_type': 'database',
+                'backup_type': 'database_encrypted',
                 'backup_date': datetime.now(timezone.utc).isoformat(),
-                'excluded_tables': 'npi*,search_*'
-            }
+                'excluded_tables': 'npi*,search_*',
+                'encryption': 'AES-256-GCM+KMS',
+                'compliance': 'HIPAA'
+            },
+            server_side_encryption='aws:kms'  # Use KMS for additional S3-level encryption
         )
+        
+        # Also upload encryption info file if provided
+        if encryption_info_path and os.path.exists(encryption_info_path):
+            encryption_info_filename = f"{backup_filename}.encryption_info"
+            encryption_info_s3_key = f"private/db_backups/{encryption_info_filename}"
+            
+            encryption_info_result = upload_file_to_s3(
+                file_path=encryption_info_path,
+                s3_key=encryption_info_s3_key,
+                content_type='application/json',
+                metadata={
+                    'backup_type': 'encryption_metadata',
+                    'backup_date': datetime.now(timezone.utc).isoformat(),
+                    'associated_backup': backup_filename
+                },
+                server_side_encryption='aws:kms'
+            )
+            
+            result['encryption_info_upload'] = encryption_info_result
         
         return result
         
@@ -258,32 +283,63 @@ def perform_database_backup() -> Dict[str, Any]:
         logger.info("Compressing backup file...")
         compressed_file_path = compress_backup_file(local_backup_path)
         
-        # Upload to S3
-        logger.info("Uploading backup to S3...")
-        s3_result = upload_backup_to_s3(compressed_file_path, compressed_filename)
+        # Encrypt backup file for HIPAA compliance
+        logger.info("Encrypting backup file for HIPAA compliance...")
+        encryption_metadata = {
+            'backup_date': start_time.isoformat() + "Z",
+            'tables_count': len(tables_to_backup),
+            'excluded_tables': 'npi*,search_*',
+            'backup_type': 'database_dump',
+            'compression': 'gzip'
+        }
+        
+        encryption_result = encrypt_backup_file(compressed_file_path, encryption_metadata)
+        
+        if not encryption_result['success']:
+            raise Exception(f"Failed to encrypt backup: {encryption_result.get('error', 'Unknown error')}")
+        
+        encrypted_file_path = encryption_result['encrypted_file_path']
+        encryption_info_path = encryption_result['encryption_info_path']
+        
+        # Remove unencrypted compressed file for security
+        os.remove(compressed_file_path)
+        logger.info("Removed unencrypted backup file for security")
+        
+        # Upload encrypted backup to S3
+        logger.info("Uploading encrypted backup to S3...")
+        encrypted_filename = f"db_backup_{timestamp}.sql.gz.encrypted"
+        s3_result = upload_backup_to_s3(encrypted_file_path, encrypted_filename, encryption_info_path)
         
         # Calculate execution time
         end_time = datetime.now(timezone.utc)
         execution_time = (end_time - start_time).total_seconds()
         
-        # Get final file size
-        final_size_mb = os.path.getsize(compressed_file_path) / (1024 * 1024)
+        # Get final encrypted file size
+        final_size_mb = os.path.getsize(encrypted_file_path) / (1024 * 1024)
         
         result = {
             "status": "success",
-            "backup_file": compressed_file_path,
-            "backup_filename": compressed_filename,
+            "backup_file": encrypted_file_path,
+            "backup_filename": encrypted_filename,
             "tables_backed_up": len(tables_to_backup),
             "table_names": tables_to_backup,
             "file_size_mb": final_size_mb,
             "execution_time_seconds": execution_time,
             "s3_upload": s3_result,
-            "timestamp": start_time.isoformat() + "Z"
+            "encryption": {
+                "enabled": True,
+                "algorithm": "AES-256-GCM+KMS",
+                "kms_key_id": encryption_result['encryption_info']['kms_key_id'],
+                "encryption_info_file": encryption_info_path
+            },
+            "timestamp": start_time.isoformat() + "Z",
+            "hipaa_compliant": True
         }
         
         logger.info(f"Database backup completed successfully in {execution_time:.2f} seconds")
-        logger.info(f"Backup file: {compressed_file_path} ({final_size_mb:.2f} MB)")
+        logger.info(f"Encrypted backup file: {encrypted_file_path} ({final_size_mb:.2f} MB)")
         logger.info(f"Tables backed up: {len(tables_to_backup)}")
+        logger.info(f"Encryption: ✅ HIPAA-compliant AES-256-GCM+KMS")
         logger.info(f"S3 upload: {'✅ Success' if s3_result['success'] else '❌ Failed'}")
         
         return result
@@ -322,7 +378,7 @@ def cleanup_old_backups(days_to_keep: int = 7) -> Dict[str, Any]:
         deleted_files = []
         
         for filename in os.listdir(backup_dir):
-            if filename.startswith("db_backup_") and filename.endswith(".gz"):
+            if filename.startswith("db_backup_") and (filename.endswith(".gz.encrypted") or filename.endswith(".encryption_info")):
                 file_path = os.path.join(backup_dir, filename)
                 file_mtime = datetime.fromtimestamp(os.path.getmtime(file_path), tz=timezone.utc)
                 

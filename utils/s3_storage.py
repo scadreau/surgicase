@@ -1,5 +1,5 @@
 # Created: 2025-07-17 10:30:00
-# Last Modified: 2025-07-29 02:13:17
+# Last Modified: 2025-08-05 22:53:44
 # Author: Scott Cadreau
 
 # utils/s3_storage.py
@@ -53,7 +53,8 @@ def upload_file_to_s3(
     file_path: str, 
     s3_key: str, 
     content_type: str = 'application/pdf',
-    metadata: Optional[Dict[str, str]] = None
+    metadata: Optional[Dict[str, str]] = None,
+    server_side_encryption: str = None
 ) -> Dict[str, Any]:
     """
     Upload a file to S3
@@ -63,6 +64,7 @@ def upload_file_to_s3(
         s3_key: S3 object key (path in bucket)
         content_type: MIME type of the file
         metadata: Optional metadata to attach to the object
+        server_side_encryption: Server-side encryption type ('AES256', 'aws:kms', or None)
         
     Returns:
         dict: {
@@ -79,9 +81,17 @@ def upload_file_to_s3(
         
         # Prepare metadata
         extra_args = {
-            'ContentType': content_type,
-            'ServerSideEncryption': config.get('encryption', 'AES256')
+            'ContentType': content_type
         }
+        
+        # Set server-side encryption
+        if server_side_encryption:
+            extra_args['ServerSideEncryption'] = server_side_encryption
+            # If using KMS, we could specify the KMS key here if needed
+            # For now, use the default AWS managed key
+        else:
+            # Use default encryption from config
+            extra_args['ServerSideEncryption'] = config.get('encryption', 'AES256')
         
         if metadata:
             extra_args['Metadata'] = metadata
@@ -278,4 +288,140 @@ def get_file_metadata(s3_key: str) -> Dict[str, Any]:
         return {
             "success": False,
             "message": f"Unexpected error: {str(e)}"
+        }
+
+def download_file_from_s3(s3_key: str, local_file_path: str) -> Dict[str, Any]:
+    """
+    Download a file from S3
+    
+    Args:
+        s3_key: S3 object key (path in bucket)
+        local_file_path: Local path to save the downloaded file
+        
+    Returns:
+        dict: {
+            "success": bool,
+            "local_file_path": str,
+            "message": str
+        }
+    """
+    try:
+        # Get S3 configuration
+        config = get_s3_config()
+        s3_client = get_s3_client(config)
+        
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
+        
+        # Download file
+        s3_client.download_file(
+            config['bucket_name'],
+            s3_key,
+            local_file_path
+        )
+        
+        logger.info(f"Successfully downloaded {s3_key} to {local_file_path}")
+        
+        return {
+            "success": True,
+            "local_file_path": local_file_path,
+            "message": f"File downloaded successfully from S3: {s3_key}"
+        }
+        
+    except FileNotFoundError:
+        error_msg = f"Local directory not found for: {local_file_path}"
+        logger.error(error_msg)
+        return {
+            "success": False,
+            "local_file_path": local_file_path,
+            "message": error_msg
+        }
+    except ClientError as e:
+        error_code = e.response['Error']['Code']
+        if error_code == 'NoSuchKey':
+            error_msg = f"File not found in S3: {s3_key}"
+        else:
+            error_msg = f"S3 download error: {str(e)}"
+        logger.error(error_msg)
+        return {
+            "success": False,
+            "local_file_path": local_file_path,
+            "message": error_msg
+        }
+    except Exception as e:
+        error_msg = f"Unexpected error downloading from S3: {str(e)}"
+        logger.error(error_msg)
+        return {
+            "success": False,
+            "local_file_path": local_file_path,
+            "message": error_msg
+        }
+
+def list_s3_objects(prefix: str = "", max_keys: int = 1000) -> Dict[str, Any]:
+    """
+    List objects in S3 bucket with optional prefix filter
+    
+    Args:
+        prefix: Prefix to filter objects (optional)
+        max_keys: Maximum number of objects to return
+        
+    Returns:
+        dict: {
+            "success": bool,
+            "objects": List[Dict],
+            "message": str
+        }
+    """
+    try:
+        # Get S3 configuration
+        config = get_s3_config()
+        s3_client = get_s3_client(config)
+        
+        # List objects
+        list_params = {
+            'Bucket': config['bucket_name'],
+            'MaxKeys': max_keys
+        }
+        
+        if prefix:
+            list_params['Prefix'] = prefix
+        
+        response = s3_client.list_objects_v2(**list_params)
+        
+        objects = []
+        if 'Contents' in response:
+            for obj in response['Contents']:
+                objects.append({
+                    'Key': obj['Key'],
+                    'LastModified': obj['LastModified'],
+                    'Size': obj['Size'],
+                    'ETag': obj['ETag']
+                })
+        
+        logger.info(f"Listed {len(objects)} objects from S3 with prefix: {prefix}")
+        
+        return {
+            "success": True,
+            "objects": objects,
+            "count": len(objects),
+            "message": f"Successfully listed {len(objects)} objects"
+        }
+        
+    except ClientError as e:
+        error_msg = f"S3 list error: {str(e)}"
+        logger.error(error_msg)
+        return {
+            "success": False,
+            "objects": [],
+            "count": 0,
+            "message": error_msg
+        }
+    except Exception as e:
+        error_msg = f"Unexpected error listing S3 objects: {str(e)}"
+        logger.error(error_msg)
+        return {
+            "success": False,
+            "objects": [],
+            "count": 0,
+            "message": error_msg
         } 

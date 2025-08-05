@@ -33,3 +33,5 @@ Do not use environment variables.  If we need to create a new variable, we will 
 Do not try to start or restart the server.  Just pause and tell me to update and reload it.
 
 If you cannot find the schema in the current table_structures_<date_time>.sql file, run the utils/get_table_structures.py command to get the current schemas
+
+If you install a pip package always add --break-system-packages to the command 
