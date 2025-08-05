@@ -1,5 +1,5 @@
 # Created: 2025-07-30 14:30:30
-# Last Modified: 2025-08-04 10:17:40
+# Last Modified: 2025-08-05 21:45:10
 # Author: Scott Cadreau
 
 import boto3
@@ -699,12 +699,13 @@ def check_email_verification_status(email_address: str, aws_region: str = "us-ea
             "message": error_msg
         }
 
-def auto_verify_recipients_for_report(report_name: str, aws_region: str = "us-east-1") -> Dict[str, Any]:
+def auto_verify_recipients_for_report(report_name: str, email_type: str = "on_demand", aws_region: str = "us-east-1") -> Dict[str, Any]:
     """
     Automatically send verification emails to any unverified recipients for a report
     
     Args:
         report_name: Name of the report (e.g., 'provider_payment_report')
+        email_type: Type of email - 'weekly' or 'on_demand' (default: 'on_demand')
         aws_region: AWS region for SES
         
     Returns:
@@ -712,12 +713,12 @@ def auto_verify_recipients_for_report(report_name: str, aws_region: str = "us-ea
     """
     try:
         # Get recipients for the report
-        recipients = get_report_email_recipients(report_name)
+        recipients = get_report_email_recipients(report_name, email_type)
         
         if not recipients:
             return {
                 "success": True,
-                "message": f"No recipients configured for {report_name}",
+                "message": f"No recipients configured for {report_name}_{email_type}",
                 "results": []
             }
         
@@ -743,7 +744,7 @@ def auto_verify_recipients_for_report(report_name: str, aws_region: str = "us-ea
         }
         
     except Exception as e:
-        error_msg = f"Error auto-verifying recipients for {report_name}: {str(e)}"
+        error_msg = f"Error auto-verifying recipients for {report_name}_{email_type}: {str(e)}"
         logger.error(error_msg)
         return {
             "success": False,
@@ -906,12 +907,13 @@ def initialize_individual_provider_templates():
         print(f"Error initializing templates: {str(e)}")
         return False
 
-def get_report_email_recipients(report_name: str) -> List[Dict[str, str]]:
+def get_report_email_recipients(report_name: str, email_type: str = "on_demand") -> List[Dict[str, str]]:
     """
     Query the report_email_list table for recipients of a specific report
     
     Args:
-        report_name: The name of the report (e.g., 'provider_payment_report')
+        report_name: The base name of the report (e.g., 'provider_payment_report')
+        email_type: The type of email - 'weekly' or 'on_demand' (default: 'on_demand')
         
     Returns:
         List of dictionaries containing email_address, first_name, last_name
@@ -926,17 +928,20 @@ def get_report_email_recipients(report_name: str) -> List[Dict[str, str]]:
     try:
         conn = get_db_connection()
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            # Create the full report name with suffix based on email_type
+            full_report_name = f"{report_name}_{email_type}"
+            
             sql = """
                 SELECT email_address, first_name, last_name 
                 FROM report_email_list 
                 WHERE report_name = %s
             """
-            cursor.execute(sql, (report_name,))
+            cursor.execute(sql, (full_report_name,))
             recipients = cursor.fetchall()
-            logger.info(f"Found {len(recipients)} recipients for report: {report_name}")
+            logger.info(f"Found {len(recipients)} recipients for report: {full_report_name}")
             return recipients
     except Exception as e:
-        logger.error(f"Error fetching email recipients for {report_name}: {str(e)}")
+        logger.error(f"Error fetching email recipients for {report_name}_{email_type}: {str(e)}")
         raise
     finally:
         if conn:
@@ -991,14 +996,14 @@ def send_provider_payment_report_emails(
         templates = get_email_templates(aws_region)
         template_config = templates['email_templates']['provider_payment_report'][email_type]
         
-        # Get recipients
-        recipients = get_report_email_recipients('provider_payment_report')
+        # Get recipients based on email type
+        recipients = get_report_email_recipients('provider_payment_report', email_type)
         
         if not recipients:
-            logger.warning("No recipients found for provider_payment_report")
+            logger.warning(f"No recipients found for provider_payment_report_{email_type}")
             return {
                 "success": True,
-                "message": "No recipients configured for provider_payment_report",
+                "message": f"No recipients configured for provider_payment_report_{email_type}",
                 "emails_sent": 0,
                 "total_recipients": 0,
                 "results": []
