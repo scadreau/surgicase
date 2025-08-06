@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-29 02:23:10
+# Last Modified: 2025-08-06 15:15:22
 # Author: Scott Cadreau
 
 # endpoints/case/get_case.py
@@ -15,7 +15,146 @@ router = APIRouter()
 @track_business_operation("read", "case")
 def get_case(request: Request, case_id: str = Query(..., description="The case ID to retrieve")):
     """
-    Retrieve case information by case_id
+    Retrieve comprehensive surgical case information with user permission-based visibility controls.
+    
+    This endpoint fetches detailed case information including patient data, surgeon and facility details,
+    procedure codes with descriptions, and automatically applies user-specific case status visibility
+    restrictions based on the case owner's profile permissions.
+    
+    Key Features:
+    - Complete case data retrieval with related entity information
+    - User permission-based case status visibility controls
+    - Enriched data with surgeon names and facility information
+    - Procedure codes with detailed descriptions
+    - Automatic case status capping for unauthorized status levels
+    - Comprehensive monitoring and error tracking
+    - Active case validation (soft-deleted cases return 404)
+    
+    Args:
+        request (Request): FastAPI request object for logging and monitoring
+        case_id (str): Unique identifier of the case to retrieve (required query parameter)
+    
+    Returns:
+        dict: Response containing:
+            - case (dict): Complete case object with:
+                - user_id (str): Owner of the case
+                - case_id (str): Unique case identifier
+                - case_date (str): ISO formatted case date
+                - patient_first (str): Patient's first name
+                - patient_last (str): Patient's last name
+                - ins_provider (str): Insurance provider information
+                - surgeon_id (str): Surgeon identifier
+                - facility_id (str): Facility identifier
+                - case_status (int): Current case status (may be capped at max_case_status)
+                - demo_file (str): Path to demonstration file
+                - note_file (str): Path to notes file
+                - misc_file (str): Path to miscellaneous file
+                - pay_amount (decimal): Calculated payment amount
+                - surgeon_name (str): Full name of the operating surgeon
+                - facility_name (str): Name of the surgical facility
+                - procedure_codes (List[dict]): Array of procedure information:
+                    - procedure_code (str): Medical procedure code
+                    - procedure_desc (str): Description of the procedure
+            - user_id (str): The user ID who owns the case
+            - case_id (str): The case ID that was requested
+    
+    Raises:
+        HTTPException:
+            - 400 Bad Request: Missing case_id parameter
+            - 404 Not Found: Case does not exist or is inactive (soft-deleted)
+            - 500 Internal Server Error: Database connection or query errors
+    
+    Database Operations:
+        1. Validates case existence and active status
+        2. Joins with surgeon_list for surgeon name information
+        3. Joins with facility_list for facility name information
+        4. Retrieves user's max_case_status from user_profile
+        5. Applies case status visibility restrictions
+        6. Fetches associated procedure codes with descriptions
+        7. Formats response data for API consumption
+    
+    User Permission Logic:
+        - Retrieves case owner's max_case_status from user_profile (default: 20)
+        - If actual case_status > max_case_status, caps display at max_case_status
+        - This ensures users only see case status information they're authorized to view
+        - Permission restrictions are applied transparently to the API consumer
+    
+    Data Enrichment:
+        - Surgeon information: Combines first_name and last_name from surgeon_list
+        - Facility information: Retrieves facility_name from facility_list
+        - Procedure details: Includes both procedure codes and their descriptions
+        - Date formatting: Converts database datetime to ISO format strings
+        - File paths: Returns complete paths to associated case files
+    
+    Monitoring & Logging:
+        - Business metrics tracking for case read operations
+        - Prometheus monitoring via @track_business_operation decorator
+        - Execution time tracking and detailed response logging
+        - Error categorization (not_found vs. general errors)
+        - User identification for audit trails
+    
+    Security Features:
+        - Only active cases (active=1) are accessible
+        - Soft-deleted cases return 404 Not Found
+        - Case status visibility enforced by user permissions
+        - All database queries use parameterized statements
+    
+    Performance Optimizations:
+        - Single transaction for all database operations
+        - Efficient JOIN operations for related data
+        - Proper connection management with automatic cleanup
+        - Minimal database round trips
+    
+    Example Usage:
+        GET /case?case_id=CASE-2024-001
+    
+    Example Response:
+        {
+            "case": {
+                "user_id": "USER123",
+                "case_id": "CASE-2024-001",
+                "case_date": "2024-01-15T00:00:00",
+                "patient_first": "John",
+                "patient_last": "Doe",
+                "ins_provider": "Blue Cross Blue Shield",
+                "surgeon_id": "SURG456",
+                "facility_id": "FAC789",
+                "case_status": 2,
+                "demo_file": "/files/demo_CASE-2024-001.mp4",
+                "note_file": "/files/notes_CASE-2024-001.pdf",
+                "misc_file": null,
+                "pay_amount": 1500.00,
+                "surgeon_name": "Dr. Jane Smith",
+                "facility_name": "Metro Surgical Center",
+                "procedure_codes": [
+                    {
+                        "procedure_code": "47562",
+                        "procedure_desc": "Laparoscopic Cholecystectomy"
+                    },
+                    {
+                        "procedure_code": "76705",
+                        "procedure_desc": "Ultrasound, Abdominal"
+                    }
+                ]
+            },
+            "user_id": "USER123",
+            "case_id": "CASE-2024-001"
+        }
+    
+    Example Error Response (Not Found):
+        {
+            "error": "Case not found",
+            "case_id": "INVALID-CASE"
+        }
+    
+    Note:
+        - Only active cases are returned; soft-deleted cases return 404
+        - Case status may be different from actual database value due to user permissions
+        - All date/time fields are converted to ISO format for consistency
+        - Procedure codes array will be empty if no procedures are associated
+        - File paths may be null if files haven't been uploaded
+        - User profile permissions are automatically applied without explicit authorization
+        - The endpoint automatically handles missing user profiles with default permissions
     """
     conn = None
     start_time = time.time()

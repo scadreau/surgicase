@@ -1,5 +1,5 @@
 # Created: 2025-07-21 16:40:47
-# Last Modified: 2025-07-29 02:22:11
+# Last Modified: 2025-08-06 15:33:01
 # Author: Scott Cadreau
 
 # endpoints/facility/search_facility.py
@@ -19,50 +19,118 @@ def search_facility(
     facility_name: str = Query(..., description="Facility name to search for")
 ):
     """
-    Search for healthcare facilities by name using optimized A-Z search tables.
+    Search for healthcare facilities by name using optimized A-Z partitioned search tables.
     
-    This function implements an intelligent search strategy across alphabetized search tables
-    for optimal performance when searching through millions of NPI facility records:
+    This endpoint provides intelligent facility search functionality across the national NPI registry including:
+    - High-performance search across millions of facility records
+    - Optimized A-Z table partitioning for sub-50ms query times
+    - Partial name matching with intelligent text formatting
+    - Comprehensive monitoring and business metrics tracking
+    - Full request logging and execution time tracking
+    - Prometheus metrics integration for operational monitoring
     
-    SEARCH STRATEGY:
-    1. Determines the appropriate search table based on the first letter of facility_name
-    2. Uses the optimized search_facility_[a-z] table for that letter
-    3. Performs LIKE search on facility_name for partial matching
-    4. Leverages database indexes for fast query execution
+    Search Strategy & Performance:
+        - Determines appropriate search table based on first letter of facility_name
+        - Uses optimized search_facility_[a-z] tables (26 partitions)
+        - Distributes millions of records across smaller indexed tables (~20K-100K each)
+        - Leverages database indexes (idx_npi, idx_facility_name) for fast execution
+        - Performs LIKE search with wildcards for partial matching
+        - Typical query time: <50ms vs >3000ms for full table scan
+        - Eliminates need to scan entire NPI dataset for each search
     
-    TABLE STRUCTURE:
-    - Tables: search_surgeon_facility.search_facility_a through search_facility_z
-    - Indexes: idx_npi, idx_facility_name
-    - Data source: npi_data_2 (Organization providers from NPI registry)
+    Table Structure & Data Source:
+        - Tables: search_surgeon_facility.search_facility_a through search_facility_z
+        - Primary indexes: idx_npi (unique), idx_facility_name (search optimized)
+        - Data source: npi_data_2 (Organization providers from National NPI registry)
+        - Record types: Hospitals, clinics, surgical centers, labs, pharmacies
     
-    PERFORMANCE BENEFITS:
-    - Distributes millions of records across 26 smaller tables (~20K-100K records each)
-    - Eliminates need to scan entire dataset for each search
-    - Uses targeted indexes for facility name searches
-    - Typical query time: <50ms vs >3000ms for full table scan
+    Text Formatting & Normalization:
+        - Applies proper capitalization to facility names via capitalize_facility_field()
+        - Normalizes city names with appropriate capitalization
+        - Handles state abbreviations (2-char) vs full state names
+        - Formats medical facility addresses appropriately
+        - Ensures consistent presentation across all search results
     
-    FIELD FORMATTING:
-    - Applies proper capitalization to facility names and addresses
-    - Handles state abbreviations (2-char) vs full state names
-    - Normalizes hospital/clinic names for consistent presentation
-    - Formats medical facility addresses appropriately
-    
-    FACILITY TYPES COVERED:
-    - Hospitals and medical centers
-    - Clinics and urgent care facilities
-    - Surgical centers and specialty practices
-    - Laboratories and diagnostic centers
-    - Pharmacies and medical equipment suppliers
+    Facility Types Covered:
+        - Hospitals and medical centers
+        - Clinics and urgent care facilities  
+        - Surgical centers and specialty practices
+        - Laboratories and diagnostic centers
+        - Pharmacies and medical equipment suppliers
+        - Rehabilitation and long-term care facilities
     
     Args:
-        facility_name (str): Healthcare facility name (partial matching supported)
-        
+        request (Request): FastAPI request object for logging and monitoring
+        facility_name (str): Healthcare facility name to search for (partial matching supported)
+    
     Returns:
-        dict: JSON response with matching facilities, search criteria, and result count
-        
+        dict: Response containing:
+            - statusCode (int): HTTP status code (200 for successful search)
+            - body (dict): Response data including:
+                - message (str): Search result summary with count
+                - search_criteria (dict): Echo of search parameters used
+                - facilities (List[dict]): Array of matching facilities, each containing:
+                    - npi (str): National Provider Identifier
+                    - facility_name (str): Formatted facility name
+                    - address (str): Formatted street address
+                    - city (str): Formatted city name
+                    - state (str): State abbreviation or full name
+                    - zip (str): ZIP/postal code
+    
     Raises:
-        HTTPException: 400 if facility_name parameter is missing/empty
-        HTTPException: 500 if database error occurs
+        HTTPException: 
+            - 400 Bad Request: facility_name parameter is missing or empty
+            - 500 Internal Server Error: Database query failures or connection issues
+    
+    Database Operations:
+        - Determines target table based on first letter of search term
+        - Executes parameterized LIKE query with wildcard matching
+        - Applies text formatting to all returned facility data
+        - Uses proper cursor management and connection cleanup
+    
+    Monitoring & Logging:
+        - Business metrics tracking for facility search operations
+        - Prometheus monitoring via @track_business_operation decorator
+        - Records success/error metrics via business_metrics.record_facility_operation()
+        - Comprehensive request logging with execution time tracking
+        - Error logging with full exception details
+    
+    Input Validation:
+        - Validates facility_name is not empty or whitespace-only
+        - Handles non-alphabetic first characters (defaults to 'a' table)
+        - Strips whitespace from search term before processing
+        - Returns appropriate 400 error for invalid input
+    
+    Example:
+        GET /search-facility?facility_name=General Hospital
+        
+        Response:
+        {
+            "statusCode": 200,
+            "body": {
+                "message": "Found 15 matching facility(ies)",
+                "search_criteria": {
+                    "facility_name": "General Hospital"
+                },
+                "facilities": [
+                    {
+                        "npi": "1234567890",
+                        "facility_name": "General Hospital Medical Center",
+                        "address": "123 Medical Drive",
+                        "city": "Healthcare City",
+                        "state": "CA",
+                        "zip": "90210"
+                    }
+                ]
+            }
+        }
+    
+    Note:
+        - Search is case-insensitive and supports partial matching
+        - Results are automatically formatted for consistent presentation
+        - Non-alphabetic search terms default to 'a' table for processing
+        - Search covers only organization-type NPI providers (facilities)
+        - Individual provider searches should use surgeon search endpoints
     """
     conn = None
     start_time = time.time()

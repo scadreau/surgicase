@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-29 02:21:41
+# Last Modified: 2025-08-06 15:36:45
 # Author: Scott Cadreau
 
 # endpoints/surgeon/delete_surgeon.py
@@ -15,7 +15,82 @@ router = APIRouter()
 @track_business_operation("delete", "surgeon")
 def delete_surgeon(request: Request, surgeon_id: int = Query(..., description="The surgeon ID to delete")):
     """
-    Delete a surgeon by surgeon_id.
+    Delete a surgeon profile by surgeon ID with comprehensive validation and monitoring.
+    
+    This endpoint provides secure surgeon deletion functionality including:
+    - Surgeon existence validation before deletion
+    - Permanent record removal from database
+    - Comprehensive monitoring and business metrics tracking
+    - Transaction safety with proper rollback handling
+    - Full request logging and execution time tracking
+    - Prometheus metrics integration for operational monitoring
+    - Proper error handling for non-existent surgeons
+    
+    Args:
+        request (Request): FastAPI request object for logging and monitoring
+        surgeon_id (int): The unique identifier of the surgeon to delete
+    
+    Returns:
+        dict: Response containing:
+            - statusCode (int): HTTP status code (200 for successful deletion)
+            - body (dict): Response data including:
+                - message (str): Success confirmation message
+                - surgeon_id (int): The ID of the deleted surgeon
+    
+    Raises:
+        HTTPException: 
+            - 404 Not Found: Surgeon with the specified surgeon_id does not exist
+            - 500 Internal Server Error: Database deletion failures or connection issues
+    
+    Database Operations:
+        - Performs DELETE operation on 'surgeon_list' table
+        - Validates surgeon existence by checking cursor.rowcount
+        - Commits transaction immediately after successful deletion
+        - Automatic rollback on any operation failure
+    
+    Monitoring & Logging:
+        - Business metrics tracking for surgeon deletion operations
+        - Prometheus monitoring via @track_business_operation decorator
+        - Records success/error/not_found metrics via business_metrics.record_surgeon_operation()
+        - Comprehensive request logging with execution time tracking
+        - Error logging with full exception details and rollback status
+    
+    Transaction Handling:
+        - Explicit transaction commit after successful deletion
+        - Automatic rollback on any operation failure with connection validation
+        - Proper connection cleanup in finally block
+        - Safe rollback handling with interface error protection
+    
+    Validation:
+        - Checks if surgeon exists before attempting deletion
+        - Returns 404 error if surgeon not found (cursor.rowcount == 0)
+        - Prevents silent failures with proper existence validation
+    
+    Example:
+        DELETE /surgeon?surgeon_id=123
+        
+        Success Response:
+        {
+            "statusCode": 200,
+            "body": {
+                "message": "Surgeon deleted successfully",
+                "surgeon_id": 123
+            }
+        }
+        
+        Not Found Response (404):
+        {
+            "error": "Surgeon not found",
+            "surgeon_id": 123
+        }
+    
+    Note:
+        - Deletion is permanent and cannot be undone
+        - Surgeon ID must be a valid integer
+        - No user validation is performed (any user can delete any surgeon)
+        - Consider implementing soft delete for audit trail requirements
+        - Ensure no active cases reference this surgeon before deletion
+        - Verify surgeon is not associated with critical medical procedures
     """
     conn = None
     start_time = time.time()

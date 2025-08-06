@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-29 02:23:03
+# Last Modified: 2025-08-06 15:15:22
 # Author: Scott Cadreau
 
 # endpoints/case/update_case.py
@@ -21,7 +21,158 @@ router = APIRouter()
 @track_business_operation("update", "case")
 def update_case(request: Request, case: CaseUpdate = Body(...)):
     """
-    Update fields in cases and replace procedure codes if provided. Only case_id is required.
+    Update surgical case fields and procedure codes with automatic pay calculation and status management.
+    
+    This endpoint provides comprehensive case updating capabilities with selective field updates,
+    complete procedure code replacement, automatic pay amount recalculation, and case status
+    management. All operations are performed within a database transaction to ensure data consistency.
+    
+    Key Features:
+    - Selective field updates (only provided fields are modified)
+    - Complete procedure code replacement with duplicate removal
+    - Automatic pay amount recalculation when procedure codes change
+    - Automatic case status updates based on business rules
+    - Transactional operations for data integrity
+    - Comprehensive validation and error handling
+    - Monitoring and performance tracking
+    - Detailed change tracking and reporting
+    
+    Args:
+        request (Request): FastAPI request object for logging and monitoring
+        case (CaseUpdate): Case update model containing:
+            - case_id (str): Unique identifier of the case to update (required)
+            - user_id (str, optional): User ID (used for pay calculations if not in database)
+            - case_date (date, optional): Surgery/case date
+            - patient_first (str, optional): Patient's first name
+            - patient_last (str, optional): Patient's last name
+            - ins_provider (str, optional): Insurance provider information
+            - surgeon_id (str, optional): Surgeon identifier
+            - facility_id (str, optional): Facility identifier
+            - demo_file (str, optional): Path to demonstration file
+            - note_file (str, optional): Path to notes file
+            - misc_file (str, optional): Path to miscellaneous file
+            - procedure_codes (List[str], optional): Complete list of procedure codes to replace existing ones
+    
+    Returns:
+        dict: Response containing:
+            - statusCode (int): HTTP status code (200 for success)
+            - body (dict): Response body with:
+                - message (str): Success confirmation message
+                - case_id (str): The case identifier that was updated
+                - updated_fields (List[str]): List of fields that were actually modified
+                - status_update (dict): Results of automatic case status update
+                - pay_amount_update (dict): Results of automatic pay amount calculation
+    
+    Raises:
+        HTTPException:
+            - 400 Bad Request: Missing case_id, no fields to update, or no changes made
+            - 404 Not Found: Case does not exist in the database
+            - 500 Internal Server Error: Database errors or transaction failures
+    
+    Database Operations:
+        1. Validates case existence in the database
+        2. Updates case table fields selectively based on provided data
+        3. Replaces procedure codes completely if provided:
+            - Deletes all existing procedure codes for the case
+            - Inserts new procedure codes with duplicate removal
+        4. Triggers automatic pay amount calculation if procedure codes changed
+        5. Triggers automatic case status update based on business rules
+        6. Commits all changes atomically or rolls back on failure
+    
+    Business Logic:
+        - Only non-null fields in the request are updated
+        - case_id is required but not updateable
+        - procedure_codes array completely replaces existing codes
+        - Duplicate procedure codes are automatically removed while preserving order
+        - Pay amount recalculation triggered only when procedure codes change
+        - Case status updated automatically based on current business rules
+        - All operations must succeed or entire transaction is rolled back
+    
+    Pay Amount Calculation:
+        - Triggered automatically when procedure_codes are provided
+        - Uses case owner's user_id (from request or database lookup)
+        - Calculates based on procedure codes and user's payment configuration
+        - Updates pay_amount field in cases table
+        - Failure logged but doesn't abort the entire operation
+    
+    Case Status Management:
+        - Automatic status updates based on current case state and business rules
+        - Status changes logged and included in response
+        - Independent of other update operations
+        - Always attempted after field and procedure code updates
+    
+    Monitoring & Logging:
+        - Business metrics tracking for update operations
+        - Prometheus monitoring via @track_business_operation decorator
+        - Detailed execution time and response logging
+        - Change tracking for all modified fields
+        - Error categorization for different failure types:
+            * not_found: Case doesn't exist
+            * no_changes: No actual database changes occurred
+            * error: General transaction or database errors
+    
+    Transaction Management:
+        - Explicit transaction control with begin/commit/rollback
+        - All database operations within single transaction
+        - Automatic rollback on any operation failure
+        - Connection state validation before rollback attempts
+        - Proper connection cleanup in finally block
+    
+    Validation Logic:
+        - case_id is mandatory and must exist
+        - At least one updateable field must be provided
+        - Empty updates return 400 Bad Request
+        - Non-existent cases return 404 Not Found
+        - Database constraint violations handled gracefully
+    
+    Example Request:
+        PATCH /case
+        {
+            "case_id": "CASE-2024-001",
+            "patient_first": "Jane",
+            "surgeon_id": "SURG789",
+            "procedure_codes": ["47562", "76705", "99213"]
+        }
+    
+    Example Response:
+        {
+            "statusCode": 200,
+            "body": {
+                "message": "Case updated successfully",
+                "case_id": "CASE-2024-001",
+                "updated_fields": ["patient_first", "surgeon_id", "procedure_codes", "pay_amount"],
+                "status_update": {
+                    "success": true,
+                    "old_status": 1,
+                    "new_status": 2,
+                    "message": "Status updated from In Review to In Progress"
+                },
+                "pay_amount_update": {
+                    "success": true,
+                    "old_amount": 1200.00,
+                    "new_amount": 1500.00,
+                    "message": "Pay amount recalculated based on procedure codes"
+                }
+            }
+        }
+    
+    Example Error Response (No Changes):
+        {
+            "statusCode": 400,
+            "body": {
+                "error": "No changes made to case"
+            }
+        }
+    
+    Note:
+        - Only active cases can be updated (soft-deleted cases return 404)
+        - Procedure code updates completely replace the existing list
+        - Duplicate procedure codes are automatically removed
+        - Pay amount recalculation is triggered only when procedure codes change
+        - Case status updates are automatic and based on current business rules
+        - All field updates are atomic - either all succeed or all are rolled back
+        - File path updates do not trigger automatic file operations
+        - Empty arrays for procedure_codes will remove all existing procedure codes
     """
     conn = None
     start_time = time.time()

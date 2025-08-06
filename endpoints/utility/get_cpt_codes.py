@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-29 02:20:30
+# Last Modified: 2025-08-06 15:42:34
 # Author: Scott Cadreau
 
 # endpoints/utility/get_cpt_codes.py
@@ -15,7 +15,56 @@ router = APIRouter()
 @track_business_operation("get", "cpt_codes")
 def get_cpt_codes(request: Request):
     """
-    Get all CPT codes.
+    Retrieve all available CPT (Current Procedural Terminology) codes from the database.
+    
+    This endpoint provides a complete list of medical procedure codes used for billing
+    and documentation purposes. CPT codes are standardized codes used in medical billing
+    to describe medical, surgical, and diagnostic services.
+    
+    Args:
+        request (Request): FastAPI request object for logging and monitoring
+    
+    Returns:
+        dict: Response containing:
+            - cpt_codes (List[dict]): Array of CPT code objects, each containing:
+                - cpt_code (str): The standardized CPT code identifier
+                - cpt_description (str): Human-readable description of the procedure
+    
+    Raises:
+        HTTPException: 
+            - 500 Internal Server Error: Database connection or query execution errors
+    
+    Database Operations:
+        - Queries 'cpt_codes' table for all available codes and descriptions
+        - Read-only operation with automatic connection management
+    
+    Monitoring & Logging:
+        - Business metrics tracking for CPT code retrieval operations
+        - Prometheus monitoring via @track_business_operation decorator
+        - Comprehensive request logging with execution time tracking
+        - Error logging with full exception details
+    
+    Example Response:
+        {
+            "cpt_codes": [
+                {
+                    "cpt_code": "00100",
+                    "cpt_description": "Anesthesia for procedures on salivary glands"
+                },
+                {
+                    "cpt_code": "00102", 
+                    "cpt_description": "Anesthesia for procedures involving plastic repair"
+                }
+            ]
+        }
+    
+    Usage:
+        GET /cpt_codes
+        
+    Notes:
+        - No authentication required for this utility endpoint
+        - Results are sorted by database default ordering
+        - Used primarily for populating dropdown lists in frontend forms
     """
     conn = None
     start_time = time.time()

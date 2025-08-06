@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-29 02:23:23
+# Last Modified: 2025-08-06 15:15:22
 # Author: Scott Cadreau
 
 # endpoints/case/delete_case.py
@@ -19,7 +19,114 @@ router = APIRouter()
 @track_business_operation("delete", "case")
 def delete_case(request: Request, case_id: str = Query(..., description="The case ID to delete")):
     """
-    Delete (deactivate) case by case_id
+    Soft delete (deactivate) a surgical case with comprehensive archiving and rollback capabilities.
+    
+    This endpoint performs a soft deletion by setting the case's active status to 0 rather than 
+    permanently removing the record. The operation includes automatic archiving of case files
+    to AWS S3 with rollback capabilities if archiving fails.
+    
+    Key Features:
+    - Soft deletion (sets active=0) for data preservation
+    - Automatic case file archiving to AWS S3
+    - Full rollback on archiving failure
+    - Duplicate deletion protection
+    - Comprehensive monitoring and logging
+    - Prometheus metrics tracking
+    
+    Args:
+        request (Request): FastAPI request object for logging and monitoring
+        case_id (str): Unique identifier of the case to delete (required query parameter)
+    
+    Returns:
+        dict: Response containing:
+            - statusCode (int): HTTP status code (200 for success)
+            - body (dict): Response body with:
+                - message (str): Success or status message
+                - case_id (str): The case identifier that was processed
+                - active (int): Current active status (0 after successful deletion)
+                - deactivated_at (str, optional): ISO timestamp of deactivation
+                - details (str, optional): Additional information for error cases
+    
+    Raises:
+        HTTPException:
+            - 400 Bad Request: Missing case_id parameter
+            - 404 Not Found: Case does not exist in the database
+            - 500 Internal Server Error: Database errors or archiving failures
+    
+    Database Operations:
+        1. Validates case existence and retrieves current active status
+        2. Checks for already inactive cases (returns success with notice)
+        3. Sets active=0 to soft delete the case
+        4. Commits the transaction before archiving
+        5. Attempts case file archiving via archive_deleted_case()
+        6. Rolls back deletion if archiving fails
+    
+    Archiving Process:
+        - Moves case files from active storage to archive storage in AWS S3
+        - Updates file paths in database to reflect archived locations
+        - Handles all file types: demo_file, note_file, misc_file
+        - Performs atomic rollback if any archiving step fails
+    
+    Business Logic:
+        - Cases already marked as inactive return success without changes
+        - Archiving failure triggers automatic rollback of the soft deletion
+        - All operations are logged for audit and monitoring purposes
+        - Case restoration possible if archiving fails
+    
+    Monitoring & Logging:
+        - Business metrics for deletion success/failure tracking
+        - Prometheus monitoring via @track_business_operation decorator
+        - Detailed execution time and response logging
+        - Specific error tracking for different failure scenarios:
+            * not_found: Case doesn't exist
+            * already_inactive: Case was already deleted
+            * update_failed: Database update failed
+            * archive_failed: S3 archiving failed
+            * error: General errors
+    
+    Error Handling:
+        - Graceful handling of already inactive cases
+        - Automatic rollback on archiving failures
+        - Detailed error messages with context
+        - Connection state validation before rollback attempts
+    
+    Example Response (Success):
+        {
+            "statusCode": 200,
+            "body": {
+                "message": "Case deactivated successfully",
+                "case_id": "CASE-2024-001",
+                "active": 0,
+                "deactivated_at": "2024-01-15T10:30:00+00:00"
+            }
+        }
+    
+    Example Response (Already Inactive):
+        {
+            "statusCode": 200,
+            "body": {
+                "message": "Case already inactive", 
+                "case_id": "CASE-2024-001",
+                "active": 0
+            }
+        }
+    
+    Example Response (Archive Failure):
+        {
+            "statusCode": 500,
+            "body": {
+                "error": "Case deletion failed during archive/S3 operations: S3 bucket not accessible",
+                "case_id": "CASE-2024-001",
+                "details": "Case has been restored to active status"
+            }
+        }
+    
+    Note:
+        - This is a soft delete operation - data is preserved for recovery
+        - Archiving includes movement of all associated files to AWS S3 archive storage
+        - Failed archiving automatically restores the case to active status
+        - All file operations are atomic - either all succeed or all are rolled back
+        - Case files in S3 are moved to archive buckets with updated database references
     """
     conn = None
     start_time = time.time()

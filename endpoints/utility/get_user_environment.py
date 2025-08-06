@@ -1,5 +1,5 @@
 # Created: 2025-07-24 17:54:30
-# Last Modified: 2025-08-05 19:39:11
+# Last Modified: 2025-08-06 15:46:58
 # Author: Scott Cadreau
 # Assisted by: Claude 4 Sonnet
 
@@ -210,15 +210,124 @@ def get_available_user_types(user_type: int, conn) -> list:
 @track_business_operation("get", "user_environment")
 def get_user_environment(request: Request, user_id: str = Query(..., description="The user ID to get environment for")):
     """
-    Get complete user environment including user profile and case statuses.
-    This provides all the information the frontend needs about a user in one call.
+    Retrieve comprehensive user environment data for complete application initialization.
+    
+    This endpoint serves as the primary user environment initialization call, providing
+    all essential user context, permissions, and available resources in a single request.
+    It delivers personalized data based on the user's type, access level, and permissions
+    to enable complete frontend application state setup with optimal performance.
+    
+    Args:
+        request (Request): FastAPI request object for logging and monitoring
+        user_id (str): User ID to retrieve environment data for.
+                      Must exist in user_profile table as an active user.
     
     Returns:
-        - User profile information
-        - Available case statuses based on user permissions
-        - User's surgeons and facilities
-        - Available user types (≤ current user's type)
-        - User access levels and capabilities
+        dict: Comprehensive response containing:
+            - user_profile (dict): Complete user profile information including:
+                - user_id (str): User identifier
+                - user_email (str): User's email address
+                - first_name (str): User's first name
+                - last_name (str): User's last name
+                - addr1, addr2, city, state, zipcode (str): Address information
+                - telephone (str): Contact phone number
+                - user_npi (str): National Provider Identifier if applicable
+                - referred_by_user (str): Referring user ID if applicable
+                - user_type (int): User type/role level
+                - user_type_desc (str): Human-readable user type description
+                - message_pref (str): Communication preferences
+                - states_licensed (str): Licensed states information
+                - user_tier (int): User tier level
+                - max_case_status (int): Maximum case status user can access
+                - max_case_status_desc (str): Description of maximum case status
+                - last_login_dt (str): Last login timestamp (ISO format)
+                - active (int): Account active status
+                - documents (List[dict]): User's uploaded documents
+                - login_updated (bool): Whether last login was successfully updated
+            - case_statuses (List[dict]): Available case statuses based on permissions
+            - surgeons (List[dict]): User's associated surgeons
+            - facilities (List[dict]): User's associated facilities  
+            - user_types (List[dict]): Available user types (≤ current user's type)
+    
+    Raises:
+        HTTPException:
+            - 400 Bad Request: Missing or invalid user_id parameter
+            - 404 Not Found: User not found or inactive in user_profile table
+            - 500 Internal Server Error: Database connection or processing errors
+    
+    Database Operations:
+        - Retrieves comprehensive user profile from 'user_profile' table
+        - Gets user documents from 'user_documents' table
+        - Updates last_login_dt timestamp for user activity tracking
+        - Retrieves case statuses filtered by user's max_case_status permissions
+        - Gets user's associated surgeons and facilities based on relationships
+        - Retrieves available user types based on hierarchical permissions
+        - All operations use consistent connection management and error handling
+    
+    Permission-Based Filtering:
+        - Case statuses limited to user's max_case_status level for security
+        - User types filtered to show only types ≤ current user's type
+        - Surgeon and facility lists based on user's access permissions
+        - Hierarchical access control throughout all data retrieval
+    
+    Monitoring & Logging:
+        - Business metrics tracking for user environment operations:
+          - "success": Complete environment successfully retrieved
+          - "user_not_found": User validation failed
+          - "error": Database or processing errors
+        - Prometheus monitoring via @track_business_operation decorator
+        - Comprehensive request logging with execution time tracking
+        - User activity tracking through last login updates
+    
+    Data Processing:
+        - Automatic datetime formatting to ISO standard for frontend consumption
+        - User type description lookup and integration
+        - Maximum case status description resolution
+        - Login timestamp update for user activity tracking
+        - Comprehensive error handling with graceful degradation
+    
+    Example Response:
+        {
+            "user_profile": {
+                "user_id": "USER123",
+                "user_email": "john.doe@example.com",
+                "first_name": "John",
+                "last_name": "Doe",
+                "user_type": 200,
+                "user_type_desc": "Advanced User",
+                "max_case_status": 5,
+                "max_case_status_desc": "Completed",
+                "last_login_dt": "2024-01-15T10:30:45.123456",
+                "documents": [...],
+                "login_updated": true
+            },
+            "case_statuses": [...],
+            "surgeons": [...], 
+            "facilities": [...],
+            "user_types": [...]
+        }
+    
+    Usage:
+        GET /user_environment?user_id=USER123
+        
+    Performance Considerations:
+        - Single endpoint call replaces multiple separate requests
+        - Optimized for frontend application initialization
+        - Minimal database connections through connection reuse
+        - Efficient data aggregation for complete user context
+    
+    Security Features:
+        - Permission-based data filtering throughout all queries
+        - User validation and active status verification
+        - Hierarchical access control for user types and case statuses
+        - Complete audit trail through comprehensive logging
+    
+    Notes:
+        - Primary endpoint for user session initialization
+        - Provides complete user context in single request for performance
+        - Updates user activity tracking automatically
+        - Essential for role-based access control throughout application
+        - Optimized for frontend state management and caching strategies
     """
     conn = None
     start_time = time.time()

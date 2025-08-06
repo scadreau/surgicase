@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-29 02:21:05
+# Last Modified: 2025-08-06 15:18:59
 # Author: Scott Cadreau
 
 # endpoints/user/update_user.py
@@ -16,8 +16,179 @@ router = APIRouter()
 @track_business_operation("update", "user")
 def update_user(request: Request, user: UserUpdate = Body(...)):
     """
-    Update user fields in user_profile. Only user_id is required; any other provided fields will be updated.
-    If documents are provided, replace all user documents with the new list.
+    Update user profile fields and documents with selective field modification and complete document replacement.
+    
+    This endpoint provides comprehensive user profile updating capabilities with selective field updates
+    and complete document management. Only the user_id is required; any other provided fields will be
+    updated while null/undefined fields remain unchanged. Document updates completely replace the
+    existing document set for specific document types.
+    
+    Key Features:
+    - Selective field updates (only provided fields are modified)
+    - Complete document type replacement with validation
+    - Transactional operations ensuring data consistency  
+    - Comprehensive validation and error handling
+    - Professional information management (NPI, licensing, etc.)
+    - Contact and address information updates
+    - User preference and type management
+    - Detailed change tracking and reporting
+    
+    Args:
+        request (Request): FastAPI request object for logging and monitoring
+        user (UserUpdate): User update model containing:
+            - user_id (str): Unique identifier of the user to update (required)
+            - user_email (str, optional): Updated email address
+            - first_name (str, optional): Updated first name
+            - last_name (str, optional): Updated last name
+            - addr1 (str, optional): Updated primary address line
+            - addr2 (str, optional): Updated secondary address line
+            - city (str, optional): Updated city of residence
+            - state (str, optional): Updated state/province
+            - zipcode (str, optional): Updated postal/ZIP code
+            - telephone (str, optional): Updated primary phone number
+            - user_npi (str, optional): Updated National Provider Identifier
+            - referred_by_user (str, optional): Updated referring user ID
+            - message_pref (str, optional): Updated communication preferences
+            - states_licensed (str, optional): Updated licensing state information
+            - timezone (str, optional): Updated timezone preference
+            - documents (List[UserDocument], optional): Document list for replacement:
+                - document_type (str): Type/category of document
+                - document_name (str): Name/path of the document file
+    
+    Returns:
+        dict: Response containing:
+            - statusCode (int): HTTP status code (200 for success)
+            - body (dict): Response body with:
+                - message (str): Success confirmation message
+                - user_id (str): The user identifier that was updated
+                - updated_fields (List[str]): List of fields that were actually modified
+    
+    Raises:
+        HTTPException:
+            - 400 Bad Request: Missing user_id, no fields to update, or no changes made
+            - 404 Not Found: User does not exist in the database
+            - 500 Internal Server Error: Database errors or transaction failures
+    
+    Database Operations:
+        1. Validates user existence in user_profile table
+        2. Updates user_profile fields selectively based on provided data
+        3. Manages document replacement per document type:
+            - Deletes existing documents of the same type
+            - Inserts new documents for each provided type
+        4. All operations performed within a single transaction
+        5. Commits changes atomically or rolls back on failure
+    
+    Business Logic:
+        - Only non-null fields in the request are updated
+        - user_id is required but not updateable
+        - Document updates are type-specific replacements, not global
+        - Empty document arrays remove all documents of that type
+        - Professional information updates maintain regulatory compliance
+        - User preferences affect system behavior and notifications
+    
+    Document Management Logic:
+        - Documents are replaced per document_type, not globally
+        - For each unique document_type in the request:
+            * All existing documents of that type are deleted
+            * New documents of that type are inserted
+        - Document types not included in request remain unchanged
+        - This allows selective document type management
+    
+    Field Update Logic:
+        - Only fields with non-null values are updated
+        - user_id and documents are excluded from field updates
+        - Dynamic SQL generation based on provided fields
+        - Change tracking reports only fields that actually changed
+        - Database-level constraints ensure data integrity
+    
+    Professional Information Updates:
+        - NPI updates for healthcare professional verification
+        - State licensing updates for regulatory compliance
+        - User type modifications affect system permissions
+        - Referral chain updates for business relationship tracking
+    
+    Monitoring & Logging:
+        - Business metrics tracking for user update operations
+        - Prometheus monitoring via @track_business_operation decorator
+        - Detailed execution time and response logging
+        - Change tracking for all modified fields
+        - Error categorization for different failure types:
+            * not_found: User doesn't exist
+            * no_changes: No actual database changes occurred
+            * success: User updated successfully
+            * error: General transaction or database errors
+    
+    Transaction Management:
+        - Explicit transaction control for data consistency
+        - All database operations within single transaction
+        - Automatic rollback on any operation failure
+        - Connection state validation before rollback attempts
+        - Proper database connection cleanup
+    
+    Validation Logic:
+        - user_id is mandatory and must exist
+        - At least one updateable field or documents must be provided
+        - Empty updates return 400 Bad Request
+        - Non-existent users return 404 Not Found
+        - Database constraint violations handled gracefully
+    
+    Example Request:
+        PATCH /user
+        {
+            "user_id": "USER123",
+            "first_name": "Dr. Jane Updated",
+            "telephone": "+1-555-9999",
+            "user_npi": "0987654321",
+            "documents": [
+                {
+                    "document_type": "medical_license",
+                    "document_name": "updated_ca_license.pdf"
+                },
+                {
+                    "document_type": "medical_license", 
+                    "document_name": "ny_license.pdf"
+                }
+            ]
+        }
+    
+    Example Response:
+        {
+            "statusCode": 200,
+            "body": {
+                "message": "User updated successfully",
+                "user_id": "USER123",
+                "updated_fields": ["first_name", "telephone", "user_npi", "documents"]
+            }
+        }
+    
+    Example Error Response (No Changes):
+        {
+            "statusCode": 400,
+            "body": {
+                "error": "No changes made to user"
+            }
+        }
+    
+    Example Error Response (Not Found):
+        {
+            "statusCode": 404,
+            "body": {
+                "error": "User not found",
+                "user_id": "INVALID_USER"
+            }
+        }
+    
+    Note:
+        - Only active users can be updated (soft-deleted users return 404)
+        - Document updates are per document_type, allowing selective management
+        - Multiple documents of the same type can be provided
+        - Empty document array for a type removes all documents of that type
+        - Professional fields (NPI, licensing) have regulatory implications
+        - User type changes may affect system permissions and access
+        - All field updates are atomic - either all succeed or all are rolled back
+        - File path updates do not trigger automatic file operations
+        - Communication preference changes affect notification behavior
+        - Timezone updates affect user experience timestamps
     """
     conn = None
     start_time = time.time()

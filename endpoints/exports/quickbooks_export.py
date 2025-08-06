@@ -1,5 +1,5 @@
 # Created: 2025-01-27 15:00:00
-# Last Modified: 2025-07-29 02:22:37
+# Last Modified: 2025-08-06 15:40:02
 # Author: Scott Cadreau
 
 # endpoints/exports/quickbooks_export.py
@@ -258,7 +258,104 @@ def export_quickbooks_vendors_csv(
     end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
     user_id: Optional[str] = Query(None, description="Filter by specific provider user_id")
 ):
-    """Export provider data as CSV for QuickBooks vendor import."""
+    """
+    Export healthcare provider data as QuickBooks-compatible CSV for vendor import.
+    
+    This endpoint provides specialized QuickBooks vendor export functionality including:
+    - Provider data aggregation from completed cases (status 15)
+    - QuickBooks-specific CSV formatting with required fields
+    - Provider payment calculations and summaries
+    - Date range and user filtering capabilities
+    - S3 backup storage with comprehensive metadata
+    - Comprehensive monitoring and business metrics tracking
+    - Full request logging and execution time tracking
+    - Prometheus metrics integration for operational monitoring
+    
+    Data Sources & Filtering:
+        - Sources data from 'cases' table joined with 'user_profile'
+        - Filters for completed cases (case_status = 15) and active records
+        - Applies optional date range filtering on case_date
+        - Supports single provider filtering via user_id parameter
+        - Aggregates provider information and payment totals
+    
+    QuickBooks Integration:
+        - Formats data for direct QuickBooks vendor import
+        - Includes required fields: Name, Company, First/Last Name, etc.
+        - Sets appropriate vendor type as "Medical Provider"
+        - Configures 1099 eligibility for tax reporting
+        - Uses NPI numbers as Tax ID for provider identification
+        - Sets standard terms (Net 30) and opening balances
+    
+    Args:
+        start_date (Optional[str]): Start date filter in YYYY-MM-DD format
+        end_date (Optional[str]): End date filter in YYYY-MM-DD format  
+        user_id (Optional[str]): Filter for specific provider user_id
+    
+    Returns:
+        FileResponse: Direct CSV file download containing:
+            - QuickBooks vendor import format with standard columns
+            - Provider names with proper capitalization formatting
+            - NPI numbers in Tax ID field for provider identification
+            - Calculated opening balances based on total payments
+            - Proper CSV encoding for QuickBooks compatibility
+            - Headers with export metadata including:
+                - Content-Disposition: attachment with timestamped filename
+                - X-S3-URL: S3 backup location for file redundancy
+                - X-Export-Type: QuickBooks vendor export identifier
+                - X-Record-Count: Number of vendors in export
+    
+    Raises:
+        HTTPException: 
+            - 404 Not Found: No cases found matching the specified criteria
+            - 500 Internal Server Error: Database, file system, or S3 failures
+    
+    Database Operations:
+        - Executes filtered JOIN query on cases and user_profile tables
+        - Applies case_status = 15 and active = 1 filters
+        - Includes optional date range and user_id filtering
+        - Retrieves procedure codes for each case via secondary queries
+        - Uses proper cursor management with DictCursor for data processing
+        - Automatic connection cleanup in finally block
+    
+    Data Processing & Transformation:
+        - Groups cases by provider (user_id) for aggregation
+        - Calculates total payment amounts per provider
+        - Applies proper name capitalization formatting
+        - Transforms provider data into QuickBooks vendor format
+        - Handles NULL values and data type conversions
+        - Maintains data integrity throughout transformation process
+    
+    File & Storage Operations:
+        - Creates local exports directory with automatic permission handling
+        - Generates timestamped CSV filename for uniqueness
+        - Formats CSV with QuickBooks-required column structure
+        - Uploads backup copy to S3 with comprehensive metadata
+        - Implements proper file cleanup and storage management
+    
+    Monitoring & Logging:
+        - Business metrics tracking for QuickBooks export operations
+        - Prometheus monitoring via @track_business_operation decorator
+        - Records success/error metrics via business_metrics.record_utility_operation()
+        - Comprehensive request logging with execution time tracking
+        - Error logging with full exception details
+        - S3 upload status tracking and metadata preservation
+    
+    Example:
+        GET /quickbooks-vendors-csv?start_date=2024-01-01&end_date=2024-12-31
+        
+        Response: CSV file download with QuickBooks vendor format:
+        Name,Company,First Name,Last Name,Vendor Type,Account Number,Tax ID,Is Vendor Eligible For 1099,Terms,Credit Limit,Opening Balance,As Of Date
+        John Smith,John Smith,John,Smith,Medical Provider,USER123,1234567890,Y,Net 30,,1500.00,08/15/2024
+    
+    Note:
+        - Export only includes completed cases (status 15) with active providers
+        - Provider names are properly capitalized for professional presentation
+        - NPI numbers are used as Tax ID for healthcare provider identification
+        - Opening balances reflect total payments owed to each provider
+        - Files are automatically backed up to S3 for audit and redundancy
+        - CSV format is optimized for direct QuickBooks import compatibility
+        - All providers are marked as 1099 eligible for tax reporting compliance
+    """
     try:
         conn = get_db_connection()
         
@@ -333,7 +430,121 @@ def export_quickbooks_transactions_iif(
     end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
     user_id: Optional[str] = Query(None, description="Filter by specific provider user_id")
 ):
-    """Export provider payment transactions as IIF for QuickBooks import."""
+    """
+    Export healthcare provider payment transactions as QuickBooks IIF format for direct import.
+    
+    This endpoint provides specialized QuickBooks transaction export functionality including:
+    - Provider payment transaction generation from completed cases
+    - QuickBooks IIF (Intuit Interchange Format) file creation
+    - Automated bill and expense entry generation
+    - Chart of accounts setup with medical expense categorization
+    - Date range and provider filtering capabilities
+    - S3 backup storage with comprehensive metadata
+    - Comprehensive monitoring and business metrics tracking
+    - Full request logging and execution time tracking
+    - Prometheus metrics integration for operational monitoring
+    
+    IIF Format & Structure:
+        - Creates industry-standard Intuit Interchange Format files
+        - Includes proper IIF headers with QuickBooks version compatibility
+        - Generates chart of accounts for medical expenses and accounts payable
+        - Creates vendor records with medical provider categorization
+        - Produces bill transactions with corresponding expense entries
+        - Maintains proper double-entry bookkeeping structure
+    
+    Data Sources & Filtering:
+        - Sources data from 'cases' table joined with 'user_profile'
+        - Filters for completed cases (case_status = 15) and active records
+        - Applies optional date range filtering on case_date
+        - Supports single provider filtering via user_id parameter
+        - Retrieves procedure codes for detailed transaction memos
+    
+    Transaction Generation:
+        - Creates BILL transactions for each case payment
+        - Generates corresponding expense entries for medical costs
+        - Uses case dates as transaction dates for accurate timing
+        - Includes case IDs as document numbers for reference
+        - Applies procedure codes in transaction memos for detail
+        - Maintains proper accounting relationships between bills and expenses
+    
+    Args:
+        start_date (Optional[str]): Start date filter in YYYY-MM-DD format
+        end_date (Optional[str]): End date filter in YYYY-MM-DD format
+        user_id (Optional[str]): Filter for specific provider user_id
+    
+    Returns:
+        FileResponse: Direct IIF file download containing:
+            - Complete QuickBooks-compatible IIF transaction file
+            - Chart of accounts setup for medical expense tracking
+            - Vendor records for all providers in the export
+            - Bill transactions with corresponding expense entries
+            - Proper IIF formatting for direct QuickBooks import
+            - Headers with export metadata including:
+                - Content-Disposition: attachment with timestamped filename
+                - X-S3-URL: S3 backup location for file redundancy
+                - X-Export-Type: QuickBooks transactions IIF identifier
+                - X-Record-Count: Number of transactions in export
+    
+    Raises:
+        HTTPException: 
+            - 404 Not Found: No cases found matching the specified criteria
+            - 500 Internal Server Error: Database, file system, or S3 failures
+    
+    Database Operations:
+        - Executes filtered JOIN query on cases and user_profile tables
+        - Applies case_status = 15 and active = 1 filters
+        - Includes optional date range and user_id filtering
+        - Retrieves procedure codes for each case via secondary queries
+        - Uses proper cursor management with DictCursor for data processing
+        - Automatic connection cleanup in finally block
+    
+    Data Processing & Transformation:
+        - Groups cases by provider for vendor record generation
+        - Transforms payment data into IIF transaction format
+        - Applies proper date formatting for QuickBooks compatibility
+        - Creates detailed transaction memos with case and procedure information
+        - Handles NULL values and data type conversions
+        - Maintains accounting integrity throughout transformation
+    
+    File & Storage Operations:
+        - Creates local exports directory with automatic permission handling
+        - Generates timestamped IIF filename for uniqueness
+        - Formats file with proper IIF structure and syntax
+        - Uploads backup copy to S3 with comprehensive metadata
+        - Implements proper file cleanup and storage management
+    
+    Monitoring & Logging:
+        - Business metrics tracking for QuickBooks transaction export operations
+        - Prometheus monitoring via @track_business_operation decorator
+        - Records success/error metrics via business_metrics.record_utility_operation()
+        - Comprehensive request logging with execution time tracking
+        - Error logging with full exception details
+        - S3 upload status tracking and metadata preservation
+    
+    Chart of Accounts Integration:
+        - Creates "Medical Expenses" expense account for cost tracking
+        - Sets up "Accounts Payable" liability account for bill management
+        - Categorizes all transactions under appropriate account types
+        - Maintains proper accounting structure for financial reporting
+    
+    Example:
+        GET /quickbooks-transactions-iif?start_date=2024-01-01&end_date=2024-12-31
+        
+        Response: IIF file download with QuickBooks transaction format:
+        !HDR PROD VER REL IIFVER DATE TIME ACCNT
+        HDR QuickBooks Pro 2023 R1 1 08/15/2024 14:30:22 N
+        !TRNS TRNSTYPE DATE ACCNT NAME CLASS AMOUNT DOCNUM MEMO
+        TRNS BILL 01/15/2024 Accounts Payable John Smith  150.00 CASE-2024-001 Case CASE-2024-001 - John Doe
+    
+    Note:
+        - Export only includes completed cases (status 15) with active providers
+        - IIF format ensures direct compatibility with QuickBooks import
+        - Transactions maintain proper double-entry bookkeeping principles
+        - Chart of accounts is automatically created for medical expense tracking
+        - Files are automatically backed up to S3 for audit and redundancy
+        - Transaction dates match original case dates for accurate reporting
+        - All providers are set up as vendors for proper payment tracking
+    """
     try:
         conn = get_db_connection()
         

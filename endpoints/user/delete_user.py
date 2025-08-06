@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-05 20:27:43
+# Last Modified: 2025-08-06 15:18:59
 # Author: Scott Cadreau
 
 # endpoints/user/delete_user.py
@@ -56,7 +56,164 @@ def delete_cognito_user(user_id: str) -> bool:
 @track_business_operation("delete", "user")
 def delete_user(request: Request, user_id: str = Query(..., description="The user ID to delete")):
     """
-    Delete (deactivate) user by user_id
+    Soft delete (deactivate) a user with comprehensive archiving, document management, and Cognito integration.
+    
+    This endpoint performs a comprehensive user deletion process including soft deletion in the database,
+    archiving of user documents to AWS S3, and removal from AWS Cognito User Pool. The operation includes
+    full rollback capabilities if any step fails, ensuring data consistency and system integrity.
+    
+    Key Features:
+    - Soft deletion (sets active=0) for data preservation and audit trails
+    - Automatic user document archiving to AWS S3 archive storage
+    - AWS Cognito User Pool integration for authentication cleanup
+    - Complete rollback on any operation failure
+    - Duplicate deletion protection with meaningful responses
+    - Comprehensive monitoring and error tracking
+    - Multi-stage operation with individual failure handling
+    
+    Args:
+        request (Request): FastAPI request object for logging and monitoring
+        user_id (str): Unique identifier of the user to delete (required query parameter)
+    
+    Returns:
+        dict: Response containing:
+            - statusCode (int): HTTP status code (200 for success)
+            - body (dict): Response body with:
+                - message (str): Success or status message
+                - user_id (str): The user identifier that was processed
+                - active (int): Current active status (0 after successful deletion)
+                - deactivated_at (str, optional): ISO timestamp of deactivation
+                - cognito_deleted (bool, optional): Cognito deletion success status
+                - archived (bool, optional): Document archiving success status
+                - details (str, optional): Additional information for error cases
+    
+    Raises:
+        HTTPException:
+            - 400 Bad Request: Missing user_id parameter
+            - 404 Not Found: User does not exist in the database
+            - 500 Internal Server Error: Database, archiving, or Cognito errors
+    
+    Database Operations:
+        1. Validates user existence and retrieves current active status
+        2. Checks for already inactive users (returns success with notice)
+        3. Sets active=0 to soft delete the user
+        4. Commits the transaction before external operations
+        5. Performs rollback if archiving or Cognito operations fail
+    
+    Multi-Stage Deletion Process:
+        Stage 1: Database soft deletion (active=0)
+        Stage 2: User document archiving via archive_deleted_user()
+        Stage 3: AWS Cognito User Pool deletion via delete_cognito_user()
+        
+        Failure Handling:
+        - Stage 1 failure: Transaction rollback, return error
+        - Stage 2 failure: Rollback soft delete, restore active=1
+        - Stage 3 failure: Rollback soft delete, restore active=1, note archive cleanup needed
+    
+    Document Archiving Process:
+        - Moves user documents from active storage to archive storage in AWS S3
+        - Updates document paths in database to reflect archived locations
+        - Handles all document types associated with the user
+        - Performs atomic operations with rollback on any failure
+        - Maintains document integrity and accessibility for audit purposes
+    
+    AWS Cognito Integration:
+        - Removes user from Cognito User Pool (us-east-1_whzpZgWwq)
+        - Handles user-not-found scenarios gracefully (considered success)
+        - Proper error handling for network and permission issues
+        - Rollback database changes if Cognito deletion fails
+        - Maintains authentication system consistency
+    
+    Business Logic:
+        - Users already marked as inactive return success without changes
+        - All operations must succeed or entire deletion is rolled back
+        - Archiving failure triggers automatic database rollback
+        - Cognito failure triggers automatic database rollback
+        - Manual cleanup may be required if partial operations succeed
+        - Audit trail maintained through soft deletion approach
+    
+    Monitoring & Logging:
+        - Business metrics tracking for user deletion operations
+        - Prometheus monitoring via @track_business_operation decorator
+        - Detailed execution time and response logging
+        - Specific error tracking for different failure scenarios:
+            * not_found: User doesn't exist
+            * already_inactive: User was already deleted
+            * update_failed: Database update failed
+            * archive_failed: S3 archiving failed
+            * cognito_failed: Cognito deletion failed
+            * cognito_success: Cognito deletion succeeded
+            * success: Complete deletion successful
+            * error: General errors
+    
+    Error Handling & Recovery:
+        - Graceful handling of already inactive users
+        - Automatic rollback on archiving failures
+        - Automatic rollback on Cognito failures
+        - Detailed error messages with context and next steps
+        - Connection state validation before rollback attempts
+        - Critical error logging for failed rollback scenarios
+    
+    Security Features:
+        - Soft deletion preserves data for audit and compliance
+        - Multi-system consistency (database + Cognito + S3)
+        - Proper cleanup of authentication credentials
+        - Document security through archiving rather than deletion
+        - Transaction-based operations prevent partial states
+    
+    Example Response (Success):
+        {
+            "statusCode": 200,
+            "body": {
+                "message": "User deactivated successfully",
+                "user_id": "USER123",
+                "active": 0,
+                "deactivated_at": "2024-01-15T10:30:00+00:00",
+                "cognito_deleted": true,
+                "archived": true
+            }
+        }
+    
+    Example Response (Already Inactive):
+        {
+            "statusCode": 200,
+            "body": {
+                "message": "User already inactive",
+                "user_id": "USER123",
+                "active": 0
+            }
+        }
+    
+    Example Response (Archive Failure):
+        {
+            "statusCode": 500,
+            "body": {
+                "error": "User deletion failed during archive/S3 operations: S3 bucket not accessible",
+                "user_id": "USER123",
+                "details": "User has been restored to active status"
+            }
+        }
+    
+    Example Response (Cognito Failure):
+        {
+            "statusCode": 500,
+            "body": {
+                "error": "User deletion failed during Cognito operations: Invalid credentials",
+                "user_id": "USER123",
+                "details": "User has been restored to active status. Archive operations may need manual cleanup."
+            }
+        }
+    
+    Note:
+        - This is a soft delete operation - user data is preserved for audit/compliance
+        - Archiving includes movement of all user documents to AWS S3 archive storage
+        - Failed archiving or Cognito operations automatically restore user to active status
+        - Cognito deletion removes authentication but user may need to be recreated if restored
+        - Document archiving maintains file accessibility through updated database references
+        - All operations are atomic at each stage - either complete success or complete rollback
+        - Manual cleanup of S3 archives may be required if Cognito deletion fails after archiving
+        - User restoration requires manual intervention and may need S3 document restoration
+        - Audit trails are maintained through database soft deletion and comprehensive logging
     """
     conn = None
     start_time = time.time()

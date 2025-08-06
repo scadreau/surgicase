@@ -1,5 +1,5 @@
 # Created: 2025-07-28 19:48:18
-# Last Modified: 2025-07-29 00:56:33
+# Last Modified: 2025-08-06 15:40:02
 # Author: Scott Cadreau
 
 # endpoints/exports/case_export.py
@@ -133,10 +133,91 @@ def create_cases_csv(cases: List[Dict[str, Any]], filepath: str) -> None:
 @track_business_operation("export", "cases")
 def export_cases(request: CaseExportRequest):
     """
-    Export case data with associated procedure codes.
+    Export comprehensive case data with associated procedure codes in JSON format.
     
-    Accepts a JSON request with a list of case_ids and returns all data
-    from the cases table joined with case_procedure_codes table.
+    This endpoint provides complete case data export functionality including:
+    - Comprehensive case data extraction from multiple database tables
+    - Procedure code aggregation and association per case
+    - Data validation and missing case identification
+    - Comprehensive monitoring and business metrics tracking
+    - Full request logging and execution time tracking
+    - Prometheus metrics integration for operational monitoring
+    
+    Args:
+        request (CaseExportRequest): The export request containing:
+            - case_ids (List[str]): List of case IDs to export data for
+    
+    Returns:
+        dict: Response containing:
+            - cases (List[dict]): Array of case records, each containing:
+                - All fields from the 'cases' table (case_id, user_id, case_date, patient info, etc.)
+                - procedure_codes (List[str]): Array of associated procedure codes
+            - summary (dict): Export metadata including:
+                - total_requested (int): Number of case IDs requested
+                - total_found (int): Number of cases successfully found
+                - total_missing (int): Number of cases not found
+                - found_case_ids (List[str]): List of successfully exported case IDs
+                - missing_case_ids (List[str]): List of case IDs that were not found
+    
+    Raises:
+        HTTPException: 
+            - 400 Bad Request: case_ids list is empty or missing
+            - 500 Internal Server Error: Database query failures or connection issues
+    
+    Database Operations:
+        - Executes JOIN query on 'cases' and 'case_procedure_codes' tables
+        - Uses parameterized IN clause for case ID filtering
+        - Groups results by case_id to handle multiple procedure codes per case
+        - Uses proper cursor management with DictCursor for JSON serialization
+        - Automatic connection cleanup in finally block
+    
+    Data Processing:
+        - Aggregates multiple procedure codes per case into arrays
+        - Preserves all original case table fields without modification
+        - Identifies and reports missing case IDs for validation
+        - Maintains data integrity and consistency across export
+    
+    Monitoring & Logging:
+        - Business metrics tracking for case export operations
+        - Prometheus monitoring via @track_business_operation decorator
+        - Records success/error metrics via business_metrics.record_utility_operation()
+        - Comprehensive request logging with execution time tracking
+        - Error logging with full exception details
+    
+    Example:
+        POST /export_cases
+        {
+            "case_ids": ["CASE-2024-001", "CASE-2024-002", "CASE-2024-003"]
+        }
+        
+        Response:
+        {
+            "cases": [
+                {
+                    "case_id": "CASE-2024-001",
+                    "user_id": "USER123",
+                    "case_date": "2024-01-15",
+                    "patient_first": "John",
+                    "patient_last": "Doe",
+                    "pay_amount": 150.00,
+                    "procedure_codes": ["12345", "67890"]
+                }
+            ],
+            "summary": {
+                "total_requested": 3,
+                "total_found": 1,
+                "total_missing": 2,
+                "found_case_ids": ["CASE-2024-001"],
+                "missing_case_ids": ["CASE-2024-002", "CASE-2024-003"]
+            }
+        }
+    
+    Note:
+        - Export includes all fields from the cases table
+        - Procedure codes are aggregated into arrays per case
+        - Missing cases are reported in the summary for audit purposes
+        - Export format is JSON for programmatic consumption
+        - Use /export_cases_csv for spreadsheet-compatible format
     """
     try:
         if not request.case_ids:
@@ -169,11 +250,97 @@ def export_cases(request: CaseExportRequest):
 @track_business_operation("export", "cases_csv")
 def export_cases_csv(request: CaseExportRequest):
     """
-    Export case data as CSV file with S3 storage.
+    Export comprehensive case data as downloadable CSV file with S3 backup storage.
     
-    Accepts a JSON request with a list of case_ids and returns a CSV file
-    with all data from the cases table joined with case_procedure_codes table.
-    Stores the file in S3 under the exports_csv directory.
+    This endpoint provides complete case data export functionality in CSV format including:
+    - Comprehensive case data extraction and CSV formatting
+    - Procedure code aggregation into comma-separated values
+    - File generation with automatic timestamping
+    - S3 backup storage with metadata preservation
+    - File cleanup automation for storage management
+    - Comprehensive monitoring and business metrics tracking
+    - Full request logging and execution time tracking
+    - Prometheus metrics integration for operational monitoring
+    
+    Args:
+        request (CaseExportRequest): The export request containing:
+            - case_ids (List[str]): List of case IDs to export data for
+    
+    Returns:
+        FileResponse: Direct CSV file download containing:
+            - All fields from the 'cases' table as CSV columns
+            - procedure_codes column with comma-separated procedure codes
+            - Proper CSV encoding (UTF-8) for international compatibility
+            - Headers with export metadata including:
+                - Content-Disposition: attachment with timestamped filename
+                - X-Export-Summary: JSON summary of export results
+                - X-S3-Upload-Status: S3 backup status indicator
+    
+    Raises:
+        HTTPException: 
+            - 400 Bad Request: case_ids list is empty or missing
+            - 500 Internal Server Error: Database, file system, or S3 failures
+    
+    Database Operations:
+        - Executes JOIN query on 'cases' and 'case_procedure_codes' tables
+        - Uses parameterized IN clause for case ID filtering
+        - Groups results by case_id to handle multiple procedure codes per case
+        - Uses proper cursor management with DictCursor for JSON serialization
+        - Automatic connection cleanup in finally block
+    
+    File & Storage Operations:
+        - Creates local exports directory with automatic permission handling
+        - Generates timestamped CSV filename for uniqueness
+        - Applies CSV formatting with proper field handling and encoding
+        - Uploads backup copy to S3 with comprehensive metadata
+        - Implements automatic file cleanup (7-day retention policy)
+        - Uses S3 folder prefix for organized storage structure
+    
+    Data Processing:
+        - Aggregates multiple procedure codes per case into comma-separated strings
+        - Handles NULL values and date formatting for CSV compatibility
+        - Preserves all original case table fields without modification
+        - Maintains data integrity and consistency across export
+        - Applies proper character encoding for international data
+    
+    Monitoring & Logging:
+        - Business metrics tracking for CSV export operations
+        - Prometheus monitoring via @track_business_operation decorator
+        - Records success/error metrics via business_metrics.record_utility_operation()
+        - Comprehensive request logging with execution time tracking
+        - Error logging with full exception details
+        - S3 upload status tracking and metadata logging
+    
+    File Management:
+        - Automatic directory creation with proper permissions
+        - Timestamped filename generation for collision avoidance
+        - Old file cleanup (configurable retention period)
+        - S3 backup with organized folder structure
+        - Comprehensive metadata preservation for audit trails
+    
+    Example:
+        POST /export_cases_csv
+        {
+            "case_ids": ["CASE-2024-001", "CASE-2024-002"]
+        }
+        
+        Response: CSV file download with headers:
+        Content-Disposition: attachment; filename=case_export_20240815_143022.csv
+        X-Export-Summary: {"total_requested":2,"total_found":1,"total_missing":1}
+        X-S3-Upload-Status: success
+        
+        CSV Content:
+        case_id,user_id,case_date,patient_first,patient_last,procedure_codes
+        CASE-2024-001,USER123,2024-01-15,John,Doe,"12345, 67890"
+    
+    Note:
+        - CSV includes all fields from the cases table
+        - Procedure codes are comma-separated within a single column
+        - Files are automatically backed up to S3 for redundancy
+        - Local files are cleaned up after 7 days to manage storage
+        - Export includes comprehensive metadata for audit purposes
+        - S3 storage uses organized folder structure for easy management
+        - File encoding is UTF-8 for international character support
     """
     try:
         if not request.case_ids:

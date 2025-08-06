@@ -1,5 +1,5 @@
 # Created: 2025-07-29 03:41:16
-# Last Modified: 2025-07-29 09:08:18
+# Last Modified: 2025-08-06 15:24:52
 # Author: Scott Cadreau
 
 # endpoints/backoffice/get_case_images.py
@@ -36,10 +36,181 @@ def get_case_images(
     user_id: str = Query(..., description="The user ID making the request (must be user_type >= 10)")
 ):
     """
-    Retrieve case images for specified case IDs and return as ZIP file.
-    Downloads demo_file and note_file from S3 for each case and packages them into a ZIP.
-    Images and PDFs are compressed for bandwidth optimization using ghostscript for PDFs.
-    Only accessible to users with user_type >= 10.
+    Download and package case files with intelligent compression for administrative case review and distribution.
+    
+    This endpoint provides administrative access to bulk case file downloads with advanced compression
+    and packaging capabilities. It retrieves demo files and note files from AWS S3 storage, applies
+    intelligent compression based on file type, and packages everything into a convenient ZIP archive
+    for administrative review, distribution, or offline analysis.
+    
+    Key Features:
+    - Bulk case file download and packaging from AWS S3 storage
+    - Intelligent compression system optimized by file type
+    - Advanced PDF compression using Ghostscript for quality preservation
+    - Image compression with configurable quality and size limits
+    - Temporary file management with automatic cleanup
+    - Administrative access control with comprehensive permission validation
+    - Detailed error reporting and download statistics
+    - Organized file structure within ZIP archives
+    
+    Args:
+        request (Request): FastAPI request object for logging and monitoring
+        case_request (CaseImagesRequest): Request body containing:
+            - case_ids (List[str]): List of case IDs to retrieve files for (required, non-empty)
+        user_id (str): Unique identifier of the requesting administrative user (required)
+                      Must have user_type >= 10 to access case files
+    
+    Returns:
+        FileResponse: ZIP file download containing:
+            - Organized directory structure by case (case_id_patient_name/)
+            - Compressed demo files (demo_filename)
+            - Compressed note files (note_filename)
+            - Error log file (download_errors.txt) if any download failures occurred
+            - Custom HTTP headers with download statistics:
+                * X-Downloaded-Files: Number of successfully downloaded files
+                * X-Download-Errors: Number of download failures
+                * X-Cases-Processed: Total number of cases processed
+                * X-Images-Compressed: Number of images compressed
+                * X-PDFs-Compressed: Number of PDFs compressed
+                * X-Compression-Errors: Number of compression failures
+    
+    Raises:
+        HTTPException:
+            - 400 Bad Request: Empty case_ids list provided
+            - 403 Forbidden: User does not have sufficient permissions (user_type < 10)
+            - 404 Not Found: No valid cases found for provided case_ids or no files downloaded
+            - 500 Internal Server Error: Database errors, S3 access issues, or compression failures
+    
+    Database Operations:
+        1. Validates requesting user's permission level (user_type >= 10)
+        2. Retrieves case information for provided case_ids
+        3. Fetches case details including user_id, file paths, and patient information
+        4. Validates case existence and active status
+        5. Only processes active cases (active = 1)
+    
+    AWS S3 Integration:
+        - Downloads demo_file and note_file from user-specific S3 buckets
+        - Handles S3 access errors gracefully with detailed error reporting
+        - Uses download_file_from_s3 utility for reliable file retrieval
+        - Supports various file types stored in S3 buckets
+        - Manages S3 connection timeouts and retry logic
+    
+    Compression System:
+        Image Compression (JPG, PNG, TIFF, BMP):
+        - Uses PIL/Pillow for high-quality image compression
+        - Quality setting: 75% for optimal size/quality balance
+        - Maximum width: 1600px for bandwidth optimization
+        - Preserves aspect ratio and metadata where possible
+        
+        PDF Compression:
+        - Uses Ghostscript for professional-grade PDF compression
+        - Quality setting: "screen" for aggressive size reduction
+        - Maintains text readability and structure
+        - Fallback to original file if compression fails
+        
+        Other File Types:
+        - Direct copy without compression for unsupported formats
+        - Preserves original file integrity and metadata
+    
+    File Organization:
+        - Creates case-specific subdirectories: case_id_patient_name/
+        - Organizes files by type: demo_filename, note_filename
+        - Handles special characters in patient names for filesystem compatibility
+        - Temporary file management with automatic cleanup
+        - ZIP archive with optimal compression settings
+    
+    Error Handling & Recovery:
+        - Graceful handling of individual file download failures
+        - Continues processing remaining files even if some fail
+        - Detailed error logging with specific failure reasons
+        - Download statistics tracking for operational insights
+        - Compression failure recovery with original file fallback
+    
+    Administrative Features:
+        - Bulk case file access for administrative review
+        - Compressed archives for efficient distribution
+        - Detailed download statistics for operational monitoring
+        - Error reporting for troubleshooting S3 or compression issues
+        - Patient information integration for file organization
+    
+    Temporary File Management:
+        - Creates timestamped temporary directories for isolation
+        - Automatic cleanup of temporary files after ZIP creation
+        - Efficient disk space usage during processing
+        - Error handling for cleanup failures
+        - Organized temporary file structure for processing
+    
+    Monitoring & Logging:
+        - Business metrics tracking for file download operations
+        - Compression statistics for performance monitoring
+        - Prometheus monitoring via @track_business_operation decorator
+        - Detailed execution time and response logging
+        - Administrative access tracking for security auditing
+        - Error categorization for different failure types:
+            * permission_denied: Insufficient user permissions
+            * success: Files downloaded and packaged successfully
+            * error: General download, compression, or packaging errors
+    
+    Security Features:
+        - Administrative access control (user_type >= 10 required)
+        - Permission validation before any file operations
+        - Only active cases and their files are accessible
+        - Secure temporary file handling with cleanup
+        - S3 access through authenticated download utilities
+    
+    Performance Optimizations:
+        - Intelligent compression reduces bandwidth requirements
+        - Temporary file cleanup minimizes disk usage
+        - Batch processing for multiple case files
+        - Efficient ZIP archive creation
+        - Progressive download with error recovery
+    
+    Example Request:
+        POST /get_case_images?user_id=ADMIN001
+        {
+            "case_ids": ["CASE-2024-001", "CASE-2024-002", "CASE-2024-003"]
+        }
+    
+    Example Response Headers:
+        Content-Type: application/zip
+        Content-Disposition: attachment; filename="case_images_20240815_143022.zip"
+        X-Downloaded-Files: 5
+        X-Download-Errors: 1
+        X-Cases-Processed: 3
+        X-Images-Compressed: 2
+        X-PDFs-Compressed: 3
+        X-Compression-Errors: 0
+    
+    Example Error Response (Permission Denied):
+        {
+            "detail": "User does not have permission to access case images."
+        }
+    
+    Example Error Response (No Files):
+        {
+            "detail": "No files were successfully downloaded"
+        }
+    
+    ZIP Archive Structure:
+        case_images_20240815_143022.zip
+        ├── CASE-2024-001_John_Doe/
+        │   ├── demo_surgery_video.mp4
+        │   └── note_surgical_report.pdf
+        ├── CASE-2024-002_Jane_Smith/
+        │   ├── demo_procedure.mp4
+        │   └── note_documentation.pdf
+        └── download_errors.txt (if any errors occurred)
+    
+    Note:
+        - Only active cases (active=1) and their files are processed
+        - Compression settings are optimized for healthcare file types
+        - ZIP files are created with timestamps to prevent naming conflicts
+        - Temporary directories are automatically cleaned up after processing
+        - Error logs are included in ZIP if any downloads fail
+        - Administrative users should use this for case review and distribution
+        - Large file sets may take time to process - consider batch size limits
+        - S3 access requires proper AWS credentials and permissions
+        - Ghostscript must be installed for PDF compression functionality
     """
     conn = None
     temp_dir = None

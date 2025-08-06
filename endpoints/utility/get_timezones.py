@@ -1,5 +1,5 @@
 # Created: 2025-07-31 02:14:20
-# Last Modified: 2025-07-31 02:14:46
+# Last Modified: 2025-08-06 15:42:39
 # Author: Scott Cadreau
 
 # endpoints/utility/get_timezones.py
@@ -15,11 +15,64 @@ router = APIRouter()
 @track_business_operation("get", "timezones")
 def get_timezones(request: Request):
     """
-    Get all available timezones with their identifiers and UTC offsets.
-    This endpoint provides timezone data for frontend dropdown lists.
+    Retrieve all available timezones with their identifiers and UTC offsets.
+    
+    This endpoint provides comprehensive timezone data used throughout the application
+    for proper time zone handling and display. The timezone information includes both
+    the standard timezone identifier (e.g., "America/New_York") and the corresponding
+    UTC offset for proper datetime calculations and user interface displays.
+    
+    Args:
+        request (Request): FastAPI request object for logging and monitoring
     
     Returns:
-        JSON response containing array of timezone objects with tz_identifier and utc_offset
+        dict: Response containing:
+            - timezones (List[dict]): Array of timezone objects, each containing:
+                - tz_identifier (str): Standard timezone identifier (e.g., "America/New_York")
+                - utc_offset (str): UTC offset in standard format (e.g., "-05:00")
+    
+    Raises:
+        HTTPException: 
+            - 500 Internal Server Error: Database connection or query execution errors
+    
+    Database Operations:
+        - Queries 'user_timezones' table for all available timezone data
+        - Results ordered alphabetically by timezone identifier
+        - Read-only operation with automatic connection management
+    
+    Monitoring & Logging:
+        - Business metrics tracking for timezone retrieval operations
+        - Prometheus monitoring via @track_business_operation decorator
+        - Comprehensive request logging with execution time tracking
+        - Error logging with full exception details
+    
+    Example Response:
+        {
+            "timezones": [
+                {
+                    "tz_identifier": "America/New_York",
+                    "utc_offset": "-05:00"
+                },
+                {
+                    "tz_identifier": "America/Los_Angeles", 
+                    "utc_offset": "-08:00"
+                },
+                {
+                    "tz_identifier": "UTC",
+                    "utc_offset": "+00:00"
+                }
+            ]
+        }
+    
+    Usage:
+        GET /timezones
+        
+    Notes:
+        - No authentication required for this utility endpoint
+        - Results are sorted alphabetically by timezone identifier for consistent UI presentation
+        - Used primarily for populating timezone dropdown lists in user profile and scheduling forms
+        - Timezone data supports proper datetime handling across different geographical regions
+        - UTC offsets may change due to daylight saving time transitions in some regions
     """
     conn = None
     start_time = time.time()

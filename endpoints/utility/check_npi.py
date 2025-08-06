@@ -1,5 +1,5 @@
 # Created: 2025-07-16 11:24:30
-# Last Modified: 2025-07-29 02:20:37
+# Last Modified: 2025-08-06 15:42:37
 # Author: Scott Cadreau
 
 # endpoints/utility/check_npi.py
@@ -14,6 +14,77 @@ router = APIRouter()
 @router.get("/check_npi")
 @track_business_operation("validate", "npi")
 def check_npi(request: Request, npi: str = Query(..., regex="^\\d{10}$")):
+    """
+    Validate and retrieve provider information from a National Provider Identifier (NPI).
+    
+    This endpoint validates a 10-digit NPI number by querying the official CMS National
+    Provider Identifier (NPI) Registry API. It performs comprehensive validation including
+    format checking, external API verification, and data extraction with automatic name
+    formatting standardization.
+    
+    Args:
+        request (Request): FastAPI request object for logging and monitoring
+        npi (str): 10-digit National Provider Identifier number to validate.
+                  Must be exactly 10 digits, validated by regex pattern "^\\d{10}$"
+    
+    Returns:
+        dict: Response containing validated provider information:
+            - npi (str): The validated 10-digit NPI number
+            - first_name (str): Provider's first name with proper capitalization
+            - last_name (str): Provider's last name with proper capitalization
+    
+    Raises:
+        HTTPException:
+            - 400 Bad Request: Invalid NPI format (not 10 digits)
+            - 404 Not Found: NPI not found in the CMS registry
+            - 422 Unprocessable Entity: NPI record missing required name fields
+            - 502 Bad Gateway: Failed to contact external NPI registry API
+            - 500 Internal Server Error: Unexpected processing errors
+    
+    External Dependencies:
+        - CMS NPI Registry API (https://npiregistry.cms.hhs.gov/api/)
+        - 10-second timeout on external API calls
+        - API version 2.1 for comprehensive provider data
+    
+    Data Processing:
+        - Automatic name capitalization using capitalize_name_field utility
+        - Validation of required fields (first_name, last_name) from API response
+        - JSON response parsing with error handling for malformed data
+    
+    Monitoring & Logging:
+        - Business metrics tracking with detailed operation categorization:
+          - "success": Valid NPI with complete provider information
+          - "invalid_format": Improper NPI format provided
+          - "not_found": NPI not found in registry
+          - "missing_fields": NPI found but missing required data
+          - "external_api_error": CMS API communication failure
+          - "error": Unexpected system errors
+        - Prometheus monitoring via @track_business_operation decorator
+        - Comprehensive request logging with execution time tracking
+        - Error logging with full exception details and status codes
+    
+    Example Usage:
+        GET /check_npi?npi=1234567890
+    
+    Example Response:
+        {
+            "npi": "1234567890",
+            "first_name": "John",
+            "last_name": "Smith"
+        }
+    
+    Security Considerations:
+        - Input validation prevents SQL injection through regex pattern
+        - External API timeout prevents indefinite hanging
+        - No sensitive data stored or logged from external responses
+        - Rate limiting handled by external CMS API
+    
+    Notes:
+        - No authentication required for this utility endpoint
+        - Names are automatically formatted for consistent presentation
+        - Only individual providers (Type 1 NPIs) with name fields are supported
+        - Organizational providers (Type 2 NPIs) may fail validation if missing name fields
+    """
     start_time = time.time()
     response_status = 200
     response_data = None

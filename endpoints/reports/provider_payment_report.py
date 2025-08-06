@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-08-04 15:51:53
+# Last Modified: 2025-08-06 15:29:28
 # Author: Scott Cadreau
 
 # endpoints/reports/provider_payment_report.py
@@ -238,8 +238,173 @@ def generate_provider_payment_report(
     email_type: Optional[str] = Query("on_demand", description="Email template type: 'weekly' or 'on_demand'")
 ):
     """
-    Generate a provider payment report as a PDF file.
-    Returns cases with case_status=1 grouped by provider.
+    Generate comprehensive provider payment reports with automated distribution and cloud storage integration.
+    
+    This endpoint produces professional PDF payment reports for healthcare providers showing pending payment
+    cases with detailed financial information, procedure codes, and projected payment dates. The system
+    handles report generation, AWS S3 storage, automated email distribution, and local file management
+    with comprehensive monitoring and error handling.
+    
+    Key Features:
+    - Professional PDF report generation with provider-specific sections
+    - Automated AWS S3 cloud storage with metadata and version control
+    - Multi-recipient email distribution with customizable templates
+    - Flexible date range and provider filtering capabilities
+    - Projected payment date calculations (upcoming Friday logic)
+    - Comprehensive financial summaries and case breakdowns
+    - Automatic file cleanup and storage optimization
+    - Real-time report generation with immediate download capability
+    
+    Args:
+        start_date (str, optional): Start date for case filtering in YYYY-MM-DD format
+                                   Filters cases where case_date >= start_date
+        end_date (str, optional): End date for case filtering in YYYY-MM-DD format
+                                 Filters cases where case_date <= end_date
+        user_id (str, optional): Specific provider user_id to filter results
+                                When provided, generates single-provider report
+        email_type (str, optional): Email template type for notifications:
+                                   - "weekly": Automated weekly report template
+                                   - "on_demand": Manual/ad-hoc report template
+                                   Default: "on_demand"
+    
+    Returns:
+        FileResponse: PDF file download with comprehensive metadata headers:
+            - Content-Type: application/pdf
+            - Content-Disposition: attachment with timestamped filename
+            - Cache-Control: no-cache for security
+            - Content-Length: File size in bytes
+            - X-S3-URL: AWS S3 storage URL for cloud access
+            - X-S3-Key: S3 object key for cloud reference
+            - X-S3-Upload-Success: S3 upload success status
+            - X-Email-Sent: Email notification success status
+            - X-Email-Count: Number of emails successfully sent
+            - X-Email-Total-Recipients: Total recipient count
+    
+    Raises:
+        HTTPException:
+            - 404 Not Found: No cases found matching the specified criteria
+            - 500 Internal Server Error: Report generation, S3 upload, or email errors
+    
+    Database Operations:
+        1. Queries cases with case_status = 15 (pending payment status)
+        2. Joins with user_profile for provider information
+        3. Filters by active status (cases and users)
+        4. Excludes system/test accounts from reporting
+        5. Retrieves procedure codes for each case
+        6. Applies date and provider filtering as specified
+        7. Groups results by provider for organized reporting
+    
+    Report Content Structure:
+        PDF Header:
+        - All-Stars Surgical Assist branding
+        - Report generation date in user's timezone
+        - Professional formatting with consistent styling
+        
+        Provider Sections (one per page):
+        - Provider name with proper capitalization
+        - NPI (National Provider Identifier) display
+        - Projected payment date (upcoming Friday)
+        - Tabular case listing with columns:
+            * Case Date
+            * Patient Name (properly capitalized)
+            * Procedure Codes
+            * Payment Category
+            * Payment Amount
+        - Provider-specific financial totals
+        
+        Summary Section:
+        - Total payment amount across all providers
+        - Total case count
+        - Total provider count
+        - Report generation metadata
+    
+    Payment Logic & Business Rules:
+        - Only includes cases with case_status = 15 (ready for payment)
+        - Excludes specific system accounts from payment calculations
+        - Projected pay dates calculated as upcoming Friday
+        - Payment amounts retrieved from pay_amount field
+        - Payment categories included for classification
+        - Active cases and users only
+    
+    AWS S3 Integration:
+        - Automatic upload to configured S3 bucket
+        - Metadata tagging with report details:
+            * Report type, generation source
+            * Provider count, case count, total amount
+            * Filter parameters applied
+            * Timestamp and version information
+        - S3 URL generation for cloud access
+        - Error handling with fallback to local storage
+    
+    Email Distribution System:
+        - Multi-recipient automated email sending
+        - Template-based email formatting (weekly vs on-demand)
+        - PDF attachment with secure delivery
+        - Timezone-aware date formatting for recipients
+        - Comprehensive delivery tracking and error reporting
+        - Failed email logging without blocking report generation
+    
+    File Management:
+        - Timestamped filename generation for uniqueness
+        - Local storage in dedicated reports directory
+        - Automatic cleanup of reports older than 7 days
+        - File size optimization and compression
+        - Secure temporary file handling
+    
+    Text Formatting & Presentation:
+        - Proper name capitalization using capitalize_name_field utility
+        - Professional PDF layout with consistent fonts and spacing
+        - Timezone-aware date formatting for user context
+        - Currency formatting for financial amounts
+        - Procedure code formatting and display
+    
+    Monitoring & Analytics:
+        - Business metrics tracking for report generation operations
+        - Prometheus monitoring via @track_business_operation decorator
+        - Success/failure tracking for all operations
+        - Performance metrics for generation time
+        - Email delivery analytics and error tracking
+        - S3 upload success monitoring
+    
+    Example Usage:
+        GET /provider_payment_report
+        GET /provider_payment_report?start_date=2024-01-01&end_date=2024-01-31
+        GET /provider_payment_report?user_id=PROV123&email_type=weekly
+        GET /provider_payment_report?start_date=2024-01-15&user_id=PROV456
+    
+    Example Response Headers:
+        Content-Type: application/pdf
+        Content-Disposition: attachment; filename="provider_payment_report_20240815_143022.pdf"
+        Cache-Control: no-cache
+        Content-Length: 245760
+        X-S3-URL: https://bucket.s3.amazonaws.com/reports/provider_payment_report_20240815_143022.pdf
+        X-S3-Key: reports/provider_payment_report_20240815_143022.pdf
+        X-S3-Upload-Success: True
+        X-Email-Sent: True
+        X-Email-Count: 5
+        X-Email-Total-Recipients: 8
+    
+    Report File Structure:
+        provider_payment_report_20240815_143022.pdf
+        ├── Header: All-Stars Surgical Assist branding
+        ├── Provider Section 1: Dr. John Smith (NPI: 1234567890)
+        │   ├── Projected Pay Date: August 16, 2024
+        │   ├── Case Table: Date | Patient | Procedures | Category | Amount
+        │   └── Provider Total: $2,500.00
+        ├── Provider Section 2: Dr. Jane Doe (NPI: 0987654321)
+        │   └── [Similar structure]
+        └── Summary: Total Amount: $15,750.00 | 3 Providers | 12 Cases
+    
+    Note:
+        - Report generation may take time for large datasets
+        - S3 upload provides cloud backup and sharing capabilities
+        - Email notifications enhance workflow automation
+        - Timezone formatting ensures proper date display for users
+        - File cleanup prevents storage bloat
+        - System accounts are automatically excluded from payment reports
+        - Projected payment dates follow business rule of upcoming Friday
+        - Report security handled through access control and temporary file management
+        - Professional formatting suitable for financial documentation and audit purposes
     """
     try:
         conn = get_db_connection()

@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-29 02:21:11
+# Last Modified: 2025-08-06 15:18:59
 # Author: Scott Cadreau
 
 # endpoints/user/get_user.py
@@ -15,7 +15,157 @@ router = APIRouter()
 @track_business_operation("read", "user")
 def get_user(request: Request, user_id: str = Query(..., description="The user ID to retrieve")):
     """
-    Retrieve user information by user_id
+    Retrieve comprehensive user profile information including personal details and associated documents.
+    
+    This endpoint fetches complete user profile data from the user_profile table along with all
+    associated documents from the user_documents table. Only active users are returned,
+    ensuring soft-deleted users are properly excluded from system access.
+    
+    Key Features:
+    - Complete user profile retrieval with validation
+    - Associated document metadata inclusion
+    - Active user filtering (soft-delete protection)
+    - Comprehensive error handling and monitoring
+    - Professional information access (NPI, licensing, etc.)
+    - Contact and address information retrieval
+    - User type and preference information
+    
+    Args:
+        request (Request): FastAPI request object for logging and monitoring
+        user_id (str): Unique identifier of the user to retrieve (required query parameter)
+    
+    Returns:
+        dict: Response containing:
+            - user (dict): Complete user profile object with:
+                - user_id (str): Unique user identifier
+                - user_email (str): User's email address
+                - first_name (str): User's first name
+                - last_name (str): User's last name
+                - addr1 (str): Primary address line
+                - addr2 (str): Secondary address line
+                - city (str): City of residence
+                - state (str): State/province of residence
+                - zipcode (str): Postal/ZIP code
+                - telephone (str): Primary phone number
+                - user_npi (str): National Provider Identifier for healthcare professionals
+                - referred_by_user (str): ID of referring user
+                - user_type (str): User classification/role type
+                - message_pref (str): Communication preference settings
+                - states_licensed (str): States where user holds professional licenses
+                - documents (List[dict]): Array of user documents:
+                    - document_type (str): Type/category of document
+                    - document_name (str): Name/path of the document file
+            - user_id (str): The user ID that was requested (for convenience)
+    
+    Raises:
+        HTTPException:
+            - 400 Bad Request: Missing user_id parameter
+            - 404 Not Found: User does not exist or is inactive (soft-deleted)
+            - 500 Internal Server Error: Database connection or query errors
+    
+    Database Operations:
+        1. Validates user_id parameter presence
+        2. Queries user_profile table for active user data
+        3. Fetches associated documents from user_documents table
+        4. Combines profile and document data into unified response
+        5. Ensures only active users (active=1) are accessible
+    
+    Active User Filtering:
+        - Only users with active=1 status are returned
+        - Soft-deleted users (active=0) return 404 Not Found
+        - This ensures deactivated users cannot access the system
+        - Maintains data integrity while preserving audit trails
+    
+    Document Integration:
+        - Fetches all documents associated with the user
+        - Documents include type classification and file references
+        - Empty documents array returned if no documents exist
+        - Document metadata only (actual files stored separately)
+    
+    Professional Information:
+        - NPI (National Provider Identifier) for healthcare professionals
+        - State licensing information for regulatory compliance
+        - User type classification for role-based access control
+        - Referral chain information for business relationships
+    
+    Monitoring & Logging:
+        - Business metrics tracking for user read operations
+        - Prometheus monitoring via @track_business_operation decorator
+        - Execution time tracking and detailed response logging
+        - Error categorization for different failure types:
+            * not_found: User doesn't exist or is inactive
+            * success: User data retrieved successfully
+            * error: General database or connection errors
+    
+    Security Features:
+        - Only active users can be retrieved
+        - Soft-deleted users properly excluded
+        - All database queries use parameterized statements
+        - No sensitive authentication data included in response
+    
+    Performance Optimizations:
+        - Single database connection for all operations
+        - Efficient JOIN-like operations with separate queries
+        - Proper connection management with automatic cleanup
+        - Minimal database round trips
+    
+    Data Integrity:
+        - Consistent user data retrieval
+        - Document associations properly maintained
+        - Active status validation prevents access to deactivated accounts
+        - Transactional data consistency
+    
+    Example Usage:
+        GET /user?user_id=USER123
+    
+    Example Response:
+        {
+            "user": {
+                "user_id": "USER123",
+                "user_email": "doctor@example.com",
+                "first_name": "Dr. Jane",
+                "last_name": "Smith",
+                "addr1": "123 Medical Center Dr",
+                "addr2": "Suite 456",
+                "city": "Healthcare City",
+                "state": "CA",
+                "zipcode": "90210",
+                "telephone": "+1-555-0123",
+                "user_npi": "1234567890",
+                "referred_by_user": "ADMIN001",
+                "user_type": "physician",
+                "message_pref": "email",
+                "states_licensed": "CA,NY,TX",
+                "documents": [
+                    {
+                        "document_type": "medical_license",
+                        "document_name": "ca_medical_license.pdf"
+                    },
+                    {
+                        "document_type": "malpractice_insurance", 
+                        "document_name": "insurance_cert_2024.pdf"
+                    }
+                ]
+            },
+            "user_id": "USER123"
+        }
+    
+    Example Error Response (Not Found):
+        {
+            "error": "User not found",
+            "user_id": "INVALID_USER"
+        }
+    
+    Note:
+        - Only active users (active=1) are accessible through this endpoint
+        - Soft-deleted users return 404 to maintain security
+        - Documents array will be empty if no documents are associated
+        - All user profile fields may be null depending on data completeness
+        - NPI and licensing information only relevant for healthcare professionals
+        - User type determines available system functionality
+        - Document files are stored separately; only metadata is returned
+        - Timezone information affects user experience but not core functionality
+        - Communication preferences control system notification behavior
     """
     conn = None
     start_time = time.time()

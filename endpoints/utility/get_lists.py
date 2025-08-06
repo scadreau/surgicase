@@ -1,5 +1,5 @@
 # Created: 2025-08-05 22:15:27
-# Last Modified: 2025-08-06 11:34:28
+# Last Modified: 2025-08-06 15:45:44
 # Author: Scott Cadreau
 
 # endpoints/utility/get_lists.py
@@ -40,9 +40,78 @@ def validate_user_access(user_id: str, conn) -> bool:
 @track_business_operation("get", "user_types")
 def get_user_types(request: Request, user_id: str = Query(..., description="User ID for authorization")):
     """
-    Get all user types with user_type < 1000.
-    Returns user_type, user_type_desc, user_max_case_status from user_type_list table.
-    Requires user_type >= 100 for access.
+    Retrieve all user types below administrative level for role management and assignment.
+    
+    This endpoint provides access to the user type hierarchy used throughout the application
+    for role-based access control, permission management, and user categorization. It returns
+    all user types with type value less than 1000, excluding high-level administrative roles
+    that are restricted from general visibility.
+    
+    Args:
+        request (Request): FastAPI request object for logging and monitoring
+        user_id (str): User ID for authorization validation.
+                      Must have user_type >= 100 for access to this administrative data.
+    
+    Returns:
+        dict: Response containing:
+            - user_types (List[dict]): Array of user type objects, each containing:
+                - user_type (int): Numeric user type identifier/level
+                - user_type_desc (str): Human-readable description of the user type
+                - user_max_case_status (int): Maximum case status this user type can access
+    
+    Raises:
+        HTTPException:
+            - 404 Not Found: User not found or inactive in user_profile table
+            - 403 Forbidden: User has insufficient privileges (user_type < 100)
+            - 500 Internal Server Error: Database connection or query execution errors
+    
+    Authorization:
+        - Requires user_type >= 100 for access to user type management data
+        - Uses validate_user_access() helper function for consistent authorization
+        - Validates user exists and is active in user_profile table
+    
+    Database Operations:
+        - Queries 'user_type_list' table for types where user_type < 1000
+        - Filters out high-level administrative roles (>= 1000)
+        - Returns role hierarchy information for permission calculations
+        - Read-only operation with automatic connection management
+    
+    Monitoring & Logging:
+        - Business metrics tracking for user type retrieval operations
+        - Prometheus monitoring via @track_business_operation decorator
+        - Comprehensive request logging with user ID tracking
+        - Authorization failure tracking for security monitoring
+    
+    Example Response:
+        {
+            "user_types": [
+                {
+                    "user_type": 100,
+                    "user_type_desc": "Basic User",
+                    "user_max_case_status": 3
+                },
+                {
+                    "user_type": 200,
+                    "user_type_desc": "Advanced User", 
+                    "user_max_case_status": 5
+                },
+                {
+                    "user_type": 500,
+                    "user_type_desc": "Manager",
+                    "user_max_case_status": 8
+                }
+            ]
+        }
+    
+    Usage:
+        GET /user_types?user_id=USER123
+        
+    Notes:
+        - Excludes super-administrative roles (user_type >= 1000) for security
+        - user_max_case_status determines case visibility and access permissions
+        - Used for populating user type dropdown lists in administrative interfaces
+        - Essential for role-based access control throughout the application
+        - Authorization required to prevent unauthorized access to user hierarchy information
     """
     conn = None
     start_time = time.time()
@@ -108,9 +177,82 @@ def get_user_types(request: Request, user_id: str = Query(..., description="User
 @track_business_operation("get", "case_statuses")
 def get_case_statuses(request: Request, user_id: str = Query(..., description="User ID for authorization")):
     """
-    Get all case statuses.
-    Returns case_status, case_status_desc from case_status_list table.
-    Requires user_type >= 100 for access.
+    Retrieve all available case status levels for case management and workflow control.
+    
+    This endpoint provides access to the complete case status hierarchy used throughout
+    the application for case lifecycle management, workflow automation, and access control.
+    Case statuses define the progression of surgical cases from initial creation through
+    completion and payment processing.
+    
+    Args:
+        request (Request): FastAPI request object for logging and monitoring
+        user_id (str): User ID for authorization validation.
+                      Must have user_type >= 100 for access to case management data.
+    
+    Returns:
+        dict: Response containing:
+            - case_statuses (List[dict]): Array of case status objects, each containing:
+                - case_status (int): Numeric case status identifier/level
+                - case_status_desc (str): Human-readable description of the case status
+    
+    Raises:
+        HTTPException:
+            - 404 Not Found: User not found or inactive in user_profile table
+            - 403 Forbidden: User has insufficient privileges (user_type < 100)
+            - 500 Internal Server Error: Database connection or query execution errors
+    
+    Authorization:
+        - Requires user_type >= 100 for access to case status management data
+        - Uses validate_user_access() helper function for consistent authorization
+        - Validates user exists and is active in user_profile table
+    
+    Database Operations:
+        - Queries 'case_status_list' table for all available case statuses
+        - Returns complete status hierarchy for workflow management
+        - Read-only operation with automatic connection management
+        - Results may be ordered by case_status value (database default)
+    
+    Monitoring & Logging:
+        - Business metrics tracking for case status retrieval operations
+        - Prometheus monitoring via @track_business_operation decorator
+        - Comprehensive request logging with user ID tracking
+        - Authorization failure tracking for security monitoring
+    
+    Example Response:
+        {
+            "case_statuses": [
+                {
+                    "case_status": 1,
+                    "case_status_desc": "Draft"
+                },
+                {
+                    "case_status": 2,
+                    "case_status_desc": "Submitted"
+                },
+                {
+                    "case_status": 3,
+                    "case_status_desc": "In Review"
+                },
+                {
+                    "case_status": 4,
+                    "case_status_desc": "Approved"
+                },
+                {
+                    "case_status": 5,
+                    "case_status_desc": "Completed"
+                }
+            ]
+        }
+    
+    Usage:
+        GET /case_statuses?user_id=USER123
+        
+    Notes:
+        - Case status levels determine user access permissions and workflow progression
+        - Used for populating case status dropdown lists in case management interfaces
+        - Essential for case lifecycle management and automated status transitions
+        - Authorization required to prevent unauthorized access to case workflow information
+        - Integrates with user_max_case_status for role-based case access control
     """
     conn = None
     start_time = time.time()
@@ -176,9 +318,78 @@ def get_case_statuses(request: Request, user_id: str = Query(..., description="U
 @track_business_operation("get", "user_doc_types")
 def get_user_doc_types(request: Request, user_id: str = Query(..., description="User ID for authorization")):
     """
-    Get all user document types.
-    Returns doc_type, doc_prefix from user_doc_type_list table.
-    Requires user_type >= 100 for access.
+    Retrieve all available user document types for document management and categorization.
+    
+    This endpoint provides access to the document type categories used for organizing
+    and classifying user-uploaded documents such as licenses, certifications, insurance
+    documents, and other professional credentials. The document types include both
+    the display name and file naming prefix for systematic document organization.
+    
+    Args:
+        request (Request): FastAPI request object for logging and monitoring
+        user_id (str): User ID for authorization validation.
+                      Must have user_type >= 100 for access to document management data.
+    
+    Returns:
+        dict: Response containing:
+            - user_doc_types (List[dict]): Array of document type objects, each containing:
+                - doc_type (str): Human-readable document type category name
+                - doc_prefix (str): File naming prefix used for systematic document organization
+    
+    Raises:
+        HTTPException:
+            - 404 Not Found: User not found or inactive in user_profile table
+            - 403 Forbidden: User has insufficient privileges (user_type < 100)
+            - 500 Internal Server Error: Database connection or query execution errors
+    
+    Authorization:
+        - Requires user_type >= 100 for access to document management data
+        - Uses validate_user_access() helper function for consistent authorization
+        - Validates user exists and is active in user_profile table
+    
+    Database Operations:
+        - Queries 'user_doc_type_list' table for all available document types
+        - Returns document categorization and file naming information
+        - Read-only operation with automatic connection management
+        - Results may be ordered by doc_type (database default)
+    
+    Monitoring & Logging:
+        - Business metrics tracking for user document type retrieval operations
+        - Prometheus monitoring via @track_business_operation decorator
+        - Comprehensive request logging with user ID tracking
+        - Authorization failure tracking for security monitoring
+    
+    Example Response:
+        {
+            "user_doc_types": [
+                {
+                    "doc_type": "Medical License",
+                    "doc_prefix": "LIC"
+                },
+                {
+                    "doc_type": "Board Certification",
+                    "doc_prefix": "CERT"
+                },
+                {
+                    "doc_type": "DEA Registration",
+                    "doc_prefix": "DEA"
+                },
+                {
+                    "doc_type": "Malpractice Insurance",
+                    "doc_prefix": "INS"
+                }
+            ]
+        }
+    
+    Usage:
+        GET /user_doc_types?user_id=USER123
+        
+    Notes:
+        - doc_prefix is used for systematic file naming and organization in document storage
+        - Used for populating document type dropdown lists in document upload interfaces
+        - Essential for document categorization and retrieval systems
+        - Authorization required to prevent unauthorized access to document type information
+        - Integrates with user document upload and management workflows
     """
     conn = None
     start_time = time.time()
@@ -244,9 +455,77 @@ def get_user_doc_types(request: Request, user_id: str = Query(..., description="
 @track_business_operation("get", "faqs")
 def get_faqs(request: Request, user_id: str = Query(..., description="User ID for authorization")):
     """
-    Get FAQ entries based on user type.
-    Returns faq_header, faq_text from faq_list table filtered by user_type.
-    Sorts results by display_order.
+    Retrieve frequently asked questions tailored to the user's type and access level.
+    
+    This endpoint provides role-specific FAQ content to help users understand
+    functionality and procedures relevant to their user type and permissions level.
+    The FAQ system delivers contextual help information organized by display order
+    to provide optimal user experience and reduce support requests.
+    
+    Args:
+        request (Request): FastAPI request object for logging and monitoring
+        user_id (str): User ID for authorization and user type determination.
+                      Must exist in user_profile table as an active user.
+    
+    Returns:
+        dict: Response containing:
+            - faqs (List[dict]): Array of FAQ objects relevant to user's type, each containing:
+                - faq_header (str): Question or topic title for the FAQ entry
+                - faq_text (str): Detailed answer or explanation content
+    
+    Raises:
+        HTTPException:
+            - 404 Not Found: User not found or inactive in user_profile table
+            - 500 Internal Server Error: Database connection or query execution errors
+    
+    User Type Filtering:
+        - Automatically determines user's user_type from user_profile table
+        - Returns only FAQ entries matching the user's specific user_type
+        - Ensures users see relevant content appropriate to their access level
+        - No manual user_type >= 100 validation (uses individual user's type)
+    
+    Database Operations:
+        - First queries 'user_profile' table to determine user's type and validate existence
+        - Then queries 'faq_list' table for FAQs matching the user's user_type
+        - Results ordered by display_order for optimal presentation sequence
+        - Read-only operations with automatic connection management
+    
+    Monitoring & Logging:
+        - Business metrics tracking for FAQ retrieval operations:
+          - "success": FAQs successfully retrieved for user type
+          - "user_not_found": User validation failed
+          - "error": Database or processing errors
+        - Prometheus monitoring via @track_business_operation decorator
+        - Comprehensive request logging with user ID tracking
+        - User validation failure tracking for security monitoring
+    
+    Example Response:
+        {
+            "faqs": [
+                {
+                    "faq_header": "How do I create a new case?",
+                    "faq_text": "To create a new case, navigate to the Cases section and click 'Add New Case'. Fill in the required patient and procedure information, then save."
+                },
+                {
+                    "faq_header": "What documents can I upload?",
+                    "faq_text": "You can upload medical licenses, board certifications, DEA registrations, and malpractice insurance documents in PDF format."
+                },
+                {
+                    "faq_header": "How do I update my profile information?",
+                    "faq_text": "Go to the Profile section in the main menu. You can update your contact information, address, and professional details there."
+                }
+            ]
+        }
+    
+    Usage:
+        GET /faqs?user_id=USER123
+        
+    Notes:
+        - FAQ content is automatically filtered by user type for relevance
+        - Results are ordered by display_order to provide logical information flow
+        - Used for contextual help systems and user onboarding processes
+        - No authorization level requirement (individual user validation only)
+        - Content varies based on user's role and permission level in the system
     """
     conn = None
     start_time = time.time()

@@ -1,5 +1,5 @@
 # Created: 2025-07-30 22:59:57
-# Last Modified: 2025-07-30 23:01:32
+# Last Modified: 2025-08-06 15:25:56
 # Author: Scott Cadreau
 
 # endpoints/backoffice/build_dashboard.py
@@ -27,17 +27,204 @@ def build_dashboard(
     end_date: Optional[str] = Query(None, description="End date for case filtering (YYYY-MM-DD format)")
 ):
     """
-    Build a comprehensive dashboard combining health data, case dashboard data, and user dashboard data.
-    Returns a cohesive JSON response with all information from the three functions.
+    Generate comprehensive administrative dashboard with integrated health monitoring, case analytics, and user insights.
+    
+    This endpoint serves as the central hub for administrative oversight, combining real-time system health
+    monitoring, case management analytics, and user distribution insights into a unified dashboard view.
+    It orchestrates data collection from multiple subsystems with intelligent error handling, ensuring
+    administrators receive complete operational visibility even when individual components experience issues.
+    
+    Key Features:
+    - Unified dashboard combining health, case, and user analytics
+    - Intelligent error isolation preventing total failure from partial issues
+    - Real-time system health monitoring integration
+    - Case analytics with optional date filtering for temporal analysis
+    - User distribution insights across organizational structure
+    - Administrative access control with comprehensive permission validation
+    - Graceful degradation with partial data availability
+    - Centralized operational monitoring and business intelligence
     
     Args:
-        request: FastAPI request object
-        user_id: The user ID making the request (must be user_type >= 10)
-        start_date: Optional start date for case filtering (YYYY-MM-DD format)
-        end_date: Optional end date for case filtering (YYYY-MM-DD format)
+        request (Request): FastAPI request object for logging and monitoring
+        user_id (str): Unique identifier of the requesting administrative user (required)
+                      Must have user_type >= 10 to access comprehensive dashboard data
+        start_date (str, optional): Start date for case filtering in YYYY-MM-DD format
+                                   Applied to case analytics component
+        end_date (str, optional): End date for case filtering in YYYY-MM-DD format
+                                 Applied to case analytics component
     
     Returns:
-        Dict containing combined data from health, case_dashboard_data, and user_dashboard_data functions
+        dict: Comprehensive dashboard response containing:
+            - dashboard_type (str): Type identifier ("comprehensive")
+            - timestamp (str): Dashboard generation timestamp in ISO format
+            - execution_time_ms (int): Total execution time in milliseconds
+            - request_filters (dict): Applied filter parameters:
+                - user_id (str): Requesting user identifier
+                - start_date (str): Start date filter (or null)
+                - end_date (str): End date filter (or null)
+            - data (dict): Integrated data from all subsystems:
+                - health (dict): System health monitoring data:
+                    - status (str): Overall system health status
+                    - services (List): Individual service health information
+                    - summary (dict): Health summary statistics
+                    - timestamp (str): Health check timestamp
+                - cases (dict): Case analytics dashboard data:
+                    - dashboard_data (List): Case status distribution and financials
+                    - summary (dict): Aggregate case statistics
+                    - filters (dict): Applied date filters
+                - users (dict): User analytics dashboard data:
+                    - user_types (List): User type distribution statistics
+                    - summary (dict): User base summary statistics
+            - summary (dict): High-level dashboard summary:
+                - overall_health (str): System health status
+                - total_cases (int): Total case count from analytics
+                - total_users (int): Total user count from analytics
+                - case_total_amount (str): Financial total from case analytics
+                - healthy_services (int): Number of healthy system services
+                - total_services (int): Total number of monitored services
+            - errors (List, optional): Collection errors if any subsystem failed
+            - status (str): Dashboard completion status ("complete" or "partial")
+    
+    Raises:
+        HTTPException:
+            - 403 Forbidden: User does not have sufficient permissions (user_type < 10)
+            - 500 Internal Server Error: Critical dashboard assembly errors
+    
+    Dashboard Components:
+        1. Health Monitoring System:
+           - Real-time service health checks
+           - System resource monitoring
+           - Service availability tracking
+           - Performance metrics collection
+           
+        2. Case Analytics Dashboard:
+           - Case status distribution analysis
+           - Financial performance tracking
+           - Time-based filtering capabilities
+           - Operational workflow insights
+           
+        3. User Analytics Dashboard:
+           - User type distribution statistics
+           - Organizational composition analysis
+           - Platform adoption metrics
+           - Role-based user insights
+    
+    Error Isolation & Recovery:
+        - Independent data collection from each subsystem
+        - Continues dashboard assembly even if individual components fail
+        - Error details captured without affecting other components
+        - Graceful degradation with partial data availability
+        - Detailed error logging for troubleshooting
+        - Fallback data structures for failed components
+    
+    Administrative Intelligence:
+        - Unified operational oversight across all system components
+        - Real-time health monitoring for proactive issue detection
+        - Financial and operational analytics for business intelligence
+        - User base insights for organizational planning
+        - Historical trending through date-filtered analytics
+        - Performance monitoring across all subsystems
+    
+    Data Integration Logic:
+        - Sequential data collection with independent error handling
+        - Timestamp coordination across all data sources
+        - Filter parameter propagation to relevant components
+        - Data structure standardization for consistent presentation
+        - Summary calculation aggregation from all sources
+    
+    Permission & Security:
+        - Administrative access control (user_type >= 10 required)
+        - Permission validation before any data collection
+        - Secure access to sensitive operational data
+        - Audit logging for administrative dashboard access
+        - Cross-component security validation
+    
+    Performance Features:
+        - Parallel data collection where possible
+        - Efficient error isolation preventing cascade failures
+        - Optimized data aggregation and summary calculation
+        - Minimal database connection overhead
+        - Intelligent caching where appropriate
+    
+    Monitoring & Logging:
+        - Business metrics tracking for dashboard access operations
+        - Prometheus monitoring via @track_business_operation decorator
+        - Comprehensive execution time tracking
+        - Error categorization across all subsystems
+        - Administrative access auditing
+        - Performance metrics for dashboard assembly
+    
+    Example Usage:
+        GET /build_dashboard?user_id=ADMIN001
+        GET /build_dashboard?user_id=ADMIN001&start_date=2024-01-01&end_date=2024-01-31
+    
+    Example Response:
+        {
+            "dashboard_type": "comprehensive",
+            "timestamp": "2024-01-15T10:30:00Z",
+            "execution_time_ms": 1250,
+            "request_filters": {
+                "user_id": "ADMIN001",
+                "start_date": "2024-01-01",
+                "end_date": "2024-01-31"
+            },
+            "data": {
+                "health": {
+                    "status": "healthy",
+                    "services": [...],
+                    "summary": {"healthy": 5, "total_services": 5}
+                },
+                "cases": {
+                    "dashboard_data": [...],
+                    "summary": {"total_cases": 150, "total_amount": "225000.00"}
+                },
+                "users": {
+                    "user_types": [...],
+                    "summary": {"total_users": 45}
+                }
+            },
+            "summary": {
+                "overall_health": "healthy",
+                "total_cases": 150,
+                "total_users": 45,
+                "case_total_amount": "225000.00",
+                "healthy_services": 5,
+                "total_services": 5
+            },
+            "errors": null,
+            "status": "complete"
+        }
+    
+    Example Response (Partial Data):
+        {
+            "dashboard_type": "comprehensive",
+            "timestamp": "2024-01-15T10:30:00Z",
+            "execution_time_ms": 1500,
+            "data": {
+                "health": {"status": "error", "error": "Service unavailable"},
+                "cases": {...},
+                "users": {...}
+            },
+            "summary": {...},
+            "errors": ["Health data collection failed: Service unavailable"],
+            "status": "partial"
+        }
+    
+    Example Error Response (Permission Denied):
+        {
+            "detail": "User does not have permission to access dashboard data."
+        }
+    
+    Note:
+        - Dashboard provides unified view of all operational aspects
+        - Error isolation ensures partial data availability during issues
+        - Date filtering applies only to case analytics component
+        - Health monitoring provides real-time system status
+        - Summary statistics enable quick operational assessment
+        - Administrative users should use this for comprehensive oversight
+        - Partial data availability indicated by "status" field
+        - Error details provided for troubleshooting subsystem issues
+        - Dashboard generation time tracked for performance monitoring
     """
     conn = None
     start_time = time.time()

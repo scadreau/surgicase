@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-29 02:27:31
+# Last Modified: 2025-08-06 15:12:18
 # Author: Scott Cadreau
 
 # endpoints/case/create_case.py
@@ -79,7 +79,87 @@ def create_case_with_procedures(case: CaseCreate, conn) -> dict:
 @track_business_operation("create", "case")
 def add_case(case: CaseCreate, request: Request):
     """
-    Add a new case to the cases table and its procedure codes to case_procedure_codes table.
+    Create a new surgical case with associated procedure codes and automatic processing.
+    
+    This endpoint provides comprehensive case creation functionality including:
+    - Case validation and duplicate prevention
+    - Transactional database operations for data integrity
+    - Automatic procedure code association
+    - Pay amount calculation based on procedure codes
+    - Case status updates when applicable
+    - Full monitoring and logging integration
+    - Prometheus metrics tracking
+    
+    Args:
+        case (CaseCreate): The case data model containing:
+            - case_id (str): Unique identifier for the case
+            - user_id (str): ID of the user creating the case
+            - case_date (date): Date when the surgery/case occurred
+            - patient (Patient): Patient information including:
+                - first (str): Patient's first name
+                - last (str): Patient's last name
+                - ins_provider (str): Insurance provider information
+            - surgeon_id (str): Identifier for the operating surgeon
+            - facility_id (str): Identifier for the surgical facility
+            - procedure_codes (List[str], optional): List of medical procedure codes
+            - demo_file (str, optional): Path to demonstration file
+            - note_file (str, optional): Path to notes file
+            - misc_file (str, optional): Path to miscellaneous file
+        request (Request): FastAPI request object for logging and monitoring
+    
+    Returns:
+        dict: Response containing:
+            - message (str): Success confirmation message
+            - user_id (str): The user ID who created the case
+            - case_id (str): The created case identifier
+            - procedure_codes (List[str]): Associated procedure codes
+            - status_update (dict): Results of automatic status update process
+            - pay_amount_update (dict): Results of pay amount calculation
+    
+    Raises:
+        HTTPException: 
+            - 409 Conflict: Case with the same case_id already exists
+            - 500 Internal Server Error: Database or processing errors
+    
+    Database Operations:
+        - Inserts record into 'cases' table with patient and case details
+        - Batch inserts procedure codes into 'case_procedure_codes' table
+        - Triggers automatic pay amount calculation via update_case_pay_amount()
+        - Triggers automatic case status update via update_case_status()
+        - All operations wrapped in a database transaction for atomicity
+    
+    Monitoring & Logging:
+        - Business metrics tracking for case creation operations
+        - Prometheus monitoring via @track_business_operation decorator
+        - Comprehensive request logging with execution time tracking
+        - Error logging with full exception details
+    
+    Transaction Handling:
+        - Explicit transaction begin/commit for data consistency
+        - Automatic rollback on any operation failure
+        - Connection validation and proper cleanup in finally block
+    
+    Example:
+        POST /case
+        {
+            "case_id": "CASE-2024-001",
+            "user_id": "USER123",
+            "case_date": "2024-01-15",
+            "patient": {
+                "first": "John",
+                "last": "Doe", 
+                "ins_provider": "Blue Cross"
+            },
+            "surgeon_id": "SURG456",
+            "facility_id": "FAC789",
+            "procedure_codes": ["12345", "67890"]
+        }
+    
+    Note:
+        - Case creation triggers automatic pay amount calculation if procedure codes are provided
+        - Case status may be automatically updated based on business rules
+        - All file paths (demo_file, note_file, misc_file) are optional
+        - Procedure codes list is optional but recommended for accurate pay calculations
     """
     conn = None
     start_time = time.time()

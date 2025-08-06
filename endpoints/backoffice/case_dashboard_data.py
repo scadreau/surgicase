@@ -1,5 +1,5 @@
 # Created: 2025-07-27 02:29:13
-# Last Modified: 2025-07-29 01:17:19
+# Last Modified: 2025-08-06 15:23:15
 # Author: Scott Cadreau
 
 # endpoints/backoffice/case_dashboard_data.py
@@ -21,9 +21,148 @@ def case_dashboard_data(
     end_date: Optional[str] = Query(None, description="End date for filtering (YYYY-MM-DD format)")
 ):
     """
-    Retrieve dashboard data showing case counts and totals by status.
-    Returns aggregated case statistics with status descriptions.
-    Optionally filters by date range if start_date and/or end_date are provided.
+    Generate comprehensive case analytics dashboard with status-based aggregation and financial summaries.
+    
+    This endpoint provides administrative insights into case distribution and financial performance
+    across different case status categories. It aggregates case counts and payment amounts by
+    status, with optional date filtering for time-based analysis. Access is restricted to
+    administrative users for business intelligence and operational oversight.
+    
+    Key Features:
+    - Case status distribution analytics with count and financial aggregation
+    - Optional date range filtering for temporal analysis
+    - Status description integration for human-readable reporting
+    - Financial summary calculations with total amounts per status
+    - Administrative access control with permission validation
+    - Comprehensive dashboard data for business intelligence
+    - Real-time aggregation from active case data
+    
+    Args:
+        request (Request): FastAPI request object for logging and monitoring
+        user_id (str): Unique identifier of the requesting administrative user (required)
+                      Must have user_type >= 10 to access dashboard data
+        start_date (str, optional): Start date for case filtering in YYYY-MM-DD format
+                                   Filters cases where case_date >= start_date
+        end_date (str, optional): End date for case filtering in YYYY-MM-DD format
+                                 Filters cases where case_date <= end_date
+    
+    Returns:
+        dict: Response containing:
+            - dashboard_data (List[dict]): Array of status aggregations, each containing:
+                - case_status (int): Numeric case status code
+                - case_status_desc (str): Human-readable status description
+                - cases (int): Number of cases in this status
+                - total_amount (str): Total payment amount for cases in this status (formatted as decimal string)
+            - summary (dict): Overall statistics:
+                - total_cases (int): Total number of cases across all statuses
+                - total_amount (str): Total payment amount across all cases (formatted as decimal string)
+            - filters (dict): Applied filter parameters:
+                - start_date (str): Start date filter applied (or null)
+                - end_date (str): End date filter applied (or null)
+    
+    Raises:
+        HTTPException:
+            - 403 Forbidden: User does not have sufficient permissions (user_type < 10)
+            - 500 Internal Server Error: Database connection or query errors
+    
+    Database Operations:
+        1. Validates requesting user's permission level (user_type >= 10)
+        2. Constructs dynamic case aggregation query with optional date filtering
+        3. Groups cases by case_status with COUNT and SUM operations
+        4. Retrieves status descriptions from case_status_list table
+        5. Combines aggregated data with descriptive information
+        6. Only includes active cases (active = 1) in calculations
+    
+    Business Intelligence Features:
+        - Status distribution analysis for operational insights
+        - Financial performance tracking across case lifecycle
+        - Time-based filtering for trend analysis and reporting
+        - Case workflow bottleneck identification through status concentrations
+        - Revenue analysis by case progression stage
+        - Administrative oversight of case management efficiency
+    
+    Date Filtering Logic:
+        - start_date: Includes cases with case_date >= start_date (inclusive)
+        - end_date: Includes cases with case_date <= end_date (inclusive)
+        - Both filters can be used independently or together
+        - Date format validation handled at query parameter level
+        - Filters apply to case_date field representing surgery/service date
+    
+    Data Aggregation:
+        - Cases grouped by exact case_status values
+        - COUNT aggregation for case volume analysis
+        - SUM aggregation for financial analysis (pay_amount field)
+        - Results ordered by case_status for consistent reporting
+        - Only active cases included in all calculations
+        - Null pay_amount values treated as 0.00 in financial calculations
+    
+    Monitoring & Logging:
+        - Business metrics tracking for dashboard access operations
+        - Prometheus monitoring via @track_business_operation decorator
+        - Detailed execution time and response logging
+        - Administrative access tracking for security auditing
+        - Error categorization for different failure types:
+            * permission_denied: Insufficient user permissions
+            * success: Dashboard data retrieved successfully
+            * error: General database or system errors
+    
+    Security Features:
+        - Administrative access control (user_type >= 10 required)
+        - Permission validation before any data processing
+        - Only active cases included in aggregations
+        - All database queries use parameterized statements
+        - Administrative action logging for compliance
+    
+    Example Usage:
+        GET /case_dashboard_data?user_id=ADMIN001
+        GET /case_dashboard_data?user_id=ADMIN001&start_date=2024-01-01&end_date=2024-01-31
+    
+    Example Response:
+        {
+            "dashboard_data": [
+                {
+                    "case_status": 1,
+                    "case_status_desc": "New Case",
+                    "cases": 15,
+                    "total_amount": "22500.00"
+                },
+                {
+                    "case_status": 2,
+                    "case_status_desc": "In Progress",
+                    "cases": 8,
+                    "total_amount": "12000.00"
+                },
+                {
+                    "case_status": 10,
+                    "case_status_desc": "Completed",
+                    "cases": 25,
+                    "total_amount": "37500.00"
+                }
+            ],
+            "summary": {
+                "total_cases": 48,
+                "total_amount": "72000.00"
+            },
+            "filters": {
+                "start_date": "2024-01-01",
+                "end_date": "2024-01-31"
+            }
+        }
+    
+    Example Error Response (Permission Denied):
+        {
+            "detail": "User does not have permission to access dashboard data."
+        }
+    
+    Note:
+        - Only active cases (active=1) are included in all aggregations
+        - Financial amounts are formatted as decimal strings for precise display
+        - Status descriptions are retrieved from case_status_list lookup table
+        - Date filtering is optional and can be used for custom reporting periods
+        - Dashboard data updates in real-time as cases are created/modified
+        - Summary totals represent the filtered dataset, not global totals
+        - Administrative users should use this for operational oversight and reporting
+        - Time-based analysis enables trend identification and performance monitoring
     """
     conn = None
     start_time = time.time()

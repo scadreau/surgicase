@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-31 18:59:19
+# Last Modified: 2025-08-06 15:15:22
 # Author: Scott Cadreau
 
 # endpoints/case/filter_cases.py
@@ -15,8 +15,140 @@ router = APIRouter()
 @track_business_operation("filter", "case")
 def get_cases(request: Request, user_id: str = Query(..., description="The user ID to retrieve cases for"), filter: str = Query("", description="Comma-separated list of case_status values (e.g. 0,1,2) or 'all' for all statuses")):
     """
-    Retrieve all cases for a user_id, filtered by case_status values.
-    Returns a list of cases in the same format as get_case.
+    Retrieve and filter surgical cases for a specific user with advanced status visibility controls.
+    
+    This endpoint provides comprehensive case filtering capabilities with user-specific visibility
+    restrictions based on their profile permissions. It supports complex filtering logic including
+    special handling for maximum case status visibility and enriched case data with related entities.
+    
+    Key Features:
+    - User-specific case filtering with permission-based visibility
+    - Smart case status filtering with max_case_status support
+    - Enriched case data with surgeon and facility information
+    - Procedure codes with descriptions included
+    - Automatic case status capping based on user permissions
+    - Comprehensive monitoring and performance tracking
+    - Flexible filtering: specific statuses, ranges, or all cases
+    
+    Args:
+        request (Request): FastAPI request object for logging and monitoring
+        user_id (str): Unique identifier of the user whose cases to retrieve (required)
+        filter (str, optional): Case status filter specification:
+            - "all": Returns all cases regardless of status
+            - "": Empty string returns all cases (same as "all")
+            - "1,2,3": Comma-separated list of specific status values
+            - "20": Single status value (supports max_case_status logic)
+    
+    Returns:
+        dict: Response containing:
+            - cases (List[dict]): Array of case objects, each containing:
+                - user_id (str): Owner of the case
+                - case_id (str): Unique case identifier
+                - case_date (str): ISO formatted case date
+                - patient_first (str): Patient's first name
+                - patient_last (str): Patient's last name
+                - ins_provider (str): Insurance provider information
+                - surgeon_id (str): Surgeon identifier
+                - facility_id (str): Facility identifier
+                - case_status (int): Current case status (may be capped at max_case_status)
+                - case_status_desc (str): Human-readable status description
+                - demo_file (str): Path to demonstration file
+                - note_file (str): Path to notes file
+                - misc_file (str): Path to miscellaneous file
+                - pay_amount (decimal): Calculated payment amount
+                - surgeon_name (str): Full name of the operating surgeon
+                - facility_name (str): Name of the surgical facility
+                - procedure_codes (List[dict]): Array of procedure information:
+                    - procedure_code (str): Medical procedure code
+                    - procedure_desc (str): Description of the procedure
+            - user_id (str): The user ID that was queried
+            - filter (List): Processed filter criteria used
+    
+    Raises:
+        HTTPException:
+            - 500 Internal Server Error: Database connection or query errors
+    
+    Database Operations:
+        1. Retrieves user's max_case_status from user_profile table
+        2. Constructs dynamic SQL query based on filter parameters
+        3. Joins with surgeon_list and facility_list for enriched data
+        4. Joins with case_status_list for status descriptions
+        5. Fetches procedure codes with descriptions for each case
+        6. Applies case status visibility restrictions per user permissions
+    
+    User Permission Logic:
+        - Each user has a max_case_status value in their profile (default: 20)
+        - Cases with status > max_case_status are capped at max_case_status
+        - Status descriptions are updated to match the capped status
+        - This ensures users only see case statuses they're authorized to view
+    
+    Filter Logic:
+        - "all" or empty: Returns all active cases for the user
+        - Specific statuses: Returns cases matching those exact statuses
+        - max_case_status handling: If max_case_status is in filter list:
+            * Returns cases with that status OR higher (>= max_case_status)
+            * Other specific statuses are handled normally
+            * Combines both conditions with OR logic
+    
+    Monitoring & Logging:
+        - Business metrics tracking for filter operations
+        - Prometheus monitoring via @track_business_operation decorator
+        - Execution time tracking and response logging
+        - Success/failure metrics with user identification
+    
+    Performance Features:
+        - Optimized queries with proper JOIN usage
+        - Batch procedure code fetching
+        - Efficient duplicate removal for procedure codes
+        - Cases ordered by case_id DESC for most recent first
+        - Only active cases retrieved (active = 1)
+    
+    Example Usage:
+        GET /case_filter?user_id=USER123&filter=1,2,20
+        GET /case_filter?user_id=USER123&filter=all
+        GET /case_filter?user_id=USER123&filter=0
+        GET /case_filter?user_id=USER123  (returns all cases)
+    
+    Example Response:
+        {
+            "cases": [
+                {
+                    "user_id": "USER123",
+                    "case_id": "CASE-2024-001",
+                    "case_date": "2024-01-15T00:00:00",
+                    "patient_first": "John",
+                    "patient_last": "Doe",
+                    "ins_provider": "Blue Cross",
+                    "surgeon_id": "SURG456",
+                    "facility_id": "FAC789",
+                    "case_status": 2,
+                    "case_status_desc": "In Progress",
+                    "demo_file": "/files/demo_CASE-2024-001.mp4",
+                    "note_file": "/files/notes_CASE-2024-001.pdf",
+                    "misc_file": null,
+                    "pay_amount": 1500.00,
+                    "surgeon_name": "Dr. Jane Smith",
+                    "facility_name": "Metro Surgical Center",
+                    "procedure_codes": [
+                        {
+                            "procedure_code": "12345",
+                            "procedure_desc": "Laparoscopic Cholecystectomy"
+                        }
+                    ]
+                }
+            ],
+            "user_id": "USER123",
+            "filter": [1, 2, 20]
+        }
+    
+    Note:
+        - Only active cases (active=1) are returned
+        - Case statuses are automatically restricted based on user permissions
+        - Procedure codes include both code and description for UI display
+        - Cases are ordered by case_id in descending order (newest first)
+        - Empty procedure_codes array is included if no procedures exist
+        - Date fields are converted to ISO format for consistent API responses
+        - User profile determines maximum visible case status level
     """
     conn = None
     start_time = time.time()

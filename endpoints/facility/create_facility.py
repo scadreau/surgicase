@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-29 02:22:31
+# Last Modified: 2025-08-06 15:32:02
 # Author: Scott Cadreau
 
 # endpoints/facility/create_facility.py
@@ -16,7 +16,81 @@ router = APIRouter()
 @track_business_operation("create", "facility")
 def add_facility(request: Request, facility: FacilityCreate):
     """
-    Add a new facility for a user.
+    Create a new healthcare facility with comprehensive validation and monitoring.
+    
+    This endpoint provides full facility creation functionality including:
+    - Facility data validation and database insertion
+    - Automatic facility ID generation via database auto-increment
+    - Comprehensive monitoring and business metrics tracking
+    - Transaction safety with proper rollback handling
+    - Full request logging and execution time tracking
+    - Prometheus metrics integration for operational monitoring
+    
+    Args:
+        request (Request): FastAPI request object for logging and monitoring
+        facility (FacilityCreate): The facility data model containing:
+            - user_id (str): ID of the user creating the facility
+            - facility_name (str): Official name of the healthcare facility
+            - facility_npi (int): National Provider Identifier for the facility
+            - facility_addr (str): Physical street address of the facility
+            - facility_city (str): City where the facility is located
+            - facility_state (str): State abbreviation (e.g., "CA", "NY")
+            - facility_zip (str): ZIP/postal code for the facility location
+    
+    Returns:
+        dict: Response containing:
+            - statusCode (int): HTTP status code (201 for successful creation)
+            - body (dict): Response data including:
+                - message (str): Success confirmation message
+                - facility_id (int): Auto-generated unique facility identifier
+                - user_id (str): The user ID who created the facility
+                - facility_name (str): Name of the created facility
+                - facility_npi (int): NPI number of the facility
+                - facility_addr (str): Address of the facility
+                - facility_city (str): City of the facility
+                - facility_state (str): State of the facility
+                - facility_zip (str): ZIP code of the facility
+    
+    Raises:
+        HTTPException: 
+            - 500 Internal Server Error: Database insertion failures or connection issues
+    
+    Database Operations:
+        - Inserts new record into 'facility_list' table
+        - Uses auto-increment for facility_id generation
+        - Commits transaction immediately after successful insertion
+        - Automatic rollback on any operation failure
+    
+    Monitoring & Logging:
+        - Business metrics tracking for facility creation operations
+        - Prometheus monitoring via @track_business_operation decorator
+        - Records success/error metrics via business_metrics.record_facility_operation()
+        - Comprehensive request logging with execution time tracking
+        - Error logging with full exception details and rollback status
+    
+    Transaction Handling:
+        - Explicit transaction commit after successful insertion
+        - Automatic rollback on any operation failure with connection validation
+        - Proper connection cleanup in finally block
+        - Safe rollback handling with interface error protection
+    
+    Example:
+        POST /facility
+        {
+            "user_id": "USER123",
+            "facility_name": "General Hospital Medical Center",
+            "facility_npi": 1234567890,
+            "facility_addr": "123 Medical Drive",
+            "facility_city": "Healthcare City",
+            "facility_state": "CA",
+            "facility_zip": "90210"
+        }
+    
+    Note:
+        - Facility NPI must be a valid 10-digit National Provider Identifier
+        - State should use standard 2-letter abbreviations
+        - All facility information is stored exactly as provided (no normalization)
+        - Auto-generated facility_id is returned for reference in subsequent operations
     """
     conn = None
     start_time = time.time()

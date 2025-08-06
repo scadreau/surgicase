@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-29 02:20:24
+# Last Modified: 2025-08-06 15:42:36
 # Author: Scott Cadreau
 
 # endpoints/utility/get_doctypes.py
@@ -15,7 +15,53 @@ router = APIRouter()
 @track_business_operation("get", "doctypes")
 def get_doc_types(request: Request):
     """
-    Get all document types.
+    Retrieve all available document types for user document management.
+    
+    This endpoint provides a complete list of document type categories that users
+    can associate with their uploaded documents. Document types are used to classify
+    and organize user-submitted files such as licenses, certifications, and other
+    professional documentation.
+    
+    Args:
+        request (Request): FastAPI request object for logging and monitoring
+    
+    Returns:
+        dict: Response containing:
+            - document_types (List[dict]): Array of document type objects, each containing:
+                - doc_type (str): The document type identifier/category name
+    
+    Raises:
+        HTTPException: 
+            - 500 Internal Server Error: Database connection or query execution errors
+    
+    Database Operations:
+        - Queries 'user_doc_type_list' table for all available document types
+        - Read-only operation with automatic connection management
+    
+    Monitoring & Logging:
+        - Business metrics tracking for document type retrieval operations
+        - Prometheus monitoring via @track_business_operation decorator
+        - Comprehensive request logging with execution time tracking
+        - Error logging with full exception details
+    
+    Example Response:
+        {
+            "document_types": [
+                {"doc_type": "Medical License"},
+                {"doc_type": "Board Certification"},
+                {"doc_type": "DEA Registration"},
+                {"doc_type": "Malpractice Insurance"}
+            ]
+        }
+    
+    Usage:
+        GET /doctypes
+        
+    Notes:
+        - No authentication required for this utility endpoint
+        - Results are sorted by database default ordering
+        - Used primarily for populating dropdown lists in document upload forms
+        - Document types define valid categories for user document classification
     """
     conn = None
     start_time = time.time()
