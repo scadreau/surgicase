@@ -152,3 +152,6 @@ case_export_*
 *_results.json
 *_results.csv
 
+# Claude Code
+.claude/
+
