@@ -1,5 +1,5 @@
 # Created: 2025-08-05 22:15:27
-# Last Modified: 2025-08-05 22:24:09
+# Last Modified: 2025-08-06 11:34:28
 # Author: Scott Cadreau
 
 # endpoints/utility/get_lists.py
@@ -220,6 +220,90 @@ def get_user_doc_types(request: Request, user_id: str = Query(..., description="
         response_status = 500
         error_message = str(e)
         business_metrics.record_utility_operation("get_user_doc_types", "error")
+        
+        if 'conn' in locals():
+            close_db_connection(conn)
+        raise HTTPException(status_code=500, detail={"error": str(e)})
+        
+    finally:
+        # Calculate execution time
+        execution_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Log request details for monitoring using the utility function
+        from endpoints.utility.log_request import log_request_from_endpoint
+        log_request_from_endpoint(
+            request=request,
+            execution_time_ms=execution_time_ms,
+            response_status=response_status,
+            user_id=user_id,
+            response_data=response_data,
+            error_message=error_message
+        )
+
+@router.get("/faqs")
+@track_business_operation("get", "faqs")
+def get_faqs(request: Request, user_id: str = Query(..., description="User ID for authorization")):
+    """
+    Get FAQ entries based on user type.
+    Returns faq_header, faq_text from faq_list table filtered by user_type.
+    Sorts results by display_order.
+    """
+    conn = None
+    start_time = time.time()
+    response_status = 200
+    response_data = None
+    error_message = None
+    
+    try:
+        conn = get_db_connection()
+        
+        try:
+            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                # Get user_type from user_profile
+                cursor.execute(
+                    "SELECT user_type FROM user_profile WHERE user_id = %s AND active = 1",
+                    (user_id,)
+                )
+                user = cursor.fetchone()
+                
+                if not user:
+                    # Record failed FAQs retrieval - user not found
+                    business_metrics.record_utility_operation("get_faqs", "user_not_found")
+                    response_status = 404
+                    error_message = "User not found or inactive"
+                    raise HTTPException(status_code=404, detail={"error": "User not found or inactive"})
+                
+                user_type = user['user_type']
+                
+                # Query FAQ list for the user's type, sorted by display_order
+                cursor.execute(
+                    "SELECT faq_header, faq_text FROM faq_list WHERE user_type = %s ORDER BY display_order",
+                    (user_type,)
+                )
+                faqs = cursor.fetchall()
+
+                # Record successful FAQs retrieval
+                business_metrics.record_utility_operation("get_faqs", "success")
+                
+        finally:
+            close_db_connection(conn)
+            
+        response_data = {
+            "faqs": faqs,
+            "user_type": user_type
+        }
+        return response_data
+        
+    except HTTPException as http_error:
+        # Re-raise HTTP exceptions and capture error details
+        response_status = http_error.status_code
+        error_message = str(http_error.detail)
+        raise
+    except Exception as e:
+        # Record failed FAQs retrieval
+        response_status = 500
+        error_message = str(e)
+        business_metrics.record_utility_operation("get_faqs", "error")
         
         if 'conn' in locals():
             close_db_connection(conn)
