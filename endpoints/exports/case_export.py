@@ -1,9 +1,9 @@
 # Created: 2025-07-28 19:48:18
-# Last Modified: 2025-08-06 15:40:02
+# Last Modified: 2025-08-06 16:04:25
 # Author: Scott Cadreau
 
 # endpoints/exports/case_export.py
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import pymysql.cursors
@@ -16,6 +16,7 @@ import json
 import csv
 import os
 import tempfile
+import time
 from datetime import datetime
 
 router = APIRouter()
@@ -131,7 +132,7 @@ def create_cases_csv(cases: List[Dict[str, Any]], filepath: str) -> None:
 
 @router.post("/export_cases")
 @track_business_operation("export", "cases")
-def export_cases(request: CaseExportRequest):
+def export_cases(request_obj: Request, export_request: CaseExportRequest):
     """
     Export comprehensive case data with associated procedure codes in JSON format.
     
@@ -219,8 +220,15 @@ def export_cases(request: CaseExportRequest):
         - Export format is JSON for programmatic consumption
         - Use /export_cases_csv for spreadsheet-compatible format
     """
+    start_time = time.time()
+    response_status = 200
+    response_data = None
+    error_message = None
+    
     try:
-        if not request.case_ids:
+        if not export_request.case_ids:
+            response_status = 400
+            error_message = "case_ids list cannot be empty"
             raise HTTPException(status_code=400, detail="case_ids list cannot be empty")
         
         conn = get_db_connection()
@@ -228,27 +236,46 @@ def export_cases(request: CaseExportRequest):
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                 # Get case data with procedure codes
-                cases = get_cases_with_procedures(cursor, request.case_ids)
+                cases = get_cases_with_procedures(cursor, export_request.case_ids)
                 
                 # Format response with metadata
-                response = format_export_response(cases, request.case_ids)
+                response = format_export_response(cases, export_request.case_ids)
                 
                 business_metrics.record_utility_operation("case_export", "success")
                 
+                response_data = response
                 return response
                 
         finally:
             close_db_connection(conn)
             
-    except HTTPException:
+    except HTTPException as http_error:
+        response_status = http_error.status_code
+        error_message = str(http_error.detail)
         raise
     except Exception as e:
+        response_status = 500
+        error_message = str(e)
         business_metrics.record_utility_operation("case_export", "error")
         raise HTTPException(status_code=500, detail=f"Error exporting cases: {str(e)}")
+    finally:
+        # Calculate execution time in milliseconds for logging
+        execution_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Log request details for monitoring using the utility function
+        from endpoints.utility.log_request import log_request_from_endpoint
+        log_request_from_endpoint(
+            request=request_obj,
+            execution_time_ms=execution_time_ms,
+            response_status=response_status,
+            user_id=None,
+            response_data=response_data,
+            error_message=error_message
+        )
 
 @router.post("/export_cases_csv")
 @track_business_operation("export", "cases_csv")
-def export_cases_csv(request: CaseExportRequest):
+def export_cases_csv(request_obj: Request, export_request: CaseExportRequest):
     """
     Export comprehensive case data as downloadable CSV file with S3 backup storage.
     
@@ -342,8 +369,15 @@ def export_cases_csv(request: CaseExportRequest):
         - S3 storage uses organized folder structure for easy management
         - File encoding is UTF-8 for international character support
     """
+    start_time = time.time()
+    response_status = 200
+    response_data = None
+    error_message = None
+    
     try:
-        if not request.case_ids:
+        if not export_request.case_ids:
+            response_status = 400
+            error_message = "case_ids list cannot be empty"
             raise HTTPException(status_code=400, detail="case_ids list cannot be empty")
         
         conn = get_db_connection()
@@ -351,7 +385,7 @@ def export_cases_csv(request: CaseExportRequest):
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                 # Get case data with procedure codes
-                cases = get_cases_with_procedures(cursor, request.case_ids)
+                cases = get_cases_with_procedures(cursor, export_request.case_ids)
                 
                 # Create exports directory
                 exports_dir = os.path.join(os.getcwd(), "exports")
@@ -372,7 +406,7 @@ def export_cases_csv(request: CaseExportRequest):
                 metadata = {
                     "report_type": "case_export",
                     "generated_at": datetime.now().isoformat(),
-                    "total_cases_requested": str(len(request.case_ids)),
+                    "total_cases_requested": str(len(export_request.case_ids)),
                     "total_cases_found": str(len(cases)),
                     "export_format": "csv"
                 }
@@ -393,7 +427,7 @@ def export_cases_csv(request: CaseExportRequest):
                 
                 # Format response with export summary and S3 info
                 found_case_ids = [case['case_id'] for case in cases]
-                missing_case_ids = [case_id for case_id in request.case_ids if case_id not in found_case_ids]
+                missing_case_ids = [case_id for case_id in export_request.case_ids if case_id not in found_case_ids]
                 
                 response = {
                     "success": True,
@@ -401,7 +435,7 @@ def export_cases_csv(request: CaseExportRequest):
                     "filepath": filepath,
                     "s3_upload": s3_result,
                     "summary": {
-                        "total_requested": len(request.case_ids),
+                        "total_requested": len(export_request.case_ids),
                         "total_found": len(cases),
                         "total_missing": len(missing_case_ids),
                         "found_case_ids": found_case_ids,
@@ -411,6 +445,8 @@ def export_cases_csv(request: CaseExportRequest):
                 }
                 
                 business_metrics.record_utility_operation("case_export_csv", "success")
+                
+                response_data = response
                 
                 # Return the CSV file as a download
                 return FileResponse(
@@ -427,8 +463,26 @@ def export_cases_csv(request: CaseExportRequest):
         finally:
             close_db_connection(conn)
             
-    except HTTPException:
+    except HTTPException as http_error:
+        response_status = http_error.status_code
+        error_message = str(http_error.detail)
         raise
     except Exception as e:
+        response_status = 500
+        error_message = str(e)
         business_metrics.record_utility_operation("case_export_csv", "error")
-        raise HTTPException(status_code=500, detail=f"Error exporting cases to CSV: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Error exporting cases to CSV: {str(e)}")
+    finally:
+        # Calculate execution time in milliseconds for logging
+        execution_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Log request details for monitoring using the utility function
+        from endpoints.utility.log_request import log_request_from_endpoint
+        log_request_from_endpoint(
+            request=request_obj,
+            execution_time_ms=execution_time_ms,
+            response_status=response_status,
+            user_id=None,
+            response_data=response_data,
+            error_message=error_message
+        ) 

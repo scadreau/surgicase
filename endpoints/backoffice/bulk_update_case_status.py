@@ -1,5 +1,5 @@
 # Created: 2025-07-27 02:00:40
-# Last Modified: 2025-07-29 01:52:13
+# Last Modified: 2025-08-06 15:57:17
 # Author: Scott Cadreau
 
 # endpoints/backoffice/bulk_update_case_status.py
@@ -288,4 +288,18 @@ def bulk_update_case_status(request: Request, update_request: BulkCaseStatusUpda
         
         # Record timing metrics
         execution_time = time.time() - start_time
-        business_metrics.record_timing("bulk_update_case_status", execution_time * 1000)  # Convert to milliseconds 
+        business_metrics.record_timing("bulk_update_case_status", execution_time * 1000)  # Convert to milliseconds
+        
+        # Calculate execution time in milliseconds for logging
+        execution_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Log request details for monitoring using the utility function
+        from endpoints.utility.log_request import log_request_from_endpoint
+        log_request_from_endpoint(
+            request=request,
+            execution_time_ms=execution_time_ms,
+            response_status=response_status,
+            user_id=None,
+            response_data=response_data,
+            error_message=error_message
+        ) 

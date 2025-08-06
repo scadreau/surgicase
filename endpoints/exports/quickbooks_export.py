@@ -1,9 +1,9 @@
 # Created: 2025-01-27 15:00:00
-# Last Modified: 2025-08-06 15:40:02
+# Last Modified: 2025-08-06 16:04:25
 # Author: Scott Cadreau
 
 # endpoints/exports/quickbooks_export.py
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 import pymysql.cursors
 from core.database import get_db_connection, close_db_connection
@@ -15,6 +15,7 @@ from datetime import datetime
 import os
 import csv
 import tempfile
+import time
 from typing import Optional, List, Dict, Any
 from functools import reduce
 from itertools import groupby
@@ -254,6 +255,7 @@ def create_transactions_iif(transactions: List[Dict[str, Any]], filepath: str) -
 @router.get("/quickbooks-vendors-csv")
 @track_business_operation("export", "quickbooks_vendors_csv")
 def export_quickbooks_vendors_csv(
+    request: Request,
     start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
     user_id: Optional[str] = Query(None, description="Filter by specific provider user_id")
@@ -356,6 +358,11 @@ def export_quickbooks_vendors_csv(
         - CSV format is optimized for direct QuickBooks import compatibility
         - All providers are marked as 1099 eligible for tax reporting compliance
     """
+    start_time = time.time()
+    response_status = 200
+    response_data = None
+    error_message = None
+    
     try:
         conn = get_db_connection()
         
@@ -365,6 +372,8 @@ def export_quickbooks_vendors_csv(
                 cases = get_provider_payment_data(cursor, start_date, end_date, user_id)
                 
                 if not cases:
+                    response_status = 404
+                    error_message = "No cases found matching the criteria"
                     raise HTTPException(status_code=404, detail="No cases found matching the criteria")
                 
                 # Transform data for QuickBooks
@@ -402,6 +411,12 @@ def export_quickbooks_vendors_csv(
                 
                 business_metrics.record_utility_operation("quickbooks_vendors_export", "success")
                 
+                response_data = {
+                    "filename": filename,
+                    "s3_result": s3_result,
+                    "summary": qb_data['summary']
+                }
+                
                 return FileResponse(
                     path=filepath,
                     filename=filename,
@@ -417,15 +432,34 @@ def export_quickbooks_vendors_csv(
         finally:
             close_db_connection(conn)
             
-    except HTTPException:
+    except HTTPException as http_error:
+        response_status = http_error.status_code
+        error_message = str(http_error.detail)
         raise
     except Exception as e:
+        response_status = 500
+        error_message = str(e)
         business_metrics.record_utility_operation("quickbooks_vendors_export", "error")
         raise HTTPException(status_code=500, detail=f"Error generating QuickBooks vendors export: {str(e)}")
+    finally:
+        # Calculate execution time in milliseconds for logging
+        execution_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Log request details for monitoring using the utility function
+        from endpoints.utility.log_request import log_request_from_endpoint
+        log_request_from_endpoint(
+            request=request,
+            execution_time_ms=execution_time_ms,
+            response_status=response_status,
+            user_id=user_id,
+            response_data=response_data,
+            error_message=error_message
+        )
 
 @router.get("/quickbooks-transactions-iif")
 @track_business_operation("export", "quickbooks_transactions_iif")
 def export_quickbooks_transactions_iif(
+    request: Request,
     start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
     user_id: Optional[str] = Query(None, description="Filter by specific provider user_id")
@@ -545,6 +579,11 @@ def export_quickbooks_transactions_iif(
         - Transaction dates match original case dates for accurate reporting
         - All providers are set up as vendors for proper payment tracking
     """
+    start_time = time.time()
+    response_status = 200
+    response_data = None
+    error_message = None
+    
     try:
         conn = get_db_connection()
         
@@ -554,6 +593,8 @@ def export_quickbooks_transactions_iif(
                 cases = get_provider_payment_data(cursor, start_date, end_date, user_id)
                 
                 if not cases:
+                    response_status = 404
+                    error_message = "No cases found matching the criteria"
                     raise HTTPException(status_code=404, detail="No cases found matching the criteria")
                 
                 # Transform data for QuickBooks
@@ -591,6 +632,12 @@ def export_quickbooks_transactions_iif(
                 
                 business_metrics.record_utility_operation("quickbooks_transactions_export", "success")
                 
+                response_data = {
+                    "filename": filename,
+                    "s3_result": s3_result,
+                    "summary": qb_data['summary']
+                }
+                
                 return FileResponse(
                     path=filepath,
                     filename=filename,
@@ -606,8 +653,26 @@ def export_quickbooks_transactions_iif(
         finally:
             close_db_connection(conn)
             
-    except HTTPException:
+    except HTTPException as http_error:
+        response_status = http_error.status_code
+        error_message = str(http_error.detail)
         raise
     except Exception as e:
+        response_status = 500
+        error_message = str(e)
         business_metrics.record_utility_operation("quickbooks_transactions_export", "error")
-        raise HTTPException(status_code=500, detail=f"Error generating QuickBooks transactions export: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Error generating QuickBooks transactions export: {str(e)}")
+    finally:
+        # Calculate execution time in milliseconds for logging
+        execution_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Log request details for monitoring using the utility function
+        from endpoints.utility.log_request import log_request_from_endpoint
+        log_request_from_endpoint(
+            request=request,
+            execution_time_ms=execution_time_ms,
+            response_status=response_status,
+            user_id=user_id,
+            response_data=response_data,
+            error_message=error_message
+        ) 

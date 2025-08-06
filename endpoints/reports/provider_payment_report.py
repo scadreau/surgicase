@@ -1,9 +1,9 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-08-06 15:29:28
+# Last Modified: 2025-08-06 16:07:24
 # Author: Scott Cadreau
 
 # endpoints/reports/provider_payment_report.py
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 import pymysql.cursors
 from core.database import get_db_connection, close_db_connection
@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 import os
 import tempfile
 import logging
+import time
 from typing import Optional
 from pypdf import PdfReader, PdfWriter
 
@@ -232,6 +233,7 @@ def generate_provider_password(last_name: str, npi: str) -> str:
 @router.get("/provider_payment_report")
 @track_business_operation("generate", "provider_payment_report")
 def generate_provider_payment_report(
+    request: Request,
     start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
     user_id: Optional[str] = Query(None, description="Filter by specific provider user_id"),
@@ -406,6 +408,11 @@ def generate_provider_payment_report(
         - Report security handled through access control and temporary file management
         - Professional formatting suitable for financial documentation and audit purposes
     """
+    start_time = time.time()
+    response_status = 200
+    response_data = None
+    error_message = None
+    
     try:
         conn = get_db_connection()
         
@@ -453,6 +460,8 @@ def generate_provider_payment_report(
                 cases = cursor.fetchall()
                 
                 if not cases:
+                    response_status = 404
+                    error_message = "No cases found matching the criteria"
                     raise HTTPException(
                         status_code=404, 
                         detail="No cases found matching the criteria"
@@ -620,19 +629,38 @@ def generate_provider_payment_report(
         finally:
             close_db_connection(conn)
             
-    except HTTPException:
+    except HTTPException as http_error:
+        response_status = http_error.status_code
+        error_message = str(http_error.detail)
         raise
     except Exception as e:
         # Record failed report generation
+        response_status = 500
+        error_message = str(e)
         business_metrics.record_utility_operation("provider_report", "error")
         raise HTTPException(
             status_code=500,
             detail=f"Error generating report: {str(e)}"
         )
+    finally:
+        # Calculate execution time in milliseconds for logging
+        execution_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Log request details for monitoring using the utility function
+        from endpoints.utility.log_request import log_request_from_endpoint
+        log_request_from_endpoint(
+            request=request,
+            execution_time_ms=execution_time_ms,
+            response_status=response_status,
+            user_id=user_id,
+            response_data=response_data,
+            error_message=error_message
+        )
 
 @router.get("/individual_provider_reports")
 @track_business_operation("generate", "individual_provider_reports")
 def generate_individual_provider_reports_endpoint(
+    request: Request,
     start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
     email_type: Optional[str] = Query("weekly", description="Email template type: 'weekly' or 'on_demand'")
@@ -641,6 +669,11 @@ def generate_individual_provider_reports_endpoint(
     Generate individual password-protected PDF reports for each provider
     and send them via email. Each provider receives only their own cases.
     """
+    start_time = time.time()
+    response_status = 200
+    response_data = None
+    error_message = None
+    
     try:
         # Record business operation start
         business_metrics.record_utility_operation("individual_provider_reports", "start")
@@ -660,7 +693,7 @@ def generate_individual_provider_reports_endpoint(
         else:
             business_metrics.record_utility_operation("individual_provider_reports", "error")
         
-        return {
+        response_data = {
             "message": result["message"],
             "success": result["success"],
             "providers_processed": result["providers_processed"],
@@ -669,12 +702,30 @@ def generate_individual_provider_reports_endpoint(
             "errors": result["errors"]
         }
         
+        return response_data
+        
     except Exception as e:
+        response_status = 500
+        error_message = str(e)
         business_metrics.record_utility_operation("individual_provider_reports", "error")
         logger.error(f"Error in individual provider reports endpoint: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Error generating individual provider reports: {str(e)}"
+        )
+    finally:
+        # Calculate execution time in milliseconds for logging
+        execution_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Log request details for monitoring using the utility function
+        from endpoints.utility.log_request import log_request_from_endpoint
+        log_request_from_endpoint(
+            request=request,
+            execution_time_ms=execution_time_ms,
+            response_status=response_status,
+            user_id=None,
+            response_data=response_data,
+            error_message=error_message
         )
 
 def generate_individual_provider_reports(

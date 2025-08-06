@@ -1,5 +1,5 @@
 # Created: 2025-07-24 17:54:30
-# Last Modified: 2025-08-06 15:46:58
+# Last Modified: 2025-08-06 16:00:46
 # Author: Scott Cadreau
 # Assisted by: Claude 4 Sonnet
 
@@ -429,4 +429,18 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
                 close_db_connection(conn)
             except:
                 pass  # Connection might already be closed
+        
+        # Calculate execution time in milliseconds for logging
+        execution_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Log request details for monitoring using the utility function
+        from endpoints.utility.log_request import log_request_from_endpoint
+        log_request_from_endpoint(
+            request=request,
+            execution_time_ms=execution_time_ms,
+            response_status=response_status,
+            user_id=user_id,
+            response_data=response_data,
+            error_message=error_message
+        )
  
