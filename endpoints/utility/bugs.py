@@ -1,5 +1,5 @@
 # Created: 2025-08-06 14:20:21
-# Last Modified: 2025-08-06 14:30:54
+# Last Modified: 2025-08-06 15:01:08
 # Author: Scott Cadreau
 
 # endpoints/utility/bugs.py
@@ -29,10 +29,11 @@ class BugReport(BaseModel):
 
 @router.post("/bugs")
 @track_business_operation("post", "bugs")
-def create_bug_report(request: Request, bug_data: BugReport):
+def create_bug_report(request: Request, bug_data: BugReport, user_id: str = Query(..., description="User ID for authorization")):
     """
     Create a new bug report entry.
     Takes the provided JSON package and logs the information in the bugs table.
+    Validates that the user exists before allowing the bug report to be submitted.
     
     Field mapping:
     - title: bug.title from json
@@ -42,6 +43,9 @@ def create_bug_report(request: Request, bug_data: BugReport):
     - priority: priority from json
     - reported_by: user_profile.first_name + user_profile.last_name from json
     - full_json: the full json package from the request
+    
+    Args:
+        user_id: User ID for authorization - must exist in user_profile table
     """
     conn = None
     start_time = time.time()
@@ -53,6 +57,20 @@ def create_bug_report(request: Request, bug_data: BugReport):
         conn = get_db_connection()
         
         try:
+            # First, validate that the user exists
+            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                cursor.execute(
+                    "SELECT user_id FROM user_profile WHERE user_id = %s AND active = 1",
+                    (user_id,)
+                )
+                user = cursor.fetchone()
+                
+                if not user:
+                    response_status = 404
+                    error_message = "User not found or inactive"
+                    business_metrics.record_utility_operation("create_bug_report", "user_not_found")
+                    raise HTTPException(status_code=404, detail={"error": "User not found or inactive"})
+            
             # Extract required fields from the JSON payload
             title = bug_data.bug.get("title", "")
             description = bug_data.bug.get("description", "")
@@ -119,7 +137,7 @@ def create_bug_report(request: Request, bug_data: BugReport):
             request=request,
             execution_time_ms=execution_time_ms,
             response_status=response_status,
-            user_id=bug_data.user_profile.get("user_id", "unknown"),
+            user_id=user_id,
             response_data=response_data,
             error_message=error_message
         )

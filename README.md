@@ -1,5 +1,5 @@
 # Created: 2025-01-27
-# Last Modified: 2025-08-06 14:30:58
+# Last Modified: 2025-08-06 15:01:13
 
 # SurgiCase Management System
 
@@ -204,6 +204,8 @@ The `/bugs` endpoints provide comprehensive bug reporting functionality for both
 - **Authorization Required**: Requires user_id parameter for logging and authorization
 
 **POST /bugs Features:**
+- **User Validation**: Validates that the user_id exists in user_profile table before processing
+- **Authorization Required**: Requires user_id parameter for authorization and logging
 - **Comprehensive Data Capture**: Captures bug details along with complete user environment, case statuses, surgeons, facilities, and permissions
 - **Automatic Field Mapping**: Extracts and maps specific fields from complex JSON payload
 - **Environment Context**: Stores full JSON context for detailed debugging and analysis
@@ -234,6 +236,10 @@ GET /bugs?user_id=uuid
 ```
 
 **POST Request Format:**
+```bash
+POST /bugs?user_id=uuid
+```
+
 ```json
 {
   "bug_date": "2025-07-30",
