@@ -1,5 +1,5 @@
 # Created: 2025-01-27
-# Last Modified: 2025-08-03 16:46:53
+# Last Modified: 2025-08-06 14:30:58
 
 # SurgiCase Management System
 
@@ -190,6 +190,77 @@ The application will be available at:
 - `GET /doctypes` - Get document types
 - `GET /cpt_codes` - Get CPT codes
 - `POST /log_request` - Log API request
+- `GET /bugs` - Retrieve open bug reports
+- `POST /bugs` - Submit bug reports with environment data
+
+#### Bug Reporting Endpoints
+The `/bugs` endpoints provide comprehensive bug reporting functionality for both submitting and retrieving bug reports:
+
+**GET /bugs Features:**
+- **Open Bug Retrieval**: Returns all bug reports with status not equal to 'Closed'
+- **Comprehensive Data**: Includes bug_id, title, description, calling_page, status, priority, created_ts
+- **Ordered Results**: Returns bugs ordered by creation date (newest first)
+- **Count Information**: Provides total count of open bugs
+- **Authorization Required**: Requires user_id parameter for logging and authorization
+
+**POST /bugs Features:**
+- **Comprehensive Data Capture**: Captures bug details along with complete user environment, case statuses, surgeons, facilities, and permissions
+- **Automatic Field Mapping**: Extracts and maps specific fields from complex JSON payload
+- **Environment Context**: Stores full JSON context for detailed debugging and analysis
+- **Database Integration**: Stores bug reports in dedicated `bugs` table with auto-generated IDs
+- **Monitoring Integration**: Includes Prometheus metrics and request logging
+
+**GET Request:**
+```bash
+GET /bugs?user_id=uuid
+```
+
+**GET Response:**
+```json
+{
+  "bugs": [
+    {
+      "bug_id": 123,
+      "title": "Cannot add case procedure codes",
+      "description": "Long description of the bug",
+      "calling_page": "Case List",
+      "status": "Open",
+      "priority": "High",
+      "created_ts": "2025-08-06T14:20:21"
+    }
+  ],
+  "count": 1
+}
+```
+
+**POST Request Format:**
+```json
+{
+  "bug_date": "2025-07-30",
+  "calling_page": "Case List", 
+  "priority": "High",
+  "bug": {
+    "title": "Cannot add case procedure codes",
+    "description": "Long description of the bug"
+  },
+  "user_profile": {
+    "user_id": "uuid",
+    "first_name": "John",
+    "last_name": "Doe",
+    // ... additional user profile data
+  },
+  // ... additional environment data (case_statuses, surgeons, facilities, etc.)
+}
+```
+
+**POST Response:**
+```json
+{
+  "message": "Bug report created successfully",
+  "bug_id": 123,
+  "status": "Open"
+}
+```
 
 ### Health & Monitoring
 - `GET /health` - Comprehensive health check with all AWS services
