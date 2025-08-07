@@ -1,5 +1,5 @@
 # Created: 2025-08-06 14:20:21
-# Last Modified: 2025-08-07 15:33:43
+# Last Modified: 2025-08-07 15:46:46
 # Author: Scott Cadreau
 
 # endpoints/utility/bugs.py
@@ -103,10 +103,14 @@ def create_clickup_task(bug_data: 'BugReport', bug_id: int) -> bool:
         response = requests.post(api_url, headers=headers, json=task_payload, timeout=10)
         
         if response.status_code == 200:
-            print(f"ClickUp task created successfully for bug #{bug_id}")
+            response_data = response.json()
+            task_id = response_data.get('id', 'unknown')
+            print(f"ClickUp task created successfully for bug #{bug_id}, task ID: {task_id}")
             return True
         else:
-            print(f"Failed to create ClickUp task: {response.status_code} - {response.text}")
+            print(f"Failed to create ClickUp task for bug #{bug_id}: {response.status_code} - {response.text}")
+            print(f"Request URL: {api_url}")
+            print(f"API Token (first 10 chars): {api_token[:10]}...")
             return False
             
     except Exception as e:
