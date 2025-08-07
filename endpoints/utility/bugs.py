@@ -1,5 +1,5 @@
 # Created: 2025-08-06 14:20:21
-# Last Modified: 2025-08-06 15:43:25
+# Last Modified: 2025-08-07 15:33:43
 # Author: Scott Cadreau
 
 # endpoints/utility/bugs.py
@@ -8,11 +8,124 @@ from pydantic import BaseModel
 from typing import Dict, Any
 import pymysql.cursors
 import json
+import boto3
+import requests
+import os
 from core.database import get_db_connection, close_db_connection
 from utils.monitoring import track_business_operation, business_metrics
 import time
 
 router = APIRouter()
+
+def get_clickup_config() -> Dict[str, Any]:
+    """
+    Fetch ClickUp configuration from AWS Secrets Manager
+    """
+    try:
+        region = os.environ.get("AWS_REGION", "us-east-1")
+        client = boto3.client("secretsmanager", region_name=region)
+        response = client.get_secret_value(SecretId="surgicase/main")
+        secret = json.loads(response["SecretString"])
+        return secret
+    except Exception as e:
+        print(f"Error fetching ClickUp configuration from Secrets Manager: {str(e)}")
+        return {}
+
+def create_clickup_task(bug_data: 'BugReport', bug_id: int) -> bool:
+    """
+    Create a task in ClickUp when a new bug is created
+    
+    Args:
+        bug_data: The bug report data
+        bug_id: The generated bug ID from the database
+        
+    Returns:
+        bool: True if task created successfully, False otherwise
+    """
+    try:
+        # Get ClickUp configuration
+        config = get_clickup_config()
+        
+        # Check if ClickUp integration is enabled
+        if not config.get("CLICKUP_ADD_BUGS"):
+            print("ClickUp integration is disabled")
+            return False
+            
+        api_token = config.get("CLICKUP_API_TOKEN")
+        list_url = config.get("CLICKUP_LIST_URL")
+        
+        if not api_token or not list_url:
+            print("ClickUp API token or list URL not found in configuration")
+            return False
+        
+        # Extract list ID from the ClickUp list URL
+        # ClickUp list URLs typically end with the list ID
+        list_id = list_url.split("/")[-1] if "/" in list_url else list_url
+        
+        # Prepare task data
+        task_title = f"Bug #{bug_id}: {bug_data.bug.get('title', 'Untitled Bug')}"
+        
+        # Create description combining bug description and full JSON
+        description_parts = []
+        if bug_data.bug.get('description'):
+            description_parts.append(f"**Description:**\n{bug_data.bug.get('description')}")
+        
+        description_parts.append(f"**Full Bug Report JSON:**\n```json\n{json.dumps(bug_data.dict(), indent=2)}\n```")
+        
+        task_description = "\n\n".join(description_parts)
+        
+        # ClickUp API endpoint for creating tasks
+        api_url = f"https://api.clickup.com/api/v2/list/{list_id}/task"
+        
+        headers = {
+            "Authorization": api_token,
+            "Content-Type": "application/json"
+        }
+        
+        task_payload = {
+            "name": task_title,
+            "description": task_description,
+            "priority": _map_priority_to_clickup(bug_data.priority),
+            "tags": ["bug", "auto-created"],
+            "custom_fields": [
+                {
+                    "id": "calling_page",
+                    "value": bug_data.calling_page
+                },
+                {
+                    "id": "bug_id", 
+                    "value": str(bug_id)
+                }
+            ] if hasattr(bug_data, 'calling_page') else []
+        }
+        
+        # Make the API request
+        response = requests.post(api_url, headers=headers, json=task_payload, timeout=10)
+        
+        if response.status_code == 200:
+            print(f"ClickUp task created successfully for bug #{bug_id}")
+            return True
+        else:
+            print(f"Failed to create ClickUp task: {response.status_code} - {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"Error creating ClickUp task: {str(e)}")
+        return False
+
+def _map_priority_to_clickup(priority: str) -> int:
+    """
+    Map bug priority to ClickUp priority values
+    ClickUp priorities: 1=Urgent, 2=High, 3=Normal, 4=Low
+    """
+    priority_map = {
+        "urgent": 1,
+        "high": 2,
+        "medium": 3,
+        "normal": 3,
+        "low": 4
+    }
+    return priority_map.get(priority.lower(), 3)  # Default to Normal
 
 class BugReport(BaseModel):
     bug_date: str
@@ -195,6 +308,14 @@ def create_bug_report(request: Request, bug_data: BugReport, user_id: str = Quer
 
                 # Record successful bug report creation
                 business_metrics.record_utility_operation("create_bug_report", "success")
+                
+                # Create ClickUp task if integration is enabled
+                try:
+                    create_clickup_task(bug_data, bug_id)
+                except Exception as clickup_error:
+                    # Log the error but don't fail the bug creation
+                    print(f"Warning: Failed to create ClickUp task for bug #{bug_id}: {str(clickup_error)}")
+                    # We don't want to fail the entire bug creation if ClickUp fails
                 
         finally:
             close_db_connection(conn)
