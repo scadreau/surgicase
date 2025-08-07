@@ -1,5 +1,5 @@
 # Created: 2025-07-29 03:41:16
-# Last Modified: 2025-08-07 17:50:56
+# Last Modified: 2025-08-07 20:25:22
 # Author: Scott Cadreau
 
 # endpoints/backoffice/get_case_images.py
@@ -84,8 +84,7 @@ def get_case_images(
     Returns:
         FileResponse: ZIP file download containing:
             - Organized directory structure by case (case_id_patient_name/)
-            - Compressed demo files (demo_filename)
-            - Compressed note files (note_filename)
+            - Compressed demo and note files with original filenames preserved
             - Error log file (download_errors.txt) if any download failures occurred
             - Custom HTTP headers with download statistics:
                 * X-Downloaded-Files: Number of successfully downloaded files
@@ -135,7 +134,8 @@ def get_case_images(
     
     File Organization:
         - Creates case-specific subdirectories: case_id_patient_name/
-        - Organizes files by type: demo_filename, note_filename
+        - Places all case files directly in case directory with original filenames
+        - Preserves original filenames without prefixes or subdirectories
         - Handles special characters in patient names for filesystem compatibility
         - Temporary file management with automatic cleanup
         - ZIP archive with optimal compression settings
@@ -222,11 +222,11 @@ def get_case_images(
     ZIP Archive Structure:
         case_images_20240815_143022.zip
         ├── CASE-2024-001_John_Doe/
-        │   ├── demo_surgery_video.mp4
-        │   └── note_surgical_report.pdf
+        │   ├── surgery_video.mp4
+        │   └── surgical_report.pdf
         ├── CASE-2024-002_Jane_Smith/
-        │   ├── demo_procedure.mp4
-        │   └── note_documentation.pdf
+        │   ├── procedure.mp4
+        │   └── documentation.pdf
         └── download_errors.txt (if any errors occurred)
     
     Note:
@@ -559,8 +559,9 @@ def _process_single_file(file_type: str, filename: str, user_id: str, case_dir: 
     stats = {"images_compressed": 0, "pdfs_compressed": 0, "compression_errors": 0}
     
     try:
-        original_path = os.path.join(case_dir, f"original_{file_type}_{filename}")
-        compressed_path = os.path.join(case_dir, f"{file_type}_{filename}")
+        # Use original filenames without prefixes, no subdirectories needed
+        original_path = os.path.join(case_dir, f"original_{filename}")
+        compressed_path = os.path.join(case_dir, filename)
         
         # Download file from S3
         success = download_file_from_s3(user_id, filename, original_path)
