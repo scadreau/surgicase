@@ -1,5 +1,5 @@
 # Created: 2025-08-06 14:20:21
-# Last Modified: 2025-08-07 15:46:46
+# Last Modified: 2025-08-07 15:59:34
 # Author: Scott Cadreau
 
 # endpoints/utility/bugs.py
@@ -86,17 +86,7 @@ def create_clickup_task(bug_data: 'BugReport', bug_id: int) -> bool:
             "name": task_title,
             "description": task_description,
             "priority": _map_priority_to_clickup(bug_data.priority),
-            "tags": ["bug", "auto-created"],
-            "custom_fields": [
-                {
-                    "id": "calling_page",
-                    "value": bug_data.calling_page
-                },
-                {
-                    "id": "bug_id", 
-                    "value": str(bug_id)
-                }
-            ] if hasattr(bug_data, 'calling_page') else []
+            "tags": ["bug", "auto-created"]
         }
         
         # Make the API request
