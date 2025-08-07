@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-06 15:15:22
+# Last Modified: 2025-08-07 19:12:18
 # Author: Scott Cadreau
 
 # endpoints/case/get_case.py
@@ -50,6 +50,7 @@ def get_case(request: Request, case_id: str = Query(..., description="The case I
                 - note_file (str): Path to notes file
                 - misc_file (str): Path to miscellaneous file
                 - pay_amount (decimal): Calculated payment amount
+                - user_name (str): Full name of the case owner (first_name + last_name)
                 - surgeon_name (str): Full name of the operating surgeon
                 - facility_name (str): Name of the surgical facility
                 - procedure_codes (List[dict]): Array of procedure information:
@@ -124,6 +125,7 @@ def get_case(request: Request, case_id: str = Query(..., description="The case I
                 "note_file": "/files/notes_CASE-2024-001.pdf",
                 "misc_file": null,
                 "pay_amount": 1500.00,
+                "user_name": "John Smith",
                 "surgeon_name": "Dr. Jane Smith",
                 "facility_name": "Metro Surgical Center",
                 "procedure_codes": [
@@ -198,10 +200,10 @@ def get_case(request: Request, case_id: str = Query(..., description="The case I
                         detail={"error": "Case not found", "case_id": case_id}
                     )
                 
-                # Get user's max_case_status from user_profile
+                # Get user's max_case_status and name from user_profile
                 user_id = case_data["user_id"]
                 cursor.execute("""
-                    SELECT max_case_status 
+                    SELECT max_case_status, first_name, last_name 
                     FROM user_profile 
                     WHERE user_id = %s AND active = 1
                 """, (user_id,))
@@ -210,13 +212,21 @@ def get_case(request: Request, case_id: str = Query(..., description="The case I
                 if not user_profile:
                     # If user profile not found, use default max_case_status of 20
                     max_case_status = 20
+                    user_name = None
                 else:
                     max_case_status = user_profile["max_case_status"] or 20
+                    # Combine first_name and last_name to create user_name
+                    first_name = user_profile.get("first_name", "")
+                    last_name = user_profile.get("last_name", "")
+                    user_name = f"{first_name} {last_name}".strip() if first_name or last_name else None
                 
                 # Apply case status visibility restriction
                 original_case_status = case_data["case_status"]
                 if original_case_status > max_case_status:
                     case_data["case_status"] = max_case_status
+                
+                # Add user name to case data
+                case_data["user_name"] = user_name
                 
                 # Convert datetime to ISO format
                 if case_data["case_date"]:
