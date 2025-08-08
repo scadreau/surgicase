@@ -1,5 +1,5 @@
 # Created: 2025-07-29 04:32:53
-# Last Modified: 2025-07-29 09:08:04
+# Last Modified: 2025-08-08 15:16:42
 # Author: Scott Cadreau
 
 # utils/compress_pdf.py
@@ -10,8 +10,27 @@ from typing import Dict, Any, Optional
 import tempfile
 import subprocess
 import shutil
+import boto3
+import json
 
 logger = logging.getLogger(__name__)
+
+def get_compression_mode() -> str:
+    """
+    Get compression mode from AWS Secrets Manager main configuration
+    
+    Returns:
+        str: "aggressive" or "normal" (defaults to "normal" if not found)
+    """
+    try:
+        region = os.environ.get("AWS_REGION", "us-east-1")
+        client = boto3.client("secretsmanager", region_name=region)
+        response = client.get_secret_value(SecretId="surgicase/main")
+        secret = json.loads(response["SecretString"])
+        return secret.get("COMPRESSION_MODE", "normal").lower()
+    except Exception as e:
+        logger.warning(f"Could not fetch compression mode from secrets, using 'normal': {str(e)}")
+        return "normal"
 
 def compress_pdf(
     input_path: str,
@@ -370,7 +389,8 @@ def compress_pdf_ghostscript(
     input_path: str,
     output_path: str,
     quality: str = "ebook",
-    dpi: int = 150
+    dpi: int = 150,
+    use_compression_mode: bool = True
 ) -> bool:
     """
     Compress a PDF using ghostscript command line tool.
@@ -384,7 +404,9 @@ def compress_pdf_ghostscript(
                 - "ebook": Medium quality, good for web viewing (150 dpi images)
                 - "printer": High quality, good for printing (300 dpi images) 
                 - "prepress": Highest quality, largest size (300 dpi, color preservation)
+                - "aggressive": Ultra-aggressive compression (50 dpi, max compression)
         dpi: Custom DPI for image downsampling (overrides quality preset)
+        use_compression_mode: Whether to override quality based on COMPRESSION_MODE secret
         
     Returns:
         bool: True if compression successful, False otherwise
@@ -398,6 +420,16 @@ def compress_pdf_ghostscript(
         # Ensure output directory exists
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         
+        # Override quality based on compression mode if enabled
+        if use_compression_mode:
+            compression_mode = get_compression_mode()
+            if compression_mode == "aggressive":
+                quality = "aggressive"
+                logger.info(f"Using aggressive compression mode for PDF: {input_path}")
+            else:
+                # Keep the provided quality for normal mode
+                logger.info(f"Using normal compression mode for PDF: {input_path}")
+        
         # Check if ghostscript is available
         try:
             subprocess.run(['gs', '--version'], capture_output=True, check=True)
@@ -405,34 +437,69 @@ def compress_pdf_ghostscript(
             logger.error("Ghostscript is not available on this system")
             return False
         
-        # Build ghostscript command - let PDFSETTINGS do the work without DPI overrides
-        gs_cmd = [
-            'gs',
-            '-sDEVICE=pdfwrite',
-            '-dCompatibilityLevel=1.4',
-            '-dPDFSETTINGS=/' + quality,
-            '-dNOPAUSE',
-            '-dQUIET',
-            '-dBATCH',
-            '-dCompressFonts=true',
-            '-dCompressPages=true',
-            '-dEmbedAllFonts=true',
-            '-dSubsetFonts=true',
-            '-dAutoRotatePages=/None',
-            f'-sOutputFile={output_path}',
-            input_path
-        ]
-        
-        # Only add custom DPI if quality is "custom" - otherwise let PDFSETTINGS handle it
-        if quality not in ['screen', 'ebook', 'printer', 'prepress']:
-            gs_cmd.extend([
-                f'-dColorImageDownsampleType=/Bicubic',
-                f'-dColorImageResolution={dpi}',
-                f'-dGrayImageDownsampleType=/Bicubic', 
-                f'-dGrayImageResolution={dpi}',
-                f'-dMonoImageDownsampleType=/Bicubic',
-                f'-dMonoImageResolution={dpi}'
-            ])
+        # Build ghostscript command based on quality mode
+        if quality == "aggressive":
+            # Ultra-aggressive compression with custom settings
+            gs_cmd = [
+                'gs',
+                '-sDEVICE=pdfwrite',
+                '-dCompatibilityLevel=1.4',
+                '-dPDFSETTINGS=/screen',  # Start with screen quality
+                '-dNOPAUSE',
+                '-dQUIET',
+                '-dBATCH',
+                '-dCompressFonts=true',
+                '-dCompressPages=true',
+                '-dEmbedAllFonts=true',
+                '-dSubsetFonts=true',
+                '-dAutoRotatePages=/None',
+                # Aggressive image compression settings
+                '-dColorImageDownsampleType=/Bicubic',
+                '-dColorImageResolution=50',  # Very low DPI for max compression
+                '-dColorImageDownsampleThreshold=1.0',
+                '-dGrayImageDownsampleType=/Bicubic',
+                '-dGrayImageResolution=50',   # Very low DPI for grayscale
+                '-dGrayImageDownsampleThreshold=1.0',
+                '-dMonoImageDownsampleType=/Bicubic',
+                '-dMonoImageResolution=72',   # Keep mono readable
+                '-dMonoImageDownsampleThreshold=1.0',
+                # Additional aggressive compression
+                '-dColorConversionStrategy=/RGB',
+                '-dProcessColorModel=/DeviceRGB',
+                '-dDetectDuplicateImages=true',
+                '-dOptimize=true',
+                f'-sOutputFile={output_path}',
+                input_path
+            ]
+        else:
+            # Standard ghostscript command for normal quality modes
+            gs_cmd = [
+                'gs',
+                '-sDEVICE=pdfwrite',
+                '-dCompatibilityLevel=1.4',
+                '-dPDFSETTINGS=/' + quality,
+                '-dNOPAUSE',
+                '-dQUIET',
+                '-dBATCH',
+                '-dCompressFonts=true',
+                '-dCompressPages=true',
+                '-dEmbedAllFonts=true',
+                '-dSubsetFonts=true',
+                '-dAutoRotatePages=/None',
+                f'-sOutputFile={output_path}',
+                input_path
+            ]
+            
+            # Only add custom DPI if quality is not a standard preset
+            if quality not in ['screen', 'ebook', 'printer', 'prepress']:
+                gs_cmd.extend([
+                    f'-dColorImageDownsampleType=/Bicubic',
+                    f'-dColorImageResolution={dpi}',
+                    f'-dGrayImageDownsampleType=/Bicubic', 
+                    f'-dGrayImageResolution={dpi}',
+                    f'-dMonoImageDownsampleType=/Bicubic',
+                    f'-dMonoImageResolution={dpi}'
+                ])
         
         # Execute ghostscript command
         result = subprocess.run(

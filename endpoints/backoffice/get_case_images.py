@@ -1,5 +1,5 @@
 # Created: 2025-07-29 03:41:16
-# Last Modified: 2025-08-07 20:25:22
+# Last Modified: 2025-08-08 15:24:13
 # Author: Scott Cadreau
 
 # endpoints/backoffice/get_case_images.py
@@ -638,11 +638,21 @@ def _compress_file_optimized(original_path: str, compressed_path: str, stats: di
                 quality = 75
                 max_width = 1600
             
+            # Lower the file size threshold for compression in aggressive mode
+            from utils.compress_pic import get_compression_mode
+            compression_mode = get_compression_mode()
+            if compression_mode == "aggressive":
+                # In aggressive mode, compress files > 50KB instead of 100KB
+                if original_size < 50 * 1024:
+                    shutil.copy2(original_path, compressed_path)
+                    return True
+            
             success = compress_image(
                 input_path=original_path,
                 output_path=compressed_path,
                 quality=quality,
-                max_width=max_width
+                max_width=max_width,
+                use_compression_mode=True
             )
             if success:
                 stats["images_compressed"] += 1
@@ -653,7 +663,7 @@ def _compress_file_optimized(original_path: str, compressed_path: str, stats: di
         
         # Handle PDF files with Ghostscript for better compression
         elif file_ext == '.pdf':
-            # Use more aggressive compression for larger PDFs
+            # Use size-based compression for normal mode, aggressive mode will override
             if original_size > 20 * 1024 * 1024:  # > 20MB
                 quality = "screen"
             elif original_size > 10 * 1024 * 1024:  # > 10MB
@@ -661,10 +671,20 @@ def _compress_file_optimized(original_path: str, compressed_path: str, stats: di
             else:
                 quality = "ebook"
             
+            # Lower the file size threshold for compression in aggressive mode
+            from utils.compress_pdf import get_compression_mode
+            compression_mode = get_compression_mode()
+            if compression_mode == "aggressive":
+                # In aggressive mode, compress files > 50KB instead of 100KB
+                if original_size < 50 * 1024:
+                    shutil.copy2(original_path, compressed_path)
+                    return True
+            
             success = compress_pdf_ghostscript(
                 input_path=original_path,
                 output_path=compressed_path,
-                quality=quality
+                quality=quality,
+                use_compression_mode=True
             )
             if success:
                 stats["pdfs_compressed"] += 1

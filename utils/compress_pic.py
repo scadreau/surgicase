@@ -1,5 +1,5 @@
 # Created: 2025-07-29 04:32:09
-# Last Modified: 2025-07-29 04:37:36
+# Last Modified: 2025-08-08 15:24:13
 # Author: Scott Cadreau
 
 # utils/compress_pic.py
@@ -8,8 +8,27 @@ import logging
 from PIL import Image, ImageOps
 from typing import Optional, Tuple
 import tempfile
+import boto3
+import json
 
 logger = logging.getLogger(__name__)
+
+def get_compression_mode() -> str:
+    """
+    Get compression mode from AWS Secrets Manager main configuration
+    
+    Returns:
+        str: "aggressive" or "normal" (defaults to "normal" if not found)
+    """
+    try:
+        region = os.environ.get("AWS_REGION", "us-east-1")
+        client = boto3.client("secretsmanager", region_name=region)
+        response = client.get_secret_value(SecretId="surgicase/main")
+        secret = json.loads(response["SecretString"])
+        return secret.get("COMPRESSION_MODE", "normal").lower()
+    except Exception as e:
+        logger.warning(f"Could not fetch compression mode from secrets, using 'normal': {str(e)}")
+        return "normal"
 
 def compress_image(
     input_path: str, 
@@ -17,10 +36,11 @@ def compress_image(
     quality: int = 75, 
     max_width: int = 1600, 
     max_height: Optional[int] = None,
-    preserve_aspect_ratio: bool = True
+    preserve_aspect_ratio: bool = True,
+    use_compression_mode: bool = True
 ) -> bool:
     """
-    Compress an image using Pillow
+    Compress an image using Pillow with configurable compression modes
     
     Args:
         input_path: Path to the input image file
@@ -29,6 +49,7 @@ def compress_image(
         max_width: Maximum width in pixels (default 1600)
         max_height: Maximum height in pixels (None = auto based on aspect ratio)
         preserve_aspect_ratio: Whether to maintain original aspect ratio
+        use_compression_mode: Whether to override settings based on COMPRESSION_MODE secret
         
     Returns:
         bool: True if compression successful, False otherwise
@@ -38,6 +59,30 @@ def compress_image(
         if not os.path.exists(input_path):
             logger.error(f"Input file does not exist: {input_path}")
             return False
+        
+        # Override settings based on compression mode if enabled
+        compression_mode = "normal"  # Default
+        if use_compression_mode:
+            compression_mode = get_compression_mode()
+            if compression_mode == "aggressive":
+                # Get file size for size-based aggressive settings
+                file_size = os.path.getsize(input_path)
+                
+                # Aggressive settings: lower quality and smaller dimensions
+                if file_size > 10 * 1024 * 1024:  # > 10MB
+                    quality = 40
+                    max_width = 800
+                elif file_size > 5 * 1024 * 1024:  # > 5MB
+                    quality = 50
+                    max_width = 1000
+                else:
+                    quality = 60
+                    max_width = 1200
+                
+                logger.info(f"Using aggressive compression mode for image: {input_path} "
+                           f"(quality={quality}, max_width={max_width})")
+            else:
+                logger.info(f"Using normal compression mode for image: {input_path}")
         
         # Ensure output directory exists
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -79,15 +124,29 @@ def compress_image(
             
             # Only resize if image is larger than target dimensions
             if new_width < original_width or new_height < original_height:
-                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                # Use more aggressive resampling in aggressive mode
+                if use_compression_mode and compression_mode == "aggressive":
+                    resampling_method = Image.Resampling.BICUBIC  # Faster, smaller files
+                else:
+                    resampling_method = Image.Resampling.LANCZOS  # Higher quality
+                
+                img = img.resize((new_width, new_height), resampling_method)
                 logger.info(f"Resized image from {original_width}x{original_height} to {new_width}x{new_height}")
             
-            # Save with compression
+            # Save with compression - more aggressive settings in aggressive mode
             save_kwargs = {
                 'format': 'JPEG',
                 'quality': quality,
                 'optimize': True
             }
+            
+            # Add progressive JPEG and strip metadata in aggressive mode
+            if use_compression_mode and compression_mode == "aggressive":
+                save_kwargs.update({
+                    'progressive': True,      # Progressive JPEG for better compression
+                    'exif': b'',             # Strip EXIF metadata
+                    'icc_profile': None      # Remove color profile
+                })
             
             img.save(output_path, **save_kwargs)
             
