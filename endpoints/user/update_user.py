@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-06 15:18:59
+# Last Modified: 2025-08-08 02:00:25
 # Author: Scott Cadreau
 
 # endpoints/user/update_user.py
@@ -48,6 +48,7 @@ def update_user(request: Request, user: UserUpdate = Body(...)):
             - telephone (str, optional): Updated primary phone number
             - user_npi (str, optional): Updated National Provider Identifier
             - referred_by_user (str, optional): Updated referring user ID
+            - user_type (int, optional): Updated user type/permission level
             - message_pref (str, optional): Updated communication preferences
             - states_licensed (str, optional): Updated licensing state information
             - timezone (str, optional): Updated timezone preference
@@ -85,6 +86,7 @@ def update_user(request: Request, user: UserUpdate = Body(...)):
         - Empty document arrays remove all documents of that type
         - Professional information updates maintain regulatory compliance
         - User preferences affect system behavior and notifications
+        - User type changes automatically update max_case_status from user_type_list
     
     Document Management Logic:
         - Documents are replaced per document_type, not globally
@@ -104,7 +106,7 @@ def update_user(request: Request, user: UserUpdate = Body(...)):
     Professional Information Updates:
         - NPI updates for healthcare professional verification
         - State licensing updates for regulatory compliance
-        - User type modifications affect system permissions
+        - User type modifications affect system permissions and auto-update max_case_status
         - Referral chain updates for business relationship tracking
     
     Monitoring & Logging:
@@ -139,6 +141,7 @@ def update_user(request: Request, user: UserUpdate = Body(...)):
             "first_name": "Dr. Jane Updated",
             "telephone": "+1-555-9999",
             "user_npi": "0987654321",
+            "user_type": 10,
             "documents": [
                 {
                     "document_type": "medical_license",
@@ -157,7 +160,7 @@ def update_user(request: Request, user: UserUpdate = Body(...)):
             "body": {
                 "message": "User updated successfully",
                 "user_id": "USER123",
-                "updated_fields": ["first_name", "telephone", "user_npi", "documents"]
+                "updated_fields": ["first_name", "telephone", "user_npi", "user_type", "max_case_status", "documents"]
             }
         }
     
@@ -184,7 +187,9 @@ def update_user(request: Request, user: UserUpdate = Body(...)):
         - Multiple documents of the same type can be provided
         - Empty document array for a type removes all documents of that type
         - Professional fields (NPI, licensing) have regulatory implications
-        - User type changes may affect system permissions and access
+        - User type changes affect system permissions and automatically update max_case_status
+        - When user_type is changed, max_case_status is retrieved from user_type_list table
+        - Max_case_status determines maximum case status visibility for the user
         - All field updates are atomic - either all succeed or all are rolled back
         - File path updates do not trigger automatic file operations
         - Communication preference changes affect notification behavior
@@ -211,14 +216,17 @@ def update_user(request: Request, user: UserUpdate = Body(...)):
         conn = get_db_connection()
         
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-            # Check if user exists
-            cursor.execute("SELECT user_id FROM user_profile WHERE user_id = %s", (user.user_id,))
-            if not cursor.fetchone():
+            # Check if user exists and get current user_type for comparison
+            cursor.execute("SELECT user_id, user_type FROM user_profile WHERE user_id = %s", (user.user_id,))
+            existing_user = cursor.fetchone()
+            if not existing_user:
                 # Record failed user update (not found)
                 business_metrics.record_user_operation("update", "not_found", user.user_id)
                 response_status = 404
                 error_message = "User not found"
                 raise HTTPException(status_code=404, detail={"error": "User not found", "user_id": user.user_id})
+            
+            current_user_type = existing_user['user_type']
 
             updated_fields = []
             # Update user_profile table if needed
@@ -230,6 +238,30 @@ def update_user(request: Request, user: UserUpdate = Body(...)):
                 cursor.execute(sql, values)
                 if cursor.rowcount > 0:
                     updated_fields.extend(update_fields.keys())
+            
+            # Check if user_type was changed and update max_case_status accordingly
+            if user.user_type is not None and user.user_type != current_user_type:
+                # Lookup the max_case_status for the new user_type from user_type_list
+                cursor.execute(
+                    "SELECT user_max_case_status FROM user_type_list WHERE user_type = %s",
+                    (user.user_type,)
+                )
+                user_type_data = cursor.fetchone()
+                
+                if user_type_data and user_type_data['user_max_case_status'] is not None:
+                    new_max_case_status = user_type_data['user_max_case_status']
+                    
+                    # Update the max_case_status in user_profile
+                    cursor.execute(
+                        "UPDATE user_profile SET max_case_status = %s WHERE user_id = %s",
+                        (new_max_case_status, user.user_id)
+                    )
+                    
+                    if cursor.rowcount > 0:
+                        # Only add to updated_fields if max_case_status wasn't already in the update
+                        if "max_case_status" not in updated_fields:
+                            updated_fields.append("max_case_status")
+            
             # Replace user documents if provided
             if user.documents is not None:
                 # Insert new documents

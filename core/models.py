@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-31 09:46:00
+# Last Modified: 2025-08-08 02:00:25
 # Author: Scott Cadreau
 
 # core/models.py
@@ -43,6 +43,7 @@ class UserUpdate(BaseModel):
     telephone: Optional[str] = None
     user_npi: Optional[str] = None
     referred_by_user: Optional[str] = None
+    user_type: Optional[int] = None
     message_pref: Optional[str] = None
     states_licensed: Optional[str] = None
     timezone: Optional[str] = None
