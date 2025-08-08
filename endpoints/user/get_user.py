@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-06 15:18:59
+# Last Modified: 2025-08-08 15:07:12
 # Author: Scott Cadreau
 
 # endpoints/user/get_user.py
@@ -8,8 +8,41 @@ import pymysql.cursors
 from core.database import get_db_connection, close_db_connection
 from utils.monitoring import track_business_operation, business_metrics
 import time
+from datetime import datetime  # TODO: TEMPORARY - Remove when frontend integrates get_user_environment
 
 router = APIRouter()
+
+# TODO: TEMPORARY FUNCTION - Remove when frontend integrates get_user_environment
+def update_user_last_login(user_id: str, conn) -> bool:
+    """
+    TEMPORARY: Update the last_login_dt field for a user with current datetime.
+    This function is temporarily added here until the frontend integrates with get_user_environment.
+    
+    Args:
+        user_id: The user ID to update
+        conn: Database connection
+        
+    Returns:
+        bool: True if update was successful, False otherwise
+    """
+    try:
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            current_time = datetime.now()
+            
+            cursor.execute("""
+                UPDATE user_profile 
+                SET last_login_dt = %s 
+                WHERE user_id = %s AND active = 1
+            """, (current_time, user_id))
+            
+            # Return True if a row was updated
+            return cursor.rowcount > 0
+    except Exception as e:
+        # Log the error but don't fail the main operation
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to update last_login_dt for user {user_id}: {str(e)}")
+        return False
 
 @router.get("/user")
 @track_business_operation("read", "user")
@@ -197,6 +230,10 @@ def get_user(request: Request, user_id: str = Query(..., description="The user I
                         status_code=404, 
                         detail={"error": "User not found", "user_id": user_id}
                     )
+
+                # TODO: TEMPORARY - Update last login when user is accessed
+                # Remove this call when frontend integrates with get_user_environment
+                login_updated = update_user_last_login(user_id, conn)
 
                 # fetch user documents
                 cursor.execute("""SELECT document_type, document_name FROM user_documents WHERE user_id = %s""", (user_id,))
