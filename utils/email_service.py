@@ -1,5 +1,5 @@
 # Created: 2025-07-30 14:30:30
-# Last Modified: 2025-08-08 15:36:34
+# Last Modified: 2025-08-08 19:26:35
 # Author: Scott Cadreau
 
 import boto3
@@ -48,6 +48,41 @@ def _get_secret_value(secret_name: str, key: str, aws_region: str = "us-east-1")
     except Exception as e:
         logger.error(f"Error retrieving secret {secret_name}, key {key}: {e}")
         raise
+
+def is_email_enabled(aws_region: str = "us-east-1") -> bool:
+    """
+    Check if email sending is enabled by checking the ENABLE_EMAIL setting in surgicase/main secret
+    
+    Args:
+        aws_region: AWS region where the secret is stored
+        
+    Returns:
+        True if email sending is enabled, False otherwise
+        
+    Raises:
+        Exception: If there's an error accessing the secret (defaults to True for safety)
+    """
+    try:
+        enable_email_value = _get_secret_value("surgicase/main", "ENABLE_EMAIL", aws_region)
+        
+        if enable_email_value is None:
+            logger.warning("ENABLE_EMAIL key not found in surgicase/main secret, defaulting to enabled")
+            return True
+            
+        # Convert string value to boolean
+        if isinstance(enable_email_value, str):
+            enable_email_value = enable_email_value.lower()
+            return enable_email_value in ('true', '1', 'yes', 'on', 'enabled')
+        elif isinstance(enable_email_value, bool):
+            return enable_email_value
+        else:
+            logger.warning(f"ENABLE_EMAIL has unexpected type {type(enable_email_value)}, defaulting to enabled")
+            return True
+            
+    except Exception as e:
+        logger.error(f"Error checking ENABLE_EMAIL setting: {str(e)}, defaulting to enabled")
+        # Default to True for safety - we don't want to accidentally disable emails due to config issues
+        return True
 
 def _get_default_from_address(aws_region: str = "us-east-1") -> str:
     """
@@ -216,6 +251,47 @@ def send_email(
     """
     
     try:
+        # Check if email sending is enabled before proceeding
+        if not is_email_enabled(aws_region):
+            logger.info("Email sending is disabled via ENABLE_EMAIL setting. Email will not be sent.")
+            
+            # Normalize email addresses to lists for logging
+            if isinstance(to_addresses, str):
+                to_addresses_list = [to_addresses]
+            else:
+                to_addresses_list = to_addresses
+            if isinstance(cc_addresses, str):
+                cc_addresses_list = [cc_addresses]
+            else:
+                cc_addresses_list = cc_addresses
+            if isinstance(bcc_addresses, str):
+                bcc_addresses_list = [bcc_addresses]
+            else:
+                bcc_addresses_list = bcc_addresses
+            
+            # Log the email as "disabled" in the database for tracking
+            log_email_to_database(
+                to_addresses=to_addresses_list,
+                subject=subject,
+                body=body,
+                from_address=from_address or "system@disabled",
+                cc_addresses=cc_addresses_list,
+                bcc_addresses=bcc_addresses_list,
+                attachments=attachments,
+                email_type=email_type,
+                report_type=report_type,
+                status="disabled",
+                error_message="Email sending disabled via ENABLE_EMAIL setting",
+                aws_region=aws_region
+            )
+            
+            return {
+                "success": False,
+                "error": "Email sending is disabled via ENABLE_EMAIL setting",
+                "disabled": True,
+                "to_addresses": to_addresses_list
+            }
+        
         # Validate required parameters
         if not to_addresses:
             raise ValueError("to_addresses is required")
