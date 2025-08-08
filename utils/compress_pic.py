@@ -1,5 +1,5 @@
 # Created: 2025-07-29 04:32:09
-# Last Modified: 2025-08-08 15:24:13
+# Last Modified: 2025-08-08 15:39:54
 # Author: Scott Cadreau
 
 # utils/compress_pic.py
@@ -8,8 +8,6 @@ import logging
 from PIL import Image, ImageOps
 from typing import Optional, Tuple
 import tempfile
-import boto3
-import json
 
 logger = logging.getLogger(__name__)
 
@@ -21,11 +19,9 @@ def get_compression_mode() -> str:
         str: "aggressive" or "normal" (defaults to "normal" if not found)
     """
     try:
-        region = os.environ.get("AWS_REGION", "us-east-1")
-        client = boto3.client("secretsmanager", region_name=region)
-        response = client.get_secret_value(SecretId="surgicase/main")
-        secret = json.loads(response["SecretString"])
-        return secret.get("COMPRESSION_MODE", "normal").lower()
+        from utils.secrets_manager import get_secret_value
+        compression_mode = get_secret_value("surgicase/main", "COMPRESSION_MODE", cache_ttl=300)
+        return compression_mode.lower() if compression_mode else "normal"
     except Exception as e:
         logger.warning(f"Could not fetch compression mode from secrets, using 'normal': {str(e)}")
         return "normal"

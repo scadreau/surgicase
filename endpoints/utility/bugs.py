@@ -1,5 +1,5 @@
 # Created: 2025-08-06 14:20:21
-# Last Modified: 2025-08-07 15:59:34
+# Last Modified: 2025-08-08 15:39:54
 # Author: Scott Cadreau
 
 # endpoints/utility/bugs.py
@@ -8,7 +8,6 @@ from pydantic import BaseModel
 from typing import Dict, Any
 import pymysql.cursors
 import json
-import boto3
 import requests
 import os
 from core.database import get_db_connection, close_db_connection
@@ -22,11 +21,8 @@ def get_clickup_config() -> Dict[str, Any]:
     Fetch ClickUp configuration from AWS Secrets Manager
     """
     try:
-        region = os.environ.get("AWS_REGION", "us-east-1")
-        client = boto3.client("secretsmanager", region_name=region)
-        response = client.get_secret_value(SecretId="surgicase/main")
-        secret = json.loads(response["SecretString"])
-        return secret
+        from utils.secrets_manager import get_secret
+        return get_secret("surgicase/main", cache_ttl=300)
     except Exception as e:
         print(f"Error fetching ClickUp configuration from Secrets Manager: {str(e)}")
         return {}

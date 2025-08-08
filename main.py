@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-08 02:32:41
+# Last Modified: 2025-08-08 15:39:54
 # Author: Scott Cadreau
 
 # main.py
@@ -44,8 +44,6 @@ from endpoints.backoffice.get_cases_by_status import router as get_cases_by_stat
 
 # Import scheduler functionality
 import os
-import boto3
-import json
 import logging
 from endpoints.backoffice.get_users import router as get_users_router
 from endpoints.backoffice.case_dashboard_data import router as case_dashboard_data_router
@@ -64,14 +62,11 @@ from utils.monitoring import monitor_request, system_monitor, db_monitor, logger
 
 def get_main_config() -> dict:
     """
-    Fetch main configuration from AWS Secrets Manager
+    Fetch main configuration from AWS Secrets Manager using centralized secrets manager
     """
     try:
-        region = os.environ.get("AWS_REGION", "us-east-1")
-        client = boto3.client("secretsmanager", region_name=region)
-        response = client.get_secret_value(SecretId="surgicase/main")
-        secret = json.loads(response["SecretString"])
-        return secret
+        from utils.secrets_manager import get_secret
+        return get_secret("surgicase/main", cache_ttl=300)
     except Exception as e:
         logging.error(f"Error fetching main configuration from Secrets Manager: {str(e)}")
         # Return default configuration if secrets are unavailable
@@ -133,6 +128,10 @@ app.include_router(health_router, tags=["health"])
 
 # Metrics endpoints
 app.include_router(metrics_router, tags=["monitoring"])
+
+# Secrets cache monitoring
+from endpoints.monitoring.secrets_cache_stats import router as secrets_cache_stats_router
+app.include_router(secrets_cache_stats_router, tags=["monitoring"])
 
 # Backoffice endpoints
 app.include_router(get_cases_by_status_router, tags=["backoffice"])

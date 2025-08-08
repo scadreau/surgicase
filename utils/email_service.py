@@ -1,5 +1,5 @@
 # Created: 2025-07-30 14:30:30
-# Last Modified: 2025-08-08 14:53:40
+# Last Modified: 2025-08-08 15:36:34
 # Author: Scott Cadreau
 
 import boto3
@@ -28,12 +28,12 @@ class EmailAttachment:
 
 def _get_secret_value(secret_name: str, key: str, aws_region: str = "us-east-1") -> Optional[str]:
     """
-    Retrieve a specific key from AWS Secrets Manager
+    Retrieve a specific key from AWS Secrets Manager using centralized secrets manager
     
     Args:
         secret_name: Name of the secret in Secrets Manager
         key: Key within the secret to retrieve
-        aws_region: AWS region where the secret is stored
+        aws_region: AWS region where the secret is stored (kept for compatibility)
         
     Returns:
         The secret value or None if not found
@@ -42,29 +42,11 @@ def _get_secret_value(secret_name: str, key: str, aws_region: str = "us-east-1")
         ClientError: If there's an error accessing the secret
     """
     try:
-        secrets_client = boto3.client('secretsmanager', region_name=aws_region)
+        from utils.secrets_manager import get_secret_value
+        return get_secret_value(secret_name, key, cache_ttl=300)
         
-        response = secrets_client.get_secret_value(SecretId=secret_name)
-        secret_dict = json.loads(response['SecretString'])
-        
-        return secret_dict.get(key)
-        
-    except ClientError as e:
-        error_code = e.response['Error']['Code']
-        if error_code == 'ResourceNotFoundException':
-            logger.error(f"Secret {secret_name} not found")
-        elif error_code == 'InvalidRequestException':
-            logger.error(f"Invalid request for secret {secret_name}")
-        elif error_code == 'InvalidParameterException':
-            logger.error(f"Invalid parameter for secret {secret_name}")
-        else:
-            logger.error(f"Error retrieving secret {secret_name}: {e}")
-        raise
-    except json.JSONDecodeError as e:
-        logger.error(f"Error parsing secret {secret_name} as JSON: {e}")
-        raise
     except Exception as e:
-        logger.error(f"Unexpected error retrieving secret {secret_name}: {e}")
+        logger.error(f"Error retrieving secret {secret_name}, key {key}: {e}")
         raise
 
 def _get_default_from_address(aws_region: str = "us-east-1") -> str:
@@ -770,9 +752,8 @@ def get_email_templates(aws_region: str = "us-east-1") -> Dict[str, Any]:
         Exception: If templates cannot be retrieved
     """
     try:
-        client = boto3.client('secretsmanager', region_name=aws_region)
-        response = client.get_secret_value(SecretId='surgicase/email_templates')
-        templates = json.loads(response['SecretString'])
+        from utils.secrets_manager import get_secret
+        templates = get_secret('surgicase/email_templates', cache_ttl=300)
         logger.info("Successfully retrieved email templates from AWS Secrets Manager")
         return templates
     except Exception as e:
@@ -794,11 +775,15 @@ def update_email_templates(templates: Dict[str, Any], aws_region: str = "us-east
         Exception: If templates cannot be updated
     """
     try:
+        # Note: Update operations still need direct boto3 client as centralized secrets manager is read-only
         client = boto3.client('secretsmanager', region_name=aws_region)
         response = client.update_secret(
             SecretId='surgicase/email_templates',
             SecretString=json.dumps(templates, indent=2)
         )
+        # Clear cache for this secret after update
+        from utils.secrets_manager import clear_secrets_cache
+        clear_secrets_cache('surgicase/email_templates')
         logger.info("Successfully updated email templates in AWS Secrets Manager")
         return True
     except Exception as e:

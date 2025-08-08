@@ -1,10 +1,8 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-30 19:10:08
+# Last Modified: 2025-08-08 15:44:44
 # Author: Scott Cadreau
 
 # core/database.py
-import boto3
-import json
 import pymysql
 import pymysql.cursors
 import os
@@ -22,38 +20,17 @@ except ImportError:
     logger = None
     track_database_operation = lambda operation, table="unknown": lambda func: func
 
-# Global credentials cache and connection pool
-_credentials_cache: Dict[str, Any] = {}
-_credentials_lock = threading.Lock()
+# Global connection pool
 _connection_pool: Optional[Queue] = None
 _pool_config: Dict[str, Any] = {}
 _pool_lock = threading.Lock()
 
 def get_db_credentials(secret_name: str) -> Dict[str, Any]:
     """
-    Function to fetch database credentials from AWS Secrets Manager with caching
+    Function to fetch database credentials from AWS Secrets Manager using centralized secrets manager
     """
-    with _credentials_lock:
-        # Check cache first (cache for 5 minutes)
-        cache_key = f"{secret_name}_cache"
-        cache_time_key = f"{secret_name}_time"
-        
-        if (cache_key in _credentials_cache and 
-            cache_time_key in _credentials_cache and
-            time.time() - _credentials_cache[cache_time_key] < 300):  # 5 minutes cache
-            return _credentials_cache[cache_key]
-        
-        # Fetch from AWS if not cached or expired
-        region = os.environ.get("AWS_REGION", "us-east-1")
-        client = boto3.client("secretsmanager", region_name=region)
-        response = client.get_secret_value(SecretId=secret_name)
-        secret = json.loads(response["SecretString"])
-        
-        # Cache the result
-        _credentials_cache[cache_key] = secret
-        _credentials_cache[cache_time_key] = time.time()
-        
-        return secret
+    from utils.secrets_manager import get_secret
+    return get_secret(secret_name, cache_ttl=300)  # 5 minutes cache
 
 def _create_connection() -> pymysql.Connection:
     """Create a new database connection"""

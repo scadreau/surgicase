@@ -1,5 +1,5 @@
 # Created: 2025-07-17 10:30:00
-# Last Modified: 2025-08-05 22:53:44
+# Last Modified: 2025-08-08 15:36:40
 # Author: Scott Cadreau
 
 # utils/s3_storage.py
@@ -15,14 +15,11 @@ logger = logging.getLogger(__name__)
 
 def get_s3_config(secret_name: str = "surgicase/s3-user-reports") -> Dict[str, Any]:
     """
-    Fetch S3 configuration from AWS Secrets Manager
+    Fetch S3 configuration from AWS Secrets Manager using centralized secrets manager
     """
     try:
-        region = os.environ.get("AWS_REGION", "us-east-1")
-        client = boto3.client("secretsmanager", region_name=region)
-        response = client.get_secret_value(SecretId=secret_name)
-        secret = json.loads(response["SecretString"])
-        return secret
+        from utils.secrets_manager import get_secret
+        return get_secret(secret_name, cache_ttl=300)
     except Exception as e:
         logger.error(f"Error fetching S3 configuration from Secrets Manager: {str(e)}")
         raise
