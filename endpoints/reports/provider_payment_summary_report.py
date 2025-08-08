@@ -1,5 +1,5 @@
 # Created: 2025-08-08 02:31:02
-# Last Modified: 2025-08-08 02:36:30
+# Last Modified: 2025-08-08 17:17:52
 # Author: Scott Cadreau
 
 # endpoints/reports/provider_payment_summary_report.py
@@ -91,11 +91,11 @@ class ProviderPaymentSummaryReportPDF(FPDF):
         self.ln(2)
 
         # Add projected pay date line below state name
-        projected_pay_date = get_upcoming_friday()
-        self.set_font("Arial", '', 11)
-        projected_pay_text = f"Projected Pay Date: {projected_pay_date.strftime('%B %d, %Y')}"
-        self.cell(0, 8, projected_pay_text, ln=True, align="L")
-        self.ln(3)
+#        projected_pay_date = get_upcoming_friday()
+#        self.set_font("Arial", '', 11)
+#        projected_pay_text = f"Projected Pay Date: {projected_pay_date.strftime('%B %d, %Y')}"#
+#        self.cell(0, 8, projected_pay_text, ln=True, align="L")
+#        self.ln(3)
 
         # Table header
         self.set_font("Arial", 'B', 10)
