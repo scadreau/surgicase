@@ -37,3 +37,5 @@ If you cannot find the schema in the current table_structures_<date_time>.sql fi
 If you install a pip package always add --break-system-packages to the command 
 
 read the case.create_case endpoint to get a docstring format and include a verbose docstring to all new endpoints
+
+use snake case for naming functions and variables.  Leading _ in function names is acceptable for internal functions

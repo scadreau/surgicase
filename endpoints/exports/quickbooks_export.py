@@ -1,5 +1,5 @@
 # Created: 2025-01-27 15:00:00
-# Last Modified: 2025-08-06 16:04:25
+# Last Modified: 2025-08-08 16:10:46
 # Author: Scott Cadreau
 
 # endpoints/exports/quickbooks_export.py
@@ -252,7 +252,7 @@ def create_transactions_iif(transactions: List[Dict[str, Any]], filepath: str) -
 
 # --- Main Export Endpoints ---
 
-@router.get("/quickbooks-vendors-csv")
+@router.get("/quickbooks_vendors_csv")
 @track_business_operation("export", "quickbooks_vendors_csv")
 def export_quickbooks_vendors_csv(
     request: Request,
@@ -456,7 +456,7 @@ def export_quickbooks_vendors_csv(
             error_message=error_message
         )
 
-@router.get("/quickbooks-transactions-iif")
+@router.get("/quickbooks_transactions_iif")
 @track_business_operation("export", "quickbooks_transactions_iif")
 def export_quickbooks_transactions_iif(
     request: Request,

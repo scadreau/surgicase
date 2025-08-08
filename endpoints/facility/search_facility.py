@@ -1,5 +1,5 @@
 # Created: 2025-07-21 16:40:47
-# Last Modified: 2025-08-06 15:33:01
+# Last Modified: 2025-08-08 16:10:46
 # Author: Scott Cadreau
 
 # endpoints/facility/search_facility.py
@@ -12,7 +12,7 @@ import time
 
 router = APIRouter()
 
-@router.get("/search-facility")
+@router.get("/search_facility")
 @track_business_operation("search", "facility")
 def search_facility(
     request: Request,

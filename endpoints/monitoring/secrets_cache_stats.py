@@ -1,5 +1,5 @@
 # Created: 2025-08-08 15:37:06
-# Last Modified: 2025-08-08 15:50:06
+# Last Modified: 2025-08-08 16:10:46
 # Author: Scott Cadreau
 
 # endpoints/monitoring/secrets_cache_stats.py
@@ -19,7 +19,7 @@ except ImportError:
 
 router = APIRouter()
 
-@router.get("/secrets-cache-stats")
+@router.get("/secrets_cache_stats")
 @track_request_metrics
 def get_secrets_cache_stats(request: Request) -> Dict[str, Any]:
     """
@@ -126,7 +126,7 @@ def get_secrets_cache_stats(request: Request) -> Dict[str, Any]:
         if REQUEST_COUNT is not None:
             REQUEST_COUNT.labels(
                 method="GET", 
-                endpoint="/secrets-cache-stats", 
+                endpoint="/secrets_cache_stats", 
                 status="error"
             ).inc()
         

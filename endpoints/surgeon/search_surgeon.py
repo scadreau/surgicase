@@ -1,5 +1,5 @@
 # Created: 2025-07-21 15:08:09
-# Last Modified: 2025-08-06 15:36:45
+# Last Modified: 2025-08-08 16:10:46
 # Author: Scott Cadreau
 
 # endpoints/surgeon/search_surgeon.py
@@ -12,7 +12,7 @@ import time
 
 router = APIRouter()
 
-@router.get("/search-surgeon")
+@router.get("/search_surgeon")
 @track_business_operation("search", "surgeon")
 def search_surgeon(
     request: Request,
