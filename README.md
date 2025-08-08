@@ -1,5 +1,6 @@
 # Created: 2025-01-27
-# Last Modified: 2025-08-06 15:01:13
+# Last Modified: 2025-08-08 13:42:16
+# Version: 0.9.0
 
 # SurgiCase Management System
 
@@ -17,21 +18,24 @@ SurgiCase is a full-featured surgical case management system that provides:
 - **Financial Integration**: QuickBooks export for accounting and billing
 - **Comprehensive Monitoring**: Prometheus metrics, structured logging, and health checks
 - **Backoffice Tools**: Administrative functions for case and user management
+- **Advanced Search**: Facility and surgeon search capabilities
+- **Dashboard Analytics**: Real-time case and user analytics for administrative oversight
 
 ## 🚀 Features
 
 ### Core Management
 - **User Management**: Complete user profiles with NPI validation and licensing
 - **Case Management**: Surgical case tracking with procedure codes and patient information
-- **Facility Management**: Hospital and surgical facility tracking
-- **Surgeon Management**: Surgeon profiles with NPI validation
-- **Document Management**: File uploads and storage with S3 integration
+- **Facility Management**: Hospital and surgical facility tracking with search capabilities
+- **Surgeon Management**: Surgeon profiles with NPI validation and search functionality
+- **Document Management**: File uploads and storage with S3 integration and compression
 
 ### Healthcare Integration
 - **NPI Validation**: Real-time NPI lookup and validation via CMS registry
 - **CPT Codes**: Comprehensive procedure code management
 - **Document Types**: Medical document categorization and management
 - **Provider Verification**: Automated provider information validation
+- **Timezone Support**: Comprehensive timezone handling for multi-location operations
 
 ### Automation & Scheduling
 - **Weekly Status Updates**: Automated case status progression
@@ -45,6 +49,13 @@ SurgiCase is a full-featured surgical case management system that provides:
 - **QuickBooks Integration**: Direct export to QuickBooks for accounting
 - **Financial Metrics**: Payment tracking and business intelligence
 - **Export Capabilities**: CSV and IIF format exports
+
+### Administrative Tools
+- **Dashboard Analytics**: Real-time case and user distribution analytics
+- **Bulk Operations**: Bulk case status updates with validation
+- **User Environment Management**: Comprehensive user data retrieval
+- **Case Image Management**: Bulk download and compression of case files
+- **Administrative Reporting**: Comprehensive business intelligence dashboards
 
 ### Monitoring & Observability
 - **Prometheus Metrics**: Comprehensive operational monitoring
@@ -163,129 +174,118 @@ The application will be available at:
 
 ### Case Management
 - `GET /case` - Retrieve case by ID
+  - Parameters: `case_id` (string, required)
 - `POST /case` - Create new case
+  - Body: CaseCreate object
 - `PATCH /case` - Update case information
+  - Body: CaseUpdate object
 - `DELETE /case` - Delete case (soft delete)
+  - Parameters: `case_id` (string, required)
 - `GET /casefilter` - Filter cases by status
-- `PATCH /bulkupdatecasestatus` - Bulk update case status
+  - Parameters: `user_id` (string, required), `filter` (string, optional)
 
 ### User Management
 - `GET /user` - Retrieve user by ID
+  - Parameters: `user_id` (string, required)
 - `POST /user` - Create new user
+  - Body: UserCreate object
 - `PATCH /user` - Update user information
+  - Body: UserUpdate object
 - `DELETE /user` - Delete user (soft delete)
+  - Parameters: `user_id` (string, required)
 
 ### Facility Management
 - `GET /facilities` - Get facilities for user
+  - Parameters: `user_id` (string, required)
 - `POST /facility` - Create new facility
+  - Body: FacilityCreate object
 - `DELETE /facility` - Delete facility
+  - Parameters: `facility_id` (integer, required)
+- `GET /search_facility` - Search facilities by name
+  - Parameters: `user_id` (string, required), `search_term` (string, required)
 
 ### Surgeon Management
 - `GET /surgeons` - Get surgeons for user
+  - Parameters: `user_id` (string, required)
 - `POST /surgeon` - Create new surgeon
+  - Body: SurgeonCreate object
 - `DELETE /surgeon` - Delete surgeon
+  - Parameters: `surgeon_id` (integer, required)
+- `GET /search_surgeon` - Search surgeons by name
+  - Parameters: `user_id` (string, required), `search_term` (string, required)
 
 ### Utility Endpoints
 - `GET /check_npi` - Validate NPI number
+  - Parameters: `npi` (string, required)
 - `GET /doctypes` - Get document types
 - `GET /cpt_codes` - Get CPT codes
 - `POST /log_request` - Log API request
 - `GET /bugs` - Retrieve open bug reports
+  - Parameters: `user_id` (string, required)
 - `POST /bugs` - Submit bug reports with environment data
+  - Parameters: `user_id` (string, required)
+  - Body: Bug report object with environment data
+- `GET /user_environment` - Get comprehensive user environment data
+  - Parameters: `user_id` (string, required)
+- `GET /timezones` - Get all available timezones with UTC offsets
+- `GET /lists` - Get various system lists (admin only)
+  - Parameters: `user_id` (string, required), `list_type` (string, required)
 
 #### Bug Reporting Endpoints
-The `/bugs` endpoints provide comprehensive bug reporting functionality for both submitting and retrieving bug reports:
+The `/bugs` endpoints provide comprehensive bug reporting functionality:
 
 **GET /bugs Features:**
-- **Open Bug Retrieval**: Returns all bug reports with status not equal to 'Closed'
-- **Comprehensive Data**: Includes bug_id, title, description, calling_page, status, priority, created_ts
-- **Ordered Results**: Returns bugs ordered by creation date (newest first)
-- **Count Information**: Provides total count of open bugs
-- **Authorization Required**: Requires user_id parameter for logging and authorization
+- Returns all bug reports with status not equal to 'Closed'
+- Includes bug_id, title, description, calling_page, status, priority, created_ts
+- Results ordered by creation date (newest first)
+- Provides total count of open bugs
+- Requires user_id parameter for authorization
 
 **POST /bugs Features:**
-- **User Validation**: Validates that the user_id exists in user_profile table before processing
-- **Authorization Required**: Requires user_id parameter for authorization and logging
-- **Comprehensive Data Capture**: Captures bug details along with complete user environment, case statuses, surgeons, facilities, and permissions
-- **Automatic Field Mapping**: Extracts and maps specific fields from complex JSON payload
-- **Environment Context**: Stores full JSON context for detailed debugging and analysis
-- **Database Integration**: Stores bug reports in dedicated `bugs` table with auto-generated IDs
-- **Monitoring Integration**: Includes Prometheus metrics and request logging
-
-**GET Request:**
-```bash
-GET /bugs?user_id=uuid
-```
-
-**GET Response:**
-```json
-{
-  "bugs": [
-    {
-      "bug_id": 123,
-      "title": "Cannot add case procedure codes",
-      "description": "Long description of the bug",
-      "calling_page": "Case List",
-      "status": "Open",
-      "priority": "High",
-      "created_ts": "2025-08-06T14:20:21"
-    }
-  ],
-  "count": 1
-}
-```
-
-**POST Request Format:**
-```bash
-POST /bugs?user_id=uuid
-```
-
-```json
-{
-  "bug_date": "2025-07-30",
-  "calling_page": "Case List", 
-  "priority": "High",
-  "bug": {
-    "title": "Cannot add case procedure codes",
-    "description": "Long description of the bug"
-  },
-  "user_profile": {
-    "user_id": "uuid",
-    "first_name": "John",
-    "last_name": "Doe",
-    // ... additional user profile data
-  },
-  // ... additional environment data (case_statuses, surgeons, facilities, etc.)
-}
-```
-
-**POST Response:**
-```json
-{
-  "message": "Bug report created successfully",
-  "bug_id": 123,
-  "status": "Open"
-}
-```
+- Validates user_id exists in user_profile table
+- Captures comprehensive environment data including user profile, case statuses, surgeons, facilities
+- Stores bug reports in dedicated `bugs` table
+- Includes Prometheus metrics and request logging
 
 ### Health & Monitoring
 - `GET /health` - Comprehensive health check with all AWS services
 - `GET /health/system` - Simplified system status (perfect for user login)
 - `GET /health/ready` - Kubernetes readiness probe
 - `GET /health/live` - Kubernetes liveness probe
-- `GET /metrics` - Prometheus metrics
-- `GET /metrics/summary` - Human-readable metrics
+- `GET /metrics` - Prometheus metrics endpoint
+- `GET /metrics/summary` - Human-readable metrics summary
+- `GET /metrics/health` - Metrics system health check
+- `GET /system_metrics` - System resource metrics
+- `GET /database_metrics` - Database performance metrics
+- `GET /business_metrics` - Business operation metrics
+- `GET /endpoint_metrics` - API endpoint performance metrics
+- `GET /metrics_self_monitoring` - Metrics system self-monitoring
 
-### Backoffice
+### Backoffice (Administrative)
 - `GET /casesbystatus` - Get cases by status (admin only)
+  - Parameters: `user_id` (string, required), `status` (integer, optional)
 - `GET /users` - Get all users (admin only)
-- `GET /casedashboarddata` - Dashboard data (admin only)
+  - Parameters: `user_id` (string, required)
+- `PATCH /bulkupdatecasestatus` - Bulk update case status
+  - Body: BulkCaseStatusUpdate object with case_ids, new_status, force flag
+- `GET /case_dashboard_data` - Comprehensive case analytics dashboard
+  - Parameters: `user_id` (string, required), `start_date` (optional), `end_date` (optional)
+- `GET /user_dashboard_data` - User analytics dashboard
+  - Parameters: `user_id` (string, required)
+- `GET /case_images` - Bulk download and compress case files
+  - Parameters: `user_id` (string, required), `case_ids` (array, required)
+- `GET /build_dashboard` - Build comprehensive dashboard data
+  - Parameters: `user_id` (string, required)
 
 ### Reports & Exports
 - `GET /provider_payment_report` - Consolidated provider payment report
-- `GET /individual_provider_reports` - Individual password-protected provider reports
+  - Parameters: Various date and filtering options
+- `GET /provider_payment_summary_report` - Summary provider payment report
+  - Parameters: Various date and filtering options
 - `GET /quickbooks-vendors-csv` - QuickBooks vendors export
 - `GET /quickbooks-transactions-iif` - QuickBooks transactions export
+- `GET /case_export` - Export case data in various formats
+  - Parameters: Export format and filtering options
 
 ## 🔧 Configuration
 
@@ -446,7 +446,7 @@ This allows automatic monitoring of additional SurgiCase instances as the system
 ### Individual Provider Reports
 - Each provider receives a password-protected PDF containing only their cases
 - Password format: `lastname_npi` (e.g., "smith_1234567890")
-- Passwords are communicated securely via email
+- Passwords are communicated securely via email [[memory:5531137]]
 - Reports are generated weekly and stored in S3 with metadata
 
 ### Security Features
@@ -488,16 +488,20 @@ surgicase/
 │   ├── user/               # User management endpoints
 │   ├── facility/           # Facility management endpoints
 │   ├── surgeon/            # Surgeon management endpoints
-│   ├── utility/            # Utility endpoints (NPI, CPT codes)
+│   ├── utility/            # Utility endpoints (NPI, CPT codes, timezones, lists)
 │   ├── backoffice/         # Administrative endpoints
 │   ├── reports/            # Report generation endpoints
-│   └── exports/            # Export endpoints (QuickBooks)
+│   ├── exports/            # Export endpoints (QuickBooks, cases)
+│   ├── health.py           # Health check endpoints
+│   └── metrics.py          # Monitoring metrics endpoints
 ├── utils/                   # Utility modules
 │   ├── monitoring.py       # Monitoring and metrics
 │   ├── scheduler.py        # Automated scheduling
 │   ├── s3_storage.py       # S3 integration
 │   ├── pay_amount_calculator.py  # Payment calculations
-│   └── logo_manager.py     # Logo management
+│   ├── logo_manager.py     # Logo management
+│   ├── compress_pic.py     # Image compression
+│   └── compress_pdf.py     # PDF compression
 ├── monitoring/             # Monitoring configuration
 │   ├── grafana/           # Grafana dashboards
 │   ├── prometheus/        # Prometheus configuration
@@ -515,6 +519,7 @@ surgicase/
 - User-based authentication via `user_id` parameter
 - Role-based access control for administrative functions
 - NPI validation for healthcare provider verification
+- User type-based access restrictions (admin functions require user_type >= 10)
 
 ### Data Protection
 - AWS Secrets Manager for credential storage
@@ -566,12 +571,14 @@ WantedBy=multi-user.target
 - Request/response timing tracking
 - Efficient query optimization
 - Caching for frequently accessed data
+- Image and PDF compression for reduced storage and transfer costs
 
 ### Scalability
 - Stateless API design
 - Horizontal scaling support
 - Database connection management
 - Resource monitoring and alerting
+- Service discovery framework for multi-instance deployments
 
 ## 🤝 Contributing
 
@@ -594,7 +601,8 @@ For support and questions:
 
 ## 🔄 Version History
 
-- **v0.8.1**: Current version with individual password-protected provider reports and enhanced security
+- **v0.9.0**: Enhanced administrative tools, search capabilities, comprehensive dashboard analytics, image management, and timezone support
+- **v0.8.1**: Individual password-protected provider reports and enhanced security
 - **v0.8.0**: Comprehensive monitoring, S3 integration, and QuickBooks export
 - **v0.7.0**: Added scheduling and automation features
 - **v0.6.0**: Implemented S3 integration and enhanced reporting
@@ -606,4 +614,4 @@ For support and questions:
 
 ---
 
-**SurgiCase Management System** - Comprehensive surgical case management for healthcare providers. 
+**SurgiCase Management System v0.9.0** - Comprehensive surgical case management for healthcare providers.

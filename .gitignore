@@ -139,7 +139,7 @@ table_structures_*.sql
 npi_data/*.csv
 
 # Reports
-reports/
+/reports/
 
 # Updates
 updates/
