@@ -1,5 +1,5 @@
 # Created: 2025-07-24 17:54:30
-# Last Modified: 2025-08-06 16:00:46
+# Last Modified: 2025-08-08 22:37:13
 # Author: Scott Cadreau
 # Assisted by: Claude 4 Sonnet
 
@@ -343,45 +343,41 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
 
         conn = get_db_connection()
         
-        try:
-            # Get user profile information
-            user_profile = get_user_profile_info(user_id, conn)
-            
-            if not user_profile:
-                # Record failed access (user not found)
-                business_metrics.record_utility_operation("get_user_environment", "user_not_found")
-                response_status = 404
-                error_message = "User not found or inactive"
-                raise HTTPException(status_code=404, detail="User not found or inactive")
+        # Get user profile information
+        user_profile = get_user_profile_info(user_id, conn)
+        
+        if not user_profile:
+            # Record failed access (user not found)
+            business_metrics.record_utility_operation("get_user_environment", "user_not_found")
+            response_status = 404
+            error_message = "User not found or inactive"
+            raise HTTPException(status_code=404, detail="User not found or inactive")
 
-            user_type = user_profile.get("user_type", 0)
-            max_case_status = user_profile.get("max_case_status", 20)
-            
-            # Update last login datetime
-            login_updated = update_user_last_login(user_id, conn)
-            
-            # Get case statuses based on user permissions
-            case_status_info = get_case_statuses_for_user(user_id, user_type, max_case_status, conn)
-            
-            # Get surgeon and facility lists for the user
-            surgeons = get_user_surgeons(user_id, conn)
-            facilities = get_user_facilities(user_id, conn)
-            
-            # Get available user types for the user
-            available_user_types = get_available_user_types(user_type, conn)
-            
-            # Find max_case_status_desc from the case_statuses array
-            max_case_status_desc = None
-            for case_status in case_status_info["case_statuses"]:
-                if case_status["case_status"] == max_case_status:
-                    max_case_status_desc = case_status["case_status_desc"]
-                    break
-            
-            # Record successful user environment retrieval
-            business_metrics.record_utility_operation("get_user_environment", "success")
-                
-        finally:
-            close_db_connection(conn)
+        user_type = user_profile.get("user_type", 0)
+        max_case_status = user_profile.get("max_case_status", 20)
+        
+        # Update last login datetime
+        login_updated = update_user_last_login(user_id, conn)
+        
+        # Get case statuses based on user permissions
+        case_status_info = get_case_statuses_for_user(user_id, user_type, max_case_status, conn)
+        
+        # Get surgeon and facility lists for the user
+        surgeons = get_user_surgeons(user_id, conn)
+        facilities = get_user_facilities(user_id, conn)
+        
+        # Get available user types for the user
+        available_user_types = get_available_user_types(user_type, conn)
+        
+        # Find max_case_status_desc from the case_statuses array
+        max_case_status_desc = None
+        for case_status in case_status_info["case_statuses"]:
+            if case_status["case_status"] == max_case_status:
+                max_case_status_desc = case_status["case_status_desc"]
+                break
+        
+        # Record successful user environment retrieval
+        business_metrics.record_utility_operation("get_user_environment", "success")
             
         response_data = {
             "user_profile": user_profile,
@@ -423,11 +419,11 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
         business_metrics.record_utility_operation("get_user_environment", "error")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
     finally:
-        # Log request execution if monitoring is available
-        if conn:
+        # Close database connection if it exists
+        if 'conn' in locals() and conn:
             try:
                 close_db_connection(conn)
-            except:
+            except Exception:
                 pass  # Connection might already be closed
         
         # Calculate execution time in milliseconds for logging

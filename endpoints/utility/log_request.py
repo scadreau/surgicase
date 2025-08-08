@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-06 15:44:12
+# Last Modified: 2025-08-08 22:37:13
 # Author: Scott Cadreau
 
 # endpoints/utility/log_request.py
@@ -258,7 +258,4 @@ def log_request(log: LogRequestModel):
     except Exception as e:
         # Record failed request logging
         business_metrics.record_utility_operation("log_request", "error")
-        
-        if 'conn' in locals():
-            close_db_connection(conn)
         raise HTTPException(status_code=500, detail={"error": str(e)}) 
