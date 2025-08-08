@@ -1,5 +1,5 @@
 # Created: 2025-07-30 14:30:30
-# Last Modified: 2025-08-08 02:47:46
+# Last Modified: 2025-08-08 14:53:40
 # Author: Scott Cadreau
 
 import boto3
@@ -916,7 +916,8 @@ def send_provider_payment_report_emails(
             "total_providers": str(report_data.get('total_providers', '')),
             "total_cases": str(report_data.get('total_cases', '')),
             "total_amount": str(report_data.get('total_amount', '')),
-            "filename": report_filename
+            "filename": report_filename,
+            "password": report_data.get('password', '') or 'Not password protected'
         }
         
         # Create attachment

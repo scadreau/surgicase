@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-08-06 16:07:24
+# Last Modified: 2025-08-08 14:52:46
 # Author: Scott Cadreau
 
 # endpoints/reports/provider_payment_report.py
@@ -524,9 +524,28 @@ def generate_provider_payment_report(
                 # Save to reports directory
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 filename = f"provider_payment_report_{timestamp}.pdf"
-                filepath = os.path.join(reports_dir, filename)
                 
-                pdf.output(filepath)
+                # Create temporary unprotected file first
+                temp_filename = f"temp_{filename}"
+                temp_filepath = os.path.join(reports_dir, temp_filename)
+                pdf.output(temp_filepath)
+                
+                # Generate password for weekly report (format: weekly_YYYYMMDD)
+                report_password = f"weekly_{datetime.now().strftime('%Y%m%d')}"
+                
+                # Create password-protected version
+                filepath = os.path.join(reports_dir, filename)
+                if not password_protect_pdf(temp_filepath, filepath, report_password):
+                    logger.error("Failed to password protect weekly provider payment report PDF")
+                    # Use unprotected version as fallback
+                    os.rename(temp_filepath, filepath)
+                    report_password = None
+                else:
+                    # Clean up temporary unprotected file
+                    try:
+                        os.remove(temp_filepath)
+                    except Exception as e:
+                        logger.warning(f"Could not remove temporary file {temp_filepath}: {str(e)}")
                 
                 # Prepare metadata for S3
                 metadata = {
@@ -574,7 +593,8 @@ def generate_provider_payment_report(
                         "report_date": report_date_range,
                         "total_providers": len(providers),
                         "total_cases": total_cases,
-                        "total_amount": f"{total_amount:.2f}"
+                        "total_amount": f"{total_amount:.2f}",
+                        "password": report_password  # Add password for encrypted PDF
                     }
                     
                     # Send emails with appropriate template type
