@@ -1,5 +1,5 @@
 # Created: 2025-08-06 14:20:21
-# Last Modified: 2025-08-08 15:39:54
+# Last Modified: 2025-08-09 00:04:10
 # Author: Scott Cadreau
 
 # endpoints/utility/bugs.py
@@ -10,6 +10,7 @@ import pymysql.cursors
 import json
 import requests
 import os
+import threading
 from core.database import get_db_connection, close_db_connection
 from utils.monitoring import track_business_operation, business_metrics
 import time
@@ -195,6 +196,7 @@ def create_bug_report(request: Request, bug_data: BugReport, user_id: str = Quer
         - Comprehensive request logging with execution time tracking
         - Full JSON payload preservation for debugging and analysis
         - Error logging with rollback tracking
+        - ClickUp integration errors logged asynchronously in background thread
     
     Data Processing:
         - JSON serialization of complete bug report for forensic analysis
@@ -239,6 +241,8 @@ def create_bug_report(request: Request, bug_data: BugReport, user_id: str = Quer
         - Full application context captured for comprehensive debugging
         - User profile validation ensures only authorized users can submit reports
         - JSON payload preserved for forensic analysis and debugging
+        - ClickUp task creation runs asynchronously to optimize response time
+        - Response returned immediately after database commit (not waiting for ClickUp)
     """
     conn = None
     start_time = time.time()
@@ -299,13 +303,21 @@ def create_bug_report(request: Request, bug_data: BugReport, user_id: str = Quer
                 # Record successful bug report creation
                 business_metrics.record_utility_operation("create_bug_report", "success")
                 
-                # Create ClickUp task if integration is enabled
-                try:
-                    create_clickup_task(bug_data, bug_id)
-                except Exception as clickup_error:
-                    # Log the error but don't fail the bug creation
-                    print(f"Warning: Failed to create ClickUp task for bug #{bug_id}: {str(clickup_error)}")
-                    # We don't want to fail the entire bug creation if ClickUp fails
+                # Create ClickUp task in background thread (fire-and-forget)
+                def _create_clickup_task_background():
+                    try:
+                        create_clickup_task(bug_data, bug_id)
+                    except Exception as clickup_error:
+                        # Log the error but don't fail the bug creation
+                        print(f"Warning: Failed to create ClickUp task for bug #{bug_id}: {str(clickup_error)}")
+                
+                # Start background thread for ClickUp integration
+                clickup_thread = threading.Thread(
+                    target=_create_clickup_task_background,
+                    daemon=True,  # Thread will not prevent app shutdown
+                    name=f"clickup_bug_{bug_id}"
+                )
+                clickup_thread.start()
                 
         finally:
             close_db_connection(conn)
