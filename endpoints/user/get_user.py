@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-08 22:32:50
+# Last Modified: 2025-08-10 06:31:04
 # Author: Scott Cadreau
 
 # endpoints/user/get_user.py
@@ -55,6 +55,7 @@ def get_user(request: Request, user_id: str = Query(..., description="The user I
                 - user_type (str): User classification/role type
                 - message_pref (str): Communication preference settings
                 - states_licensed (str): States where user holds professional licenses
+                - user_tier (int): User tier classification for billing/permissions
                 - documents (List[dict]): Array of user documents:
                     - document_type (str): Type/category of document
                     - document_name (str): Name/path of the document file
@@ -139,6 +140,7 @@ def get_user(request: Request, user_id: str = Query(..., description="The user I
                 "user_type": "physician",
                 "message_pref": "email",
                 "states_licensed": "CA,NY,TX",
+                "user_tier": 1,
                 "documents": [
                     {
                         "document_type": "medical_license",
@@ -188,7 +190,7 @@ def get_user(request: Request, user_id: str = Query(..., description="The user I
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                 # fetch from users table
                 cursor.execute("""select user_id,user_email, first_name, last_name, addr1, addr2, city, state, zipcode, telephone, user_npi, 
-                    referred_by_user, user_type, message_pref, states_licensed from user_profile where user_id = %s and active = 1""", (user_id))
+                    referred_by_user, user_type, message_pref, states_licensed, user_tier from user_profile where user_id = %s and active = 1""", (user_id))
                 user_data = cursor.fetchone()
 
                 if not user_data:
