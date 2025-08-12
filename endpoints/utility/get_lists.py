@@ -1,5 +1,5 @@
 # Created: 2025-08-05 22:15:27
-# Last Modified: 2025-08-06 15:45:44
+# Last Modified: 2025-08-12 16:06:30
 # Author: Scott Cadreau
 
 # endpoints/utility/get_lists.py
@@ -583,6 +583,156 @@ def get_faqs(request: Request, user_id: str = Query(..., description="User ID fo
         response_status = 500
         error_message = str(e)
         business_metrics.record_utility_operation("get_faqs", "error")
+        
+        if 'conn' in locals():
+            close_db_connection(conn)
+        raise HTTPException(status_code=500, detail={"error": str(e)})
+        
+    finally:
+        # Calculate execution time
+        execution_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Log request details for monitoring using the utility function
+        from endpoints.utility.log_request import log_request_from_endpoint
+        log_request_from_endpoint(
+            request=request,
+            execution_time_ms=execution_time_ms,
+            response_status=response_status,
+            user_id=user_id,
+            response_data=response_data,
+            error_message=error_message
+        )
+
+@router.get("/pay_tiers")
+@track_business_operation("get", "pay_tiers")
+def get_pay_tiers(request: Request, user_id: str = Query(..., description="User ID for authorization")):
+    """
+    Retrieve all procedure code payment tier buckets for billing and reimbursement management.
+    
+    This endpoint provides access to the complete procedure code payment tier structure used
+    throughout the application for medical billing calculations, reimbursement analysis, and
+    financial reporting. The payment tiers organize procedure codes into buckets with associated
+    payment amounts based on tier levels, code categories, and bucket classifications for
+    systematic billing and revenue management.
+    
+    Args:
+        request (Request): FastAPI request object for logging and monitoring
+        user_id (str): User ID for authorization validation.
+                      Must have user_type >= 100 for access to payment tier data.
+    
+    Returns:
+        dict: Response containing:
+            - pay_tiers (List[dict]): Array of payment tier bucket objects, each containing:
+                - code_category (str): Medical procedure code category classification
+                - code_bucket (str): Grouping bucket for related procedure codes
+                - tier (int): Payment tier level determining reimbursement amount
+                - pay_amount (decimal): Associated payment amount for this tier/bucket combination
+    
+    Raises:
+        HTTPException:
+            - 404 Not Found: User not found or inactive in user_profile table
+            - 403 Forbidden: User has insufficient privileges (user_type < 100)
+            - 500 Internal Server Error: Database connection or query execution errors
+    
+    Authorization:
+        - Requires user_type >= 100 for access to payment tier management data
+        - Uses validate_user_access() helper function for consistent authorization
+        - Validates user exists and is active in user_profile table
+    
+    Database Operations:
+        - Queries 'procedure_code_buckets' table for all payment tier configurations
+        - Results ordered by tier, code_bucket, code_category for logical presentation
+        - Returns complete payment structure for billing system integration
+        - Read-only operation with automatic connection management
+    
+    Monitoring & Logging:
+        - Business metrics tracking for payment tier retrieval operations
+        - Prometheus monitoring via @track_business_operation decorator
+        - Comprehensive request logging with user ID tracking
+        - Authorization failure tracking for security monitoring
+    
+    Example Response:
+        {
+            "pay_tiers": [
+                {
+                    "code_category": "SURGERY",
+                    "code_bucket": "BASIC_PROCEDURES",
+                    "tier": 1,
+                    "pay_amount": 250.00
+                },
+                {
+                    "code_category": "SURGERY", 
+                    "code_bucket": "COMPLEX_PROCEDURES",
+                    "tier": 1,
+                    "pay_amount": 500.00
+                },
+                {
+                    "code_category": "CONSULTATION",
+                    "code_bucket": "INITIAL_CONSULT",
+                    "tier": 2,
+                    "pay_amount": 150.00
+                },
+                {
+                    "code_category": "SURGERY",
+                    "code_bucket": "BASIC_PROCEDURES", 
+                    "tier": 2,
+                    "pay_amount": 300.00
+                }
+            ]
+        }
+    
+    Usage:
+        GET /pay_tiers?user_id=USER123
+        
+    Notes:
+        - Payment tiers are organized hierarchically with tier levels determining base reimbursement
+        - Code buckets group related procedures for standardized billing calculations
+        - Code categories provide high-level classification of medical procedure types
+        - Used for automated billing calculations and reimbursement processing
+        - Essential for revenue management and financial reporting systems
+        - Authorization required to prevent unauthorized access to sensitive payment information
+        - Integrates with case payment calculations and provider reimbursement workflows
+    """
+    conn = None
+    start_time = time.time()
+    response_status = 200
+    response_data = None
+    error_message = None
+    
+    try:
+        conn = get_db_connection()
+        
+        # Validate user access
+        validate_user_access(user_id, conn)
+        
+        try:
+            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                cursor.execute(
+                    "SELECT code_category, code_bucket, tier, pay_amount FROM procedure_code_buckets ORDER BY tier, code_bucket, code_category"
+                )
+                pay_tiers = cursor.fetchall()
+
+                # Record successful pay tiers retrieval
+                business_metrics.record_utility_operation("get_pay_tiers", "success")
+                
+        finally:
+            close_db_connection(conn)
+            
+        response_data = {
+            "pay_tiers": pay_tiers
+        }
+        return response_data
+        
+    except HTTPException as http_error:
+        # Re-raise HTTP exceptions and capture error details
+        response_status = http_error.status_code
+        error_message = str(http_error.detail)
+        raise
+    except Exception as e:
+        # Record failed pay tiers retrieval
+        response_status = 500
+        error_message = str(e)
+        business_metrics.record_utility_operation("get_pay_tiers", "error")
         
         if 'conn' in locals():
             close_db_connection(conn)
