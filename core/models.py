@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-12 17:17:11
+# Last Modified: 2025-08-12 17:32:36
 # Author: Scott Cadreau
 
 # core/models.py
@@ -50,6 +50,7 @@ class UserUpdate(BaseModel):
     documents: Optional[List[UserDocument]] = None
     last_login_dt: Optional[datetime] = None
     max_case_status: Optional[int] = None
+    user_tier: Optional[int] = None
 
 class UserRequest(BaseModel):
     user_id: str

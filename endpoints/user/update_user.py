@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-08 02:00:25
+# Last Modified: 2025-08-12 17:32:31
 # Author: Scott Cadreau
 
 # endpoints/user/update_user.py
@@ -52,6 +52,7 @@ def update_user(request: Request, user: UserUpdate = Body(...)):
             - message_pref (str, optional): Updated communication preferences
             - states_licensed (str, optional): Updated licensing state information
             - timezone (str, optional): Updated timezone preference
+            - user_tier (int, optional): Updated user tier level
             - documents (List[UserDocument], optional): Document list for replacement:
                 - document_type (str): Type/category of document
                 - document_name (str): Name/path of the document file
@@ -87,6 +88,7 @@ def update_user(request: Request, user: UserUpdate = Body(...)):
         - Professional information updates maintain regulatory compliance
         - User preferences affect system behavior and notifications
         - User type changes automatically update max_case_status from user_type_list
+        - User tier updates affect the user's access level and system privileges
     
     Document Management Logic:
         - Documents are replaced per document_type, not globally
@@ -107,6 +109,7 @@ def update_user(request: Request, user: UserUpdate = Body(...)):
         - NPI updates for healthcare professional verification
         - State licensing updates for regulatory compliance
         - User type modifications affect system permissions and auto-update max_case_status
+        - User tier modifications affect access levels and system privileges
         - Referral chain updates for business relationship tracking
     
     Monitoring & Logging:
@@ -142,6 +145,7 @@ def update_user(request: Request, user: UserUpdate = Body(...)):
             "telephone": "+1-555-9999",
             "user_npi": "0987654321",
             "user_type": 10,
+            "user_tier": 2,
             "documents": [
                 {
                     "document_type": "medical_license",
@@ -160,7 +164,7 @@ def update_user(request: Request, user: UserUpdate = Body(...)):
             "body": {
                 "message": "User updated successfully",
                 "user_id": "USER123",
-                "updated_fields": ["first_name", "telephone", "user_npi", "user_type", "max_case_status", "documents"]
+                "updated_fields": ["first_name", "telephone", "user_npi", "user_type", "user_tier", "max_case_status", "documents"]
             }
         }
     
@@ -190,6 +194,7 @@ def update_user(request: Request, user: UserUpdate = Body(...)):
         - User type changes affect system permissions and automatically update max_case_status
         - When user_type is changed, max_case_status is retrieved from user_type_list table
         - Max_case_status determines maximum case status visibility for the user
+        - User tier changes affect the user's access level and available features
         - All field updates are atomic - either all succeed or all are rolled back
         - File path updates do not trigger automatic file operations
         - Communication preference changes affect notification behavior
