@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-07 19:13:46
+# Last Modified: 2025-08-12 17:02:34
 # Author: Scott Cadreau
 
 # endpoints/case/get_case.py
@@ -13,7 +13,7 @@ router = APIRouter()
 
 @router.get("/case")
 @track_business_operation("read", "case")
-def get_case(request: Request, case_id: str = Query(..., description="The case ID to retrieve")):
+def get_case(request: Request, case_id: str = Query(..., description="The case ID to retrieve"), calling_user_id: str = Query(None, description="Optional user ID to check max_case_status against (for permission-based visibility)")):
     """
     Retrieve comprehensive surgical case information with user permission-based visibility controls.
     
@@ -33,6 +33,10 @@ def get_case(request: Request, case_id: str = Query(..., description="The case I
     Args:
         request (Request): FastAPI request object for logging and monitoring
         case_id (str): Unique identifier of the case to retrieve (required query parameter)
+        calling_user_id (str, optional): User ID to check max_case_status against for permission-based 
+                                        case status visibility. When provided, this user's max_case_status 
+                                        determines the maximum case status level that will be returned. 
+                                        If not provided, defaults to using the case owner's max_case_status.
     
     Returns:
         dict: Response containing:
@@ -75,10 +79,13 @@ def get_case(request: Request, case_id: str = Query(..., description="The case I
         7. Formats response data for API consumption
     
     User Permission Logic:
-        - Retrieves case owner's max_case_status from user_profile (default: 20)
+        - If calling_user_id is provided, uses that user's max_case_status from user_profile
+        - If calling_user_id is not provided, uses case owner's max_case_status from user_profile  
+        - Default max_case_status is 20 if user profile not found or max_case_status is null
         - If actual case_status > max_case_status, caps display at max_case_status
         - This ensures users only see case status information they're authorized to view
         - Permission restrictions are applied transparently to the API consumer
+        - Calling user permissions override case owner permissions when calling_user_id is specified
     
     Data Enrichment:
         - Surgeon information: Combines first_name and last_name from surgeon_list
@@ -108,6 +115,7 @@ def get_case(request: Request, case_id: str = Query(..., description="The case I
     
     Example Usage:
         GET /case?case_id=CASE-2024-001
+        GET /case?case_id=CASE-2024-001&calling_user_id=USER456
     
     Example Response:
         {
@@ -156,7 +164,9 @@ def get_case(request: Request, case_id: str = Query(..., description="The case I
         - Procedure codes array will be empty if no procedures are associated
         - File paths may be null if files haven't been uploaded
         - User profile permissions are automatically applied without explicit authorization
-        - The endpoint automatically handles missing user profiles with default permissions
+        - The endpoint automatically handles missing user profiles with default permissions (max_case_status=20)
+        - When calling_user_id is provided, it takes precedence over case owner's permissions
+        - Usage of calling_user_id parameter is tracked in response logging for monitoring
     """
     conn = None
     start_time = time.time()
@@ -164,6 +174,7 @@ def get_case(request: Request, case_id: str = Query(..., description="The case I
     response_data = None
     error_message = None
     user_id = None
+    using_calling_user_id = calling_user_id is not None
     
     try:
         if not case_id:
@@ -202,6 +213,11 @@ def get_case(request: Request, case_id: str = Query(..., description="The case I
                 
                 # Get user's max_case_status and name from user_profile
                 user_id = case_data["user_id"]
+                
+                # Determine which user ID to use for max_case_status check
+                permission_user_id = calling_user_id if calling_user_id else user_id
+                
+                # Get case owner's profile for user_name
                 cursor.execute("""
                     SELECT max_case_status, first_name, last_name 
                     FROM user_profile 
@@ -209,13 +225,30 @@ def get_case(request: Request, case_id: str = Query(..., description="The case I
                 """, (user_id,))
                 user_profile = cursor.fetchone()
                 
+                # Get permission user's max_case_status if different from case owner
+                if calling_user_id and calling_user_id != user_id:
+                    cursor.execute("""
+                        SELECT max_case_status 
+                        FROM user_profile 
+                        WHERE user_id = %s AND active = 1
+                    """, (calling_user_id,))
+                    permission_profile = cursor.fetchone()
+                    permission_max_case_status = permission_profile["max_case_status"] if permission_profile else 20
+                else:
+                    permission_max_case_status = None
+                
                 if not user_profile:
                     # If user profile not found, use default max_case_status of 20
                     max_case_status = 20
                     user_name = None
                 else:
-                    max_case_status = user_profile["max_case_status"] or 20
-                    # Combine first_name and last_name to create user_name
+                    # Use calling_user's max_case_status if provided, otherwise use case owner's
+                    if permission_max_case_status is not None:
+                        max_case_status = permission_max_case_status or 20
+                    else:
+                        max_case_status = user_profile["max_case_status"] or 20
+                    
+                    # Combine first_name and last_name to create user_name (always from case owner)
                     first_name = user_profile.get("first_name", "")
                     last_name = user_profile.get("last_name", "")
                     user_name = f"{first_name} {last_name}".strip() if first_name or last_name else None
@@ -271,6 +304,11 @@ def get_case(request: Request, case_id: str = Query(..., description="The case I
         
         # Log request details for monitoring using the utility function
         from endpoints.utility.log_request import log_request_from_endpoint
+        
+        # Add calling_user_id usage information to response_data for logging
+        if response_data and using_calling_user_id:
+            response_data["calling_user_id_used"] = calling_user_id
+        
         log_request_from_endpoint(
             request=request,
             execution_time_ms=execution_time_ms,
