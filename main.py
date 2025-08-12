@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-08 15:39:54
+# Last Modified: 2025-08-12 17:17:11
 # Author: Scott Cadreau
 
 # main.py
@@ -35,6 +35,7 @@ from endpoints.utility.check_npi import router as check_npi_router
 from endpoints.utility.get_user_environment import router as get_user_environment_router
 from endpoints.utility.get_timezones import router as get_timezones_router
 from endpoints.utility.get_lists import router as get_lists_router
+from endpoints.utility.add_to_lists import router as add_to_lists_router
 from endpoints.utility.bugs import router as bugs_router
 
 from endpoints.health import router as health_router
@@ -121,6 +122,7 @@ app.include_router(check_npi_router, tags=["utility"])
 app.include_router(get_user_environment_router, tags=["utility"])
 app.include_router(get_timezones_router, tags=["utility"])
 app.include_router(get_lists_router, tags=["utility"])
+app.include_router(add_to_lists_router, tags=["utility"])
 app.include_router(bugs_router, tags=["utility"])
 
 # Health check

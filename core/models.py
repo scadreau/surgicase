@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-08 02:00:25
+# Last Modified: 2025-08-12 17:17:11
 # Author: Scott Cadreau
 
 # core/models.py
@@ -141,3 +141,34 @@ class BulkCaseStatusUpdate(BaseModel):
     case_ids: List[str]
     new_status: int
     force: Optional[bool] = False
+
+# List Addition Models for add_to_lists.py
+class UserTypeCreate(BaseModel):
+    user_type: int
+    user_type_desc: str
+    user_max_case_status: int
+    user_id: str  # For authorization
+
+class CaseStatusCreate(BaseModel):
+    case_status: int
+    case_status_desc: str
+    user_id: str  # For authorization
+
+class UserDocTypeCreate(BaseModel):
+    doc_type: str
+    doc_prefix: str
+    user_id: str  # For authorization
+
+class FaqCreate(BaseModel):
+    user_type: int
+    faq_header: str
+    faq_text: str
+    display_order: int
+    user_id: str  # For authorization
+
+class PayTierCreate(BaseModel):
+    code_category: str
+    code_bucket: str
+    tier: int
+    pay_amount: float
+    user_id: str  # For authorization
