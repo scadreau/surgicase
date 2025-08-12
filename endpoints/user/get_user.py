@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-10 06:31:04
+# Last Modified: 2025-08-10 06:41:52
 # Author: Scott Cadreau
 
 # endpoints/user/get_user.py
@@ -56,6 +56,9 @@ def get_user(request: Request, user_id: str = Query(..., description="The user I
                 - message_pref (str): Communication preference settings
                 - states_licensed (str): States where user holds professional licenses
                 - user_tier (int): User tier classification for billing/permissions
+                - create_ts (timestamp): Timestamp when the user account was created
+                - last_updated_ts (timestamp): Timestamp when the user account was last updated
+                - last_login_dt (datetime): Date and time of the user's last login
                 - documents (List[dict]): Array of user documents:
                     - document_type (str): Type/category of document
                     - document_name (str): Name/path of the document file
@@ -141,6 +144,9 @@ def get_user(request: Request, user_id: str = Query(..., description="The user I
                 "message_pref": "email",
                 "states_licensed": "CA,NY,TX",
                 "user_tier": 1,
+                "create_ts": "2024-01-15T09:30:00",
+                "last_updated_ts": "2024-08-10T14:22:33",
+                "last_login_dt": "2024-08-10T08:45:12",
                 "documents": [
                     {
                         "document_type": "medical_license",
@@ -190,7 +196,7 @@ def get_user(request: Request, user_id: str = Query(..., description="The user I
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                 # fetch from users table
                 cursor.execute("""select user_id,user_email, first_name, last_name, addr1, addr2, city, state, zipcode, telephone, user_npi, 
-                    referred_by_user, user_type, message_pref, states_licensed, user_tier from user_profile where user_id = %s and active = 1""", (user_id))
+                    referred_by_user, user_type, message_pref, states_licensed, user_tier, create_ts, last_updated_ts, last_login_dt from user_profile where user_id = %s and active = 1""", (user_id))
                 user_data = cursor.fetchone()
 
                 if not user_data:
