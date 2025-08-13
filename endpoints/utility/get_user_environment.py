@@ -1,5 +1,5 @@
 # Created: 2025-07-24 17:54:30
-# Last Modified: 2025-08-08 22:37:13
+# Last Modified: 2025-08-13 19:04:15
 # Author: Scott Cadreau
 # Assisted by: Claude 4 Sonnet
 
@@ -29,7 +29,7 @@ def get_user_profile_info(user_id: str, conn) -> dict:
             SELECT user_id, user_email, first_name, last_name, addr1, addr2, 
                    city, state, zipcode, telephone, user_npi, referred_by_user, 
                    user_type, message_pref, states_licensed, user_tier, max_case_status,
-                   last_login_dt, active
+                   create_ts, last_updated_ts, last_login_dt, active
             FROM user_profile 
             WHERE user_id = %s AND active = 1
         """, (user_id,))
