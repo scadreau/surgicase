@@ -4,13 +4,31 @@ This document describes the scheduled tasks that automatically run for the Surgi
 
 ## Overview
 
-The scheduler provides automatic weekly updates for three separate jobs:
+The scheduler provides automatic weekly updates for case status changes, NPI data updates, and automated report generation:
 
 ### Pending Payment Update
 - **Source Status**: 10 (cases ready for billing)
 - **Target Status**: 15 (pending payment)
 - **Schedule**: Monday at 08:00 UTC
 - **Function**: `weekly_pending_payment_update()`
+
+### Provider Payment Report
+- **Purpose**: Generate consolidated provider payment report with detailed case information
+- **Schedule**: Monday at 09:00 UTC (1 hour after status update)
+- **Function**: `weekly_provider_payment_report()`
+- **Features**: PDF generation, S3 storage, automated email distribution
+
+### Provider Payment Summary Report
+- **Purpose**: Generate state-grouped provider payment summary report
+- **Schedule**: Monday at 09:15 UTC (15 minutes after consolidated report)
+- **Function**: `weekly_provider_payment_summary_report()`
+- **Features**: State-based grouping, PDF generation, S3 storage, automated email distribution
+
+### Individual Provider Reports
+- **Purpose**: Generate password-protected individual provider reports
+- **Schedule**: Monday at 10:00 UTC (1 hour after consolidated report)
+- **Function**: `weekly_individual_provider_reports()`
+- **Features**: Password protection, individual provider emails, secure distribution
 
 ### NPI Data Update
 - **Source**: CMS National Provider Identifier database
@@ -24,6 +42,12 @@ The scheduler provides automatic weekly updates for three separate jobs:
 - **Target Status**: 20 (paid/completed)
 - **Schedule**: Thursday at 08:00 UTC
 - **Function**: `weekly_paid_update()`
+
+### Daily Database Backup
+- **Purpose**: Backup all database tables (excluding npi* and search_* tables)
+- **Schedule**: Daily at 08:00 UTC
+- **Function**: `daily_database_backup()`
+- **Features**: Compressed backups, S3 storage, automatic cleanup
 
 The case status updates use the existing `bulk_update_case_status` function for reliable processing.
 The NPI update includes comprehensive duplicate prevention to avoid reprocessing files.
@@ -123,14 +147,34 @@ Test the scheduler functionality immediately:
 from utils.scheduler import (
     run_pending_payment_update_now,
     run_paid_update_now,
+    run_provider_payment_report_now,
+    run_provider_payment_summary_report_now,
+    run_individual_provider_reports_now,
+    run_npi_update_now,
+    run_backup_now,
     run_update_now  # backward compatibility - runs pending payment update
 )
 
 # Run the pending payment update immediately (status 10 -> 15)
 run_pending_payment_update_now()
 
+# Run the provider payment report immediately
+run_provider_payment_report_now()
+
+# Run the provider payment summary report immediately
+run_provider_payment_summary_report_now()
+
+# Run the individual provider reports immediately
+run_individual_provider_reports_now()
+
 # Run the paid update immediately (status 15 -> 20)
 run_paid_update_now()
+
+# Run NPI data update immediately
+run_npi_update_now()
+
+# Run database backup immediately
+run_backup_now()
 
 # Original function (backward compatibility)
 run_update_now()
@@ -189,14 +233,30 @@ To modify the days and times, edit `utils/scheduler.py`:
 def setup_weekly_scheduler():
     """
     Schedules all weekly update functions:
+    - daily_database_backup: Every day at 08:00 UTC (database backup)
     - weekly_pending_payment_update: Monday at 08:00 UTC (status 10 -> 15)
+    - weekly_provider_payment_report: Monday at 09:00 UTC (consolidated report + emails)
+    - weekly_provider_payment_summary_report: Monday at 09:15 UTC (summary report + emails)
+    - weekly_individual_provider_reports: Monday at 10:00 UTC (individual reports + emails)
     - weekly_npi_update: Tuesday at 08:00 UTC (NPI data refresh)
     - weekly_paid_update: Thursday at 08:00 UTC (status 15 -> 20)
     
     To change days/times: modify the schedule lines below
     """
+    # Schedule daily database backup at 08:00 UTC
+    schedule.every().day.at("08:00").do(daily_database_backup)
+    
     # Schedule pending payment update for Monday at 08:00 UTC
     schedule.every().monday.at("08:00").do(weekly_pending_payment_update)
+    
+    # Schedule consolidated provider payment report for Monday at 09:00 UTC
+    schedule.every().monday.at("09:00").do(weekly_provider_payment_report)
+    
+    # Schedule provider payment summary report for Monday at 09:15 UTC
+    schedule.every().monday.at("09:15").do(weekly_provider_payment_summary_report)
+    
+    # Schedule individual provider reports for Monday at 10:00 UTC
+    schedule.every().monday.at("10:00").do(weekly_individual_provider_reports)
     
     # Schedule NPI data update for Tuesday at 08:00 UTC
     schedule.every().tuesday.at("08:00").do(weekly_npi_update)
@@ -280,8 +340,12 @@ To change these values, modify the respective functions in `utils/scheduler.py`.
 
 8. **Testing Utilities:**
    - **`run_pending_payment_update_now()`** - Test pending payment update immediately
+   - **`run_provider_payment_report_now()`** - Test consolidated provider payment report immediately
+   - **`run_provider_payment_summary_report_now()`** - Test provider payment summary report immediately
+   - **`run_individual_provider_reports_now()`** - Test individual provider reports immediately
    - **`run_npi_update_now()`** - Test NPI data update immediately
    - **`run_paid_update_now()`** - Test paid update immediately
+   - **`run_backup_now()`** - Test database backup immediately
    - **`run_update_now()`** - Backward compatibility (runs pending payment update)
 
 ### Error Handling
@@ -345,18 +409,34 @@ Test individual updates immediately:
 ```python
 from utils.scheduler import (
     run_pending_payment_update_now,
+    run_provider_payment_report_now,
+    run_provider_payment_summary_report_now,
+    run_individual_provider_reports_now,
     run_npi_update_now,
-    run_paid_update_now
+    run_paid_update_now,
+    run_backup_now
 )
 
 # Test pending payment update (10 -> 15)
 run_pending_payment_update_now()
+
+# Test consolidated provider payment report
+run_provider_payment_report_now()
+
+# Test provider payment summary report
+run_provider_payment_summary_report_now()
+
+# Test individual provider reports
+run_individual_provider_reports_now()
 
 # Test NPI data update (with duplicate prevention)
 run_npi_update_now()
 
 # Test paid update (15 -> 20)
 run_paid_update_now()
+
+# Test database backup
+run_backup_now()
 ```
 
 Alternatively, use the dedicated NPI test script:

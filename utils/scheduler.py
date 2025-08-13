@@ -1,5 +1,5 @@
 # Created: 2025-01-15
-# Last Modified: 2025-08-04 10:10:00
+# Last Modified: 2025-08-13 20:07:25
 # Author: Scott Cadreau
 
 import schedule
@@ -254,6 +254,56 @@ def weekly_provider_payment_report():
     except Exception as e:
         logger.error(f"❌ Error in weekly provider payment report job: {str(e)}")
 
+def weekly_provider_payment_summary_report():
+    """
+    Weekly scheduled function to generate provider payment summary report and send emails.
+    
+    This function:
+    1. Calls the provider payment summary report endpoint with weekly email type
+    2. Generates PDF summary report grouped by state for cases with status=15 (pending payment)
+    3. Automatically sends emails to configured recipients
+    4. Uses weekly email template for professional notifications
+    
+    Runs 15 minutes after weekly_provider_payment_report to allow consolidated report to complete first.
+    """
+    logger.info("Starting weekly provider payment summary report job...")
+    
+    try:
+        # Call the provider payment summary report endpoint with weekly email type
+        response = requests.get(
+            'http://localhost:8000/provider_payment_summary_report?email_type=weekly',
+            timeout=300  # 5 minute timeout for report generation
+        )
+        
+        if response.status_code == 200:
+            logger.info("✅ Weekly provider payment summary report generated successfully")
+            
+            # Log email status from response headers
+            email_headers = {k: v for k, v in response.headers.items() if k.startswith('X-Email')}
+            if email_headers:
+                emails_sent = email_headers.get('X-Email-Count', '0')
+                total_recipients = email_headers.get('X-Email-Total-Recipients', '0')
+                email_success = email_headers.get('X-Email-Sent', 'False')
+                
+                logger.info(f"📧 Email notifications: {emails_sent}/{total_recipients} sent successfully")
+                logger.info(f"📧 Email status: {email_success}")
+            
+            # Log report details
+            content_length = len(response.content)
+            logger.info(f"📄 Report size: {content_length} bytes")
+            logger.info("Weekly provider payment summary report job completed successfully")
+            
+        else:
+            logger.error(f"❌ Provider payment summary report failed with status {response.status_code}")
+            logger.error(f"Response: {response.text[:500]}")  # Log first 500 chars of error
+            
+    except requests.exceptions.Timeout:
+        logger.error("❌ Provider payment summary report timed out (>5 minutes)")
+    except requests.exceptions.ConnectionError:
+        logger.error("❌ Cannot connect to API server for provider payment summary report")
+    except Exception as e:
+        logger.error(f"❌ Error in weekly provider payment summary report job: {str(e)}")
+
 def weekly_individual_provider_reports():
     """
     Weekly scheduled function to generate individual password-protected provider reports.
@@ -367,6 +417,7 @@ def setup_weekly_scheduler():
     - daily_database_backup: Every day at 08:00 UTC (database backup)
     - weekly_pending_payment_update: Monday at 08:00 UTC (status 10 -> 15)
     - weekly_provider_payment_report: Monday at 09:00 UTC (generate consolidated report + send emails)
+    - weekly_provider_payment_summary_report: Monday at 09:15 UTC (generate summary report + send emails)
     - weekly_individual_provider_reports: Monday at 10:00 UTC (generate individual provider reports + send emails)
     - weekly_npi_update: Tuesday at 08:00 UTC (NPI data refresh)
     - weekly_paid_update: Thursday at 08:00 UTC (status 15 -> 20)
@@ -382,6 +433,9 @@ def setup_weekly_scheduler():
     # Schedule consolidated provider payment report for Monday at 09:00 UTC (1 hour after status update)
     schedule.every().monday.at("09:00").do(weekly_provider_payment_report)
     
+    # Schedule provider payment summary report for Monday at 09:15 UTC (15 minutes after consolidated report)
+    schedule.every().monday.at("09:15").do(weekly_provider_payment_summary_report)
+    
     # Schedule individual provider reports for Monday at 10:00 UTC (1 hour after consolidated report)
     schedule.every().monday.at("10:00").do(weekly_individual_provider_reports)
     
@@ -395,6 +449,7 @@ def setup_weekly_scheduler():
     logger.info("  - Database backup: Daily at 08:00 UTC")
     logger.info("  - Pending payment update: Monday at 08:00 UTC")
     logger.info("  - Consolidated provider payment report: Monday at 09:00 UTC")
+    logger.info("  - Provider payment summary report: Monday at 09:15 UTC")
     logger.info("  - Individual provider reports: Monday at 10:00 UTC")
     logger.info("  - NPI data update: Tuesday at 08:00 UTC")
     logger.info("  - Paid update: Thursday at 08:00 UTC")
@@ -486,4 +541,11 @@ def run_provider_payment_report_now():
     Utility function to run the consolidated provider payment report immediately (for testing).
     """
     logger.info("Running consolidated provider payment report immediately...")
-    weekly_provider_payment_report() 
+    weekly_provider_payment_report()
+
+def run_provider_payment_summary_report_now():
+    """
+    Utility function to run the provider payment summary report immediately (for testing).
+    """
+    logger.info("Running provider payment summary report immediately...")
+    weekly_provider_payment_summary_report() 
