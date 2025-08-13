@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-10 06:41:52
+# Last Modified: 2025-08-13 19:14:32
 # Author: Scott Cadreau
 
 # endpoints/user/get_user.py
@@ -53,6 +53,7 @@ def get_user(request: Request, user_id: str = Query(..., description="The user I
                 - user_npi (str): National Provider Identifier for healthcare professionals
                 - referred_by_user (str): ID of referring user
                 - user_type (str): User classification/role type
+                - user_type_desc (str): Human-readable description of the user type
                 - message_pref (str): Communication preference settings
                 - states_licensed (str): States where user holds professional licenses
                 - user_tier (int): User tier classification for billing/permissions
@@ -141,6 +142,7 @@ def get_user(request: Request, user_id: str = Query(..., description="The user I
                 "user_npi": "1234567890",
                 "referred_by_user": "ADMIN001",
                 "user_type": "physician",
+                "user_type_desc": "Licensed Physician",
                 "message_pref": "email",
                 "states_licensed": "CA,NY,TX",
                 "user_tier": 1,
@@ -194,9 +196,12 @@ def get_user(request: Request, user_id: str = Query(..., description="The user I
 
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-                # fetch from users table
-                cursor.execute("""select user_id,user_email, first_name, last_name, addr1, addr2, city, state, zipcode, telephone, user_npi, 
-                    referred_by_user, user_type, message_pref, states_licensed, user_tier, create_ts, last_updated_ts, last_login_dt from user_profile where user_id = %s and active = 1""", (user_id))
+                # fetch from users table with user type description
+                cursor.execute("""select up.user_id, up.user_email, up.first_name, up.last_name, up.addr1, up.addr2, up.city, up.state, up.zipcode, up.telephone, up.user_npi, 
+                    up.referred_by_user, up.user_type, utl.user_type_desc, up.message_pref, up.states_licensed, up.user_tier, up.create_ts, up.last_updated_ts, up.last_login_dt, up.max_case_status
+                    from user_profile up
+                    left join user_type_list utl on up.user_type = utl.user_type
+                    where up.user_id = %s and up.active = 1""", (user_id))
                 user_data = cursor.fetchone()
 
                 if not user_data:
