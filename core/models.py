@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-12 17:32:36
+# Last Modified: 2025-08-14 12:43:58
 # Author: Scott Cadreau
 
 # core/models.py
@@ -173,3 +173,8 @@ class PayTierCreate(BaseModel):
     tier: int
     pay_amount: float
     user_id: str  # For authorization
+
+# Password Management Models
+class PasswordChange(BaseModel):
+    user_id: str
+    new_password: str = Field(..., min_length=8, description="New password (minimum 8 characters)")

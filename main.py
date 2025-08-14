@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-12 17:17:11
+# Last Modified: 2025-08-14 12:44:10
 # Author: Scott Cadreau
 
 # main.py
@@ -17,6 +17,7 @@ from endpoints.user.get_user import router as get_user_router
 from endpoints.user.create_user import router as create_user_router
 from endpoints.user.update_user import router as update_user_router
 from endpoints.user.delete_user import router as delete_user_router
+from endpoints.user.change_password import router as change_password_router
 
 from endpoints.facility.create_facility import router as create_facility_router
 from endpoints.facility.delete_facility import router as delete_facility_router
@@ -101,6 +102,7 @@ app.include_router(get_user_router, tags=["users"])
 app.include_router(create_user_router, tags=["users"])
 app.include_router(update_user_router, tags=["users"])
 app.include_router(delete_user_router, tags=["users"])
+app.include_router(change_password_router, tags=["users"])
 
 # Facility endpoints
 app.include_router(create_facility_router, tags=["facilities"])
