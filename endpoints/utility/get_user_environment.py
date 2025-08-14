@@ -1,7 +1,6 @@
 # Created: 2025-07-24 17:54:30
-# Last Modified: 2025-08-14 13:20:57
+# Last Modified: 2025-08-14 20:10:49
 # Author: Scott Cadreau
-# Assisted by: Claude 4 Sonnet
 
 # endpoints/utility/get_user_environment.py
 from fastapi import APIRouter, HTTPException, Query, Request
