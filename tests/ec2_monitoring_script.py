@@ -1,5 +1,5 @@
 # Created: 2025-08-14 15:55:28
-# Last Modified: 2025-08-14 15:58:57
+# Last Modified: 2025-08-14 16:32:11
 # Author: Scott Cadreau
 
 """
@@ -193,17 +193,31 @@ class EC2Monitor:
     
     def get_memory_utilization(self) -> Optional[float]:
         """
-        Get memory utilization from CloudWatch.
-        Note: This requires the CloudWatch agent to be installed on the EC2 instance.
+        Get memory utilization from CloudWatch agent or fall back to system metrics.
         
         Returns:
             float: Memory utilization percentage or None if not available
         """
-        return self.get_cloudwatch_metric(
+        # Try CloudWatch agent first
+        cloudwatch_memory = self.get_cloudwatch_metric(
             metric_name="MemoryUtilization",
             namespace="CWAgent",
             statistic="Average"
         )
+        
+        if cloudwatch_memory is not None:
+            return cloudwatch_memory
+        
+        # Fallback to system memory if CloudWatch agent isn't working
+        try:
+            import psutil
+            memory = psutil.virtual_memory()
+            memory_percent = memory.percent
+            logger.info(f"Using system memory metrics: {memory_percent}%")
+            return round(memory_percent, 2)
+        except Exception as e:
+            logger.warning(f"Failed to get system memory metrics: {str(e)}")
+            return None
     
     def get_cpu_utilization(self) -> Optional[float]:
         """
