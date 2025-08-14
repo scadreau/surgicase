@@ -1,5 +1,5 @@
 # Created: 2025-08-14 15:55:28
-# Last Modified: 2025-08-14 16:32:11
+# Last Modified: 2025-08-14 16:35:37
 # Author: Scott Cadreau
 
 """
@@ -257,11 +257,12 @@ class EC2Monitor:
     
     def get_disk_metrics(self) -> Tuple[Optional[float], Optional[float]]:
         """
-        Get disk read and write metrics.
+        Get disk read and write metrics from CloudWatch or system metrics.
         
         Returns:
             tuple: (disk_read_bytes, disk_write_bytes)
         """
+        # Try CloudWatch first
         disk_read = self.get_cloudwatch_metric(
             metric_name="DiskReadBytes",
             namespace="AWS/EC2",
@@ -276,7 +277,31 @@ class EC2Monitor:
             unit="Bytes"
         )
         
-        return disk_read, disk_write
+        # If CloudWatch metrics are available, return them
+        if disk_read is not None and disk_write is not None:
+            return disk_read, disk_write
+        
+        # Fallback to system disk I/O metrics
+        try:
+            import psutil
+            
+            # Get current disk I/O counters
+            disk_io = psutil.disk_io_counters()
+            if disk_io:
+                # Note: These are cumulative values since boot, not per-period
+                # For monitoring trends, this is still useful
+                disk_read_bytes = disk_io.read_bytes
+                disk_write_bytes = disk_io.write_bytes
+                
+                logger.info(f"Using system disk I/O metrics: Read={disk_read_bytes:,} bytes, Write={disk_write_bytes:,} bytes")
+                return disk_read_bytes, disk_write_bytes
+            else:
+                logger.warning("System disk I/O counters not available")
+                return None, None
+                
+        except Exception as e:
+            logger.warning(f"Failed to get system disk I/O metrics: {str(e)}")
+            return None, None
     
     def get_status_checks(self) -> Tuple[bool, bool, bool]:
         """
@@ -353,6 +378,16 @@ class EC2Monitor:
             notes.append(f"High memory utilization: {memory_utilization}%")
         if status_failed:
             notes.append("Status check failed")
+        
+        # Add disk usage information to notes
+        try:
+            import psutil
+            disk_usage = psutil.disk_usage('/')
+            disk_percent = (disk_usage.used / disk_usage.total) * 100
+            if disk_percent > 80:
+                notes.append(f"High disk usage: {disk_percent:.1f}%")
+        except Exception as e:
+            logger.debug(f"Could not get disk usage: {str(e)}")
         
         metrics['notes'] = '; '.join(notes) if notes else None
         
@@ -450,7 +485,8 @@ def print_latest_metrics():
         with connection.cursor() as cursor:
             cursor.execute("""
                 SELECT instance_id, timestamp, cpu_utilization_percent, memory_utilization_percent,
-                       network_in_bytes, network_out_bytes, status_check_failed, notes
+                       network_in_bytes, network_out_bytes, disk_read_bytes, disk_write_bytes,
+                       status_check_failed, notes
                 FROM ec2_monitoring 
                 WHERE instance_id = %s
                 ORDER BY timestamp DESC 
@@ -460,11 +496,11 @@ def print_latest_metrics():
             results = cursor.fetchall()
             
             if results:
-                print("\n" + "="*80)
+                print("\n" + "="*100)
                 print("LATEST MONITORING RESULTS")
-                print("="*80)
-                print(f"{'Timestamp':<20} {'CPU %':<8} {'Memory %':<10} {'Network In':<12} {'Network Out':<12} {'Notes':<20}")
-                print("-"*80)
+                print("="*100)
+                print(f"{'Timestamp':<20} {'CPU %':<8} {'Mem %':<8} {'Net In':<10} {'Net Out':<10} {'Disk Read':<12} {'Disk Write':<12} {'Notes':<15}")
+                print("-"*100)
                 
                 for row in results:
                     # Handle both dict and tuple formats
@@ -472,19 +508,23 @@ def print_latest_metrics():
                         timestamp = row['timestamp'].strftime("%Y-%m-%d %H:%M:%S") if row['timestamp'] else "N/A"
                         cpu = f"{row['cpu_utilization_percent']:.1f}" if row['cpu_utilization_percent'] is not None else "N/A"
                         memory = f"{row['memory_utilization_percent']:.1f}" if row['memory_utilization_percent'] is not None else "N/A"
-                        net_in = f"{row['network_in_bytes']:,}" if row['network_in_bytes'] is not None else "N/A"
-                        net_out = f"{row['network_out_bytes']:,}" if row['network_out_bytes'] is not None else "N/A"
-                        notes = row['notes'][:18] + "..." if row['notes'] and len(row['notes']) > 18 else (row['notes'] or "")
+                        net_in = f"{row['network_in_bytes']//1000:,}K" if row['network_in_bytes'] is not None else "N/A"
+                        net_out = f"{row['network_out_bytes']//1000:,}K" if row['network_out_bytes'] is not None else "N/A"
+                        disk_read = f"{row['disk_read_bytes']//1000000:,}M" if row['disk_read_bytes'] is not None else "N/A"
+                        disk_write = f"{row['disk_write_bytes']//1000000:,}M" if row['disk_write_bytes'] is not None else "N/A"
+                        notes = row['notes'][:12] + "..." if row['notes'] and len(row['notes']) > 12 else (row['notes'] or "")
                     else:
                         timestamp = row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else "N/A"
                         cpu = f"{row[2]:.1f}" if row[2] is not None else "N/A"
                         memory = f"{row[3]:.1f}" if row[3] is not None else "N/A"
-                        net_in = f"{row[4]:,}" if row[4] is not None else "N/A"
-                        net_out = f"{row[5]:,}" if row[5] is not None else "N/A"
-                        notes = row[7][:18] + "..." if row[7] and len(row[7]) > 18 else (row[7] or "")
+                        net_in = f"{row[4]//1000:,}K" if row[4] is not None else "N/A"
+                        net_out = f"{row[5]//1000:,}K" if row[5] is not None else "N/A"
+                        disk_read = f"{row[6]//1000000:,}M" if row[6] is not None else "N/A"
+                        disk_write = f"{row[7]//1000000:,}M" if row[7] is not None else "N/A"
+                        notes = row[9][:12] + "..." if row[9] and len(row[9]) > 12 else (row[9] or "")
                     
-                    print(f"{timestamp:<20} {cpu:<8} {memory:<10} {net_in:<12} {net_out:<12} {notes:<20}")
-                print("="*80)
+                    print(f"{timestamp:<20} {cpu:<8} {memory:<8} {net_in:<10} {net_out:<10} {disk_read:<12} {disk_write:<12} {notes:<15}")
+                print("="*100)
             else:
                 print("No monitoring data found in database")
                 
