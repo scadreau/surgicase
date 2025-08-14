@@ -1,5 +1,5 @@
 # Created: 2025-07-27 02:29:13
-# Last Modified: 2025-08-06 15:23:15
+# Last Modified: 2025-08-14 14:13:15
 # Author: Scott Cadreau
 
 # endpoints/backoffice/case_dashboard_data.py
@@ -193,6 +193,7 @@ def case_dashboard_data(
                         SUM(c.pay_amount) as total_amount
                     FROM cases c
                     WHERE c.active = 1
+                    AND c.user_id NOT IN ('04e884e8-4011-70e9-f3bd-d89fabd15c7b', '94883428-50c1-7049-9d3d-e095ca81f174', '94b80418-6091-701b-eac8-8b325f95a799', '74081438-80d1-7055-f5df-2221b7f96049')
                 """
                 
                 params = []
