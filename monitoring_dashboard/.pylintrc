@@ -1,0 +1,9 @@
+# Pylint configuration for monitoring dashboard
+# This suppresses import warnings for local utility modules
+
+[MESSAGES CONTROL]
+disable=import-error,no-name-in-module
+
+[IMPORTS]
+# Allow imports of local modules
+ignored-modules=dashboard_db,dashboard_charts

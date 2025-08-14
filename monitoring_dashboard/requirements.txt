@@ -1,0 +1,21 @@
+# EC2 Monitoring Dashboard Dependencies
+# Install with: pip install -r requirements.txt --break-system-packages
+
+# Streamlit for web dashboard
+streamlit>=1.28.0
+
+# Data visualization
+plotly>=5.17.0
+pandas>=2.1.0
+
+# Database connectivity (should already be installed)
+# pymysql>=1.1.0
+
+# Date/time handling (built-in)
+# datetime
+
+# Logging (built-in)
+# logging
+
+# Note: Core dependencies like pymysql should already be available 
+# from the main SurgiCase project requirements
