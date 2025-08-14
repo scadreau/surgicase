@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-13 19:14:32
+# Last Modified: 2025-08-14 13:05:52
 # Author: Scott Cadreau
 
 # endpoints/user/get_user.py
@@ -11,6 +11,37 @@ import time
 from datetime import datetime  # TODO: TEMPORARY - Remove when frontend integrates get_user_environment
 
 router = APIRouter()
+
+# TODO: TEMPORARY - Remove this function when frontend integrates get_user_environment
+def update_user_last_login(user_id: str, conn) -> bool:
+    """
+    Update the last_login_dt field for a user with current datetime.
+    
+    Args:
+        user_id: The user ID to update
+        conn: Database connection
+        
+    Returns:
+        bool: True if update was successful, False otherwise
+    """
+    try:
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            current_time = datetime.now()
+            
+            cursor.execute("""
+                UPDATE user_profile 
+                SET last_login_dt = %s 
+                WHERE user_id = %s AND active = 1
+            """, (current_time, user_id))
+            
+            # Return True if a row was updated
+            return cursor.rowcount > 0
+    except Exception as e:
+        # Log the error but don't fail the main operation
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to update last_login_dt for user {user_id}: {str(e)}")
+        return False
 
 
 
@@ -193,6 +224,10 @@ def get_user(request: Request, user_id: str = Query(..., description="The user I
             raise HTTPException(status_code=400, detail="Missing user_id parameter")
 
         conn = get_db_connection()
+
+        # TODO: TEMPORARY - Remove this call when frontend integrates get_user_environment
+        # Update user's last login timestamp
+        update_user_last_login(user_id, conn)
 
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
