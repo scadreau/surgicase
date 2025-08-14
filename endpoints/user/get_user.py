@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-14 13:05:52
+# Last Modified: 2025-08-14 13:12:47
 # Author: Scott Cadreau
 
 # endpoints/user/get_user.py
@@ -15,7 +15,7 @@ router = APIRouter()
 # TODO: TEMPORARY - Remove this function when frontend integrates get_user_environment
 def update_user_last_login(user_id: str, conn) -> bool:
     """
-    Update the last_login_dt field for a user with current datetime.
+    Update the last_login_dt field for a user with current timestamp.
     
     Args:
         user_id: The user ID to update
@@ -26,13 +26,12 @@ def update_user_last_login(user_id: str, conn) -> bool:
     """
     try:
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-            current_time = datetime.now()
-            
+            # Use CURRENT_TIMESTAMP for timestamp fields (now that last_login_dt is timestamp type)
             cursor.execute("""
                 UPDATE user_profile 
-                SET last_login_dt = %s 
+                SET last_login_dt = CURRENT_TIMESTAMP 
                 WHERE user_id = %s AND active = 1
-            """, (current_time, user_id))
+            """, (user_id,))
             
             # Return True if a row was updated
             return cursor.rowcount > 0
@@ -90,7 +89,7 @@ def get_user(request: Request, user_id: str = Query(..., description="The user I
                 - user_tier (int): User tier classification for billing/permissions
                 - create_ts (timestamp): Timestamp when the user account was created
                 - last_updated_ts (timestamp): Timestamp when the user account was last updated
-                - last_login_dt (datetime): Date and time of the user's last login
+                - last_login_dt (timestamp): Date and time of the user's last login
                 - documents (List[dict]): Array of user documents:
                     - document_type (str): Type/category of document
                     - document_name (str): Name/path of the document file

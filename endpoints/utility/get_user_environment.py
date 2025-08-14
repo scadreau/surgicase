@@ -1,5 +1,5 @@
 # Created: 2025-07-24 17:54:30
-# Last Modified: 2025-08-13 19:04:15
+# Last Modified: 2025-08-14 13:12:47
 # Author: Scott Cadreau
 # Assisted by: Claude 4 Sonnet
 
@@ -71,7 +71,7 @@ def get_user_profile_info(user_id: str, conn) -> dict:
 
 def update_user_last_login(user_id: str, conn) -> bool:
     """
-    Update the last_login_dt field for a user with current datetime.
+    Update the last_login_dt field for a user with current timestamp.
     
     Args:
         user_id: The user ID to update
@@ -82,13 +82,12 @@ def update_user_last_login(user_id: str, conn) -> bool:
     """
     try:
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-            current_time = datetime.now()
-            
+            # Use CURRENT_TIMESTAMP for timestamp fields (last_login_dt is now timestamp type)
             cursor.execute("""
                 UPDATE user_profile 
-                SET last_login_dt = %s 
+                SET last_login_dt = CURRENT_TIMESTAMP 
                 WHERE user_id = %s AND active = 1
-            """, (current_time, user_id))
+            """, (user_id,))
             
             # Return True if a row was updated
             return cursor.rowcount > 0
