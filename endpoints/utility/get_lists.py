@@ -1,5 +1,5 @@
 # Created: 2025-08-05 22:15:27
-# Last Modified: 2025-08-14 15:35:44
+# Last Modified: 2025-08-14 15:41:44
 # Author: Scott Cadreau
 
 # endpoints/utility/get_lists.py
@@ -800,7 +800,7 @@ def get_tiers_summary(request: Request, user_id: str = Query(..., description="U
             - tiers_summary (List[dict]): Array of tier summary objects, each containing:
                 - tier (str): Payment tier level identifier
                 - amounts (str): Formatted payment amounts string in specialty order:
-                  "(OB/Gyn/General/Other/Orthopedic/Plastic/Spine)"
+                  "(OB-Gyn/General/Other/Orthopedic/Plastic/Spine)"
                   Shows payment amount for each specialty, or "0" if not available
     
     Raises:
@@ -824,7 +824,7 @@ def get_tiers_summary(request: Request, user_id: str = Query(..., description="U
     
     Data Processing:
         - Groups payment amounts by tier level across medical specialties
-        - Organizes specialty amounts in fixed order: OB/Gyn, General, Other, Orthopedic, Plastic, Spine
+        - Organizes specialty amounts in fixed order: OB-Gyn, General, Other, Orthopedic, Plastic, Spine
         - Formats amounts as parenthetical string with forward slash separation
         - Handles missing specialty data by substituting "0" for unavailable amounts
         - Preserves tier ordering for consistent reporting structure
@@ -886,8 +886,8 @@ def get_tiers_summary(request: Request, user_id: str = Query(..., description="U
                 raw_data = cursor.fetchall()
 
                 # Process the data to create tier summary
-                # Define the specialty order as requested: (OB/Gyn/General/Other/Orthopedic/Plastic/Spine)
-                specialty_order = ["OB/Gyn", "General", "Other", "Orthopedic", "Plastic", "Spine"]
+                # Define the specialty order as requested: (OB-Gyn/General/Other/Orthopedic/Plastic/Spine)
+                specialty_order = ["OB-Gyn", "General", "Other", "Orthopedic", "Plastic", "Spine"]
                 
                 # Group data by tier
                 tiers_data = {}
