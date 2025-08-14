@@ -1,0 +1,13 @@
+# EC2 Monitoring Dependencies
+# Install with: pip install -r monitoring_requirements.txt --break-system-packages
+
+# AWS SDK for Python
+boto3>=1.34.0
+
+# System and process utilities
+psutil>=5.9.0
+
+# MySQL database connector (already required by main project)
+# pymysql>=1.0.0
+
+# Note: pymysql should already be installed as part of the main project requirements
