@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-14 13:12:47
+# Last Modified: 2025-08-14 13:21:49
 # Author: Scott Cadreau
 
 # endpoints/user/get_user.py
@@ -30,7 +30,7 @@ def update_user_last_login(user_id: str, conn) -> bool:
             cursor.execute("""
                 UPDATE user_profile 
                 SET last_login_dt = CURRENT_TIMESTAMP 
-                WHERE user_id = %s AND active = 1
+                WHERE user_id = %s
             """, (user_id,))
             
             # Return True if a row was updated
@@ -226,7 +226,9 @@ def get_user(request: Request, user_id: str = Query(..., description="The user I
 
         # TODO: TEMPORARY - Remove this call when frontend integrates get_user_environment
         # Update user's last login timestamp
-        update_user_last_login(user_id, conn)
+#        update_user_last_login(user_id, conn)
+        # Commit the login timestamp update
+#        conn.commit()
 
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:

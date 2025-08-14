@@ -1,5 +1,5 @@
 # Created: 2025-07-24 17:54:30
-# Last Modified: 2025-08-14 13:12:47
+# Last Modified: 2025-08-14 13:20:57
 # Author: Scott Cadreau
 # Assisted by: Claude 4 Sonnet
 
@@ -86,7 +86,7 @@ def update_user_last_login(user_id: str, conn) -> bool:
             cursor.execute("""
                 UPDATE user_profile 
                 SET last_login_dt = CURRENT_TIMESTAMP 
-                WHERE user_id = %s AND active = 1
+                WHERE user_id = %s
             """, (user_id,))
             
             # Return True if a row was updated
@@ -357,6 +357,9 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
         
         # Update last login datetime
         login_updated = update_user_last_login(user_id, conn)
+        # Commit the login timestamp update
+        if login_updated:
+            conn.commit()
         
         # Get case statuses based on user permissions
         case_status_info = get_case_statuses_for_user(user_id, user_type, max_case_status, conn)
