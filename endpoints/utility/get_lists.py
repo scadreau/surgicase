@@ -1,5 +1,5 @@
 # Created: 2025-08-05 22:15:27
-# Last Modified: 2025-08-12 16:06:30
+# Last Modified: 2025-08-14 15:35:44
 # Author: Scott Cadreau
 
 # endpoints/utility/get_lists.py
@@ -29,6 +29,31 @@ def validate_user_access(user_id: str, conn) -> bool:
             
             if user['user_type'] < 100:
                 raise HTTPException(status_code=403, detail={"error": "Insufficient privileges. User type must be >= 100"})
+            
+            return True
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={"error": f"Error validating user access: {str(e)}"})
+
+def validate_tiers_summary_access(user_id: str, conn) -> bool:
+    """
+    Validate that the user has user_type >= 20 to access tiers summary endpoint.
+    Returns True if authorized, raises HTTPException if not.
+    """
+    try:
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute(
+                "SELECT user_type FROM user_profile WHERE user_id = %s AND active = 1",
+                (user_id,)
+            )
+            user = cursor.fetchone()
+            
+            if not user:
+                raise HTTPException(status_code=404, detail={"error": "User not found or inactive"})
+            
+            if user['user_type'] < 20:
+                raise HTTPException(status_code=403, detail={"error": "Insufficient privileges. User type must be >= 20"})
             
             return True
     except HTTPException:
@@ -733,6 +758,186 @@ def get_pay_tiers(request: Request, user_id: str = Query(..., description="User 
         response_status = 500
         error_message = str(e)
         business_metrics.record_utility_operation("get_pay_tiers", "error")
+        
+        if 'conn' in locals():
+            close_db_connection(conn)
+        raise HTTPException(status_code=500, detail={"error": str(e)})
+        
+    finally:
+        # Calculate execution time
+        execution_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Log request details for monitoring using the utility function
+        from endpoints.utility.log_request import log_request_from_endpoint
+        log_request_from_endpoint(
+            request=request,
+            execution_time_ms=execution_time_ms,
+            response_status=response_status,
+            user_id=user_id,
+            response_data=response_data,
+            error_message=error_message
+        )
+@router.get("/tiers_summary")
+@track_business_operation("get", "tiers_summary")
+def get_tiers_summary(request: Request, user_id: str = Query(..., description="User ID for authorization")):
+    """
+    Retrieve procedure code payment tier summary organized by tier with amounts grouped by specialty.
+    
+    This endpoint provides a consolidated view of the payment tier structure by organizing
+    procedure code payment amounts into tiers with specialty-grouped payment amounts. The
+    summary aggregates payment data from the procedure_code_buckets table and formats
+    it into a tier-based structure showing payment amounts across medical specialties
+    in a standardized order for consistent reporting and billing reference.
+    
+    Args:
+        request (Request): FastAPI request object for logging and monitoring
+        user_id (str): User ID for authorization validation.
+                      Must have user_type >= 20 for access to payment tier summary data.
+    
+    Returns:
+        dict: Response containing:
+            - buckets (str): Order of specialties for frontend display: "OB-Gyn/General/Other/Orthopedic/Plastic/Spine"
+            - tiers_summary (List[dict]): Array of tier summary objects, each containing:
+                - tier (str): Payment tier level identifier
+                - amounts (str): Formatted payment amounts string in specialty order:
+                  "(OB/Gyn/General/Other/Orthopedic/Plastic/Spine)"
+                  Shows payment amount for each specialty, or "0" if not available
+    
+    Raises:
+        HTTPException:
+            - 404 Not Found: User not found or inactive in user_profile table
+            - 403 Forbidden: User has insufficient privileges (user_type < 20)
+            - 500 Internal Server Error: Database connection or query execution errors
+    
+    Authorization:
+        - Requires user_type >= 20 for access to payment tier summary data
+        - Uses validate_tiers_summary_access() helper function for consistent authorization
+        - Validates user exists and is active in user_profile table
+    
+    Database Operations:
+        - Queries 'procedure_code_buckets' table with grouped aggregation:
+          SELECT tier, code_bucket, pay_amount FROM procedure_code_buckets 
+          GROUP BY tier, code_bucket, pay_amount ORDER BY tier, pay_amount
+        - Aggregates data by tier level and specialty bucket
+        - Read-only operation with automatic connection management
+        - Results processed for specialty-ordered formatting
+    
+    Data Processing:
+        - Groups payment amounts by tier level across medical specialties
+        - Organizes specialty amounts in fixed order: OB/Gyn, General, Other, Orthopedic, Plastic, Spine
+        - Formats amounts as parenthetical string with forward slash separation
+        - Handles missing specialty data by substituting "0" for unavailable amounts
+        - Preserves tier ordering for consistent reporting structure
+    
+    Monitoring & Logging:
+        - Business metrics tracking for tiers summary retrieval operations
+        - Prometheus monitoring via @track_business_operation decorator
+        - Comprehensive request logging with user ID tracking
+        - Authorization failure tracking for security monitoring
+    
+    Example Response:
+        {
+            "buckets": "OB-Gyn/General/Other/Orthopedic/Plastic/Spine",
+            "tiers_summary": [
+                {
+                    "tier": "1",
+                    "amounts": "(250/400/550/550/1050/0)"
+                },
+                {
+                    "tier": "2", 
+                    "amounts": "(300/450/600/600/1150/800)"
+                },
+                {
+                    "tier": "3",
+                    "amounts": "(350/500/650/650/1250/900)"
+                }
+            ]
+        }
+    
+    Usage:
+        GET /tiers_summary?user_id=USER123
+        
+    Notes:
+        - Payment amounts are organized by medical specialty in standardized order
+        - Tier levels determine base reimbursement structure across specialties
+        - Used for quick reference of payment structures across different procedure types
+        - Authorization required to prevent unauthorized access to sensitive payment information
+        - Integrates with billing systems and reimbursement calculation workflows
+        - Specialty order follows standard medical practice categorization system
+    """
+    conn = None
+    start_time = time.time()
+    response_status = 200
+    response_data = None
+    error_message = None
+    
+    try:
+        conn = get_db_connection()
+        
+        # Validate user access
+        validate_tiers_summary_access(user_id, conn)
+        
+        try:
+            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                # Execute the exact query as specified
+                cursor.execute(
+                    "SELECT tier, code_bucket, pay_amount FROM procedure_code_buckets GROUP BY tier, code_bucket, pay_amount ORDER BY tier, pay_amount, code_bucket"
+                )
+                raw_data = cursor.fetchall()
+
+                # Process the data to create tier summary
+                # Define the specialty order as requested: (OB/Gyn/General/Other/Orthopedic/Plastic/Spine)
+                specialty_order = ["OB/Gyn", "General", "Other", "Orthopedic", "Plastic", "Spine"]
+                
+                # Group data by tier
+                tiers_data = {}
+                for row in raw_data:
+                    tier = str(row['tier'])
+                    code_bucket = row['code_bucket']
+                    pay_amount = int(row['pay_amount'])  # Convert to integer to remove decimal places
+                    
+                    if tier not in tiers_data:
+                        tiers_data[tier] = {}
+                    
+                    tiers_data[tier][code_bucket] = pay_amount
+                
+                # Format the response
+                tiers_summary = []
+                for tier in sorted(tiers_data.keys(), key=int):  # Sort tiers numerically
+                    amounts = []
+                    for specialty in specialty_order:
+                        amount = tiers_data[tier].get(specialty, 0)
+                        amounts.append(str(amount))
+                    
+                    formatted_amounts = f"({'/'.join(amounts)})"
+                    
+                    tiers_summary.append({
+                        "tier": tier,
+                        "amounts": formatted_amounts
+                    })
+
+                # Record successful tiers summary retrieval
+                business_metrics.record_utility_operation("get_tiers_summary", "success")
+                
+        finally:
+            close_db_connection(conn)
+            
+        response_data = {
+            "buckets": "OB-Gyn/General/Other/Orthopedic/Plastic/Spine",
+            "tiers_summary": tiers_summary
+        }
+        return response_data
+        
+    except HTTPException as http_error:
+        # Re-raise HTTP exceptions and capture error details
+        response_status = http_error.status_code
+        error_message = str(http_error.detail)
+        raise
+    except Exception as e:
+        # Record failed tiers summary retrieval
+        response_status = 500
+        error_message = str(e)
+        business_metrics.record_utility_operation("get_tiers_summary", "error")
         
         if 'conn' in locals():
             close_db_connection(conn)
