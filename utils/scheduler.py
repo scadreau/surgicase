@@ -1,5 +1,5 @@
 # Created: 2025-01-15
-# Last Modified: 2025-08-13 20:08:12
+# Last Modified: 2025-08-15 21:45:59
 # Author: Scott Cadreau
 
 import schedule
@@ -420,7 +420,7 @@ def setup_weekly_scheduler():
     - weekly_provider_payment_summary_report: Monday at 09:15 UTC (generate summary report + send emails)
     - weekly_individual_provider_reports: Monday at 10:00 UTC (generate individual provider reports + send emails)
     - weekly_npi_update: Tuesday at 08:00 UTC (NPI data refresh)
-    - weekly_paid_update: Thursday at 08:00 UTC (status 15 -> 20)
+    - weekly_paid_update: Friday at 08:00 UTC (status 15 -> 20)
     
     To change days/times: modify the schedule lines below
     """
@@ -443,7 +443,7 @@ def setup_weekly_scheduler():
     schedule.every().tuesday.at("08:00").do(weekly_npi_update)
     
     # Schedule paid update for Thursday at 08:00 UTC
-    schedule.every().thursday.at("08:00").do(weekly_paid_update)
+    schedule.every().friday.at("08:00").do(weekly_paid_update)
     
     logger.info("Scheduler configured:")
     logger.info("  - Database backup: Daily at 08:00 UTC")
@@ -452,7 +452,7 @@ def setup_weekly_scheduler():
     logger.info("  - Provider payment summary report: Monday at 09:15 UTC")
     logger.info("  - Individual provider reports: Monday at 10:00 UTC")
     logger.info("  - NPI data update: Tuesday at 08:00 UTC")
-    logger.info("  - Paid update: Thursday at 08:00 UTC")
+    logger.info("  - Paid update: Friday at 08:00 UTC")
 
 def run_scheduler():
     """
