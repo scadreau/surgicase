@@ -1,5 +1,5 @@
 # Created: 2025-07-30 14:30:30
-# Last Modified: 2025-08-08 19:26:35
+# Last Modified: 2025-08-15 20:35:19
 # Author: Scott Cadreau
 
 import boto3
@@ -1304,4 +1304,83 @@ def send_provider_payment_summary_report_emails(
             "emails_sent": 0,
             "total_recipients": 0,
             "results": []
+        }
+
+# ========================================
+# Welcome Email Functions
+# ========================================
+
+def send_welcome_email(
+    user_email: str,
+    first_name: str,
+    last_name: str,
+    aws_region: str = "us-east-1"
+) -> Dict[str, Any]:
+    """
+    Send welcome email to new users when they complete registration
+    
+    Args:
+        user_email: User's email address
+        first_name: User's first name
+        last_name: User's last name
+        aws_region: AWS region for services
+        
+    Returns:
+        Dictionary with email sending results
+    """
+    try:
+        # Get email templates
+        templates = get_email_templates(aws_region)
+        
+        # Check if welcome template exists
+        if 'welcome_user' not in templates['email_templates']:
+            logger.error("Welcome user email template not found in AWS Secrets Manager")
+            raise ValueError("Welcome user email template not configured in AWS Secrets")
+        
+        welcome_template = templates['email_templates']['welcome_user']
+        
+        # Prepare template variables
+        template_variables = {
+            "first_name": first_name or "New User",
+            "last_name": last_name or ""
+        }
+        
+        # Format email content
+        subject = format_email_template(welcome_template['subject'], template_variables)
+        body = format_email_template(welcome_template['body'], template_variables)
+        
+        # Send email
+        result = send_email(
+            to_addresses=user_email,
+            subject=subject,
+            body=body,
+            from_address="SurgiCase Team <noreply@metoraymedical.com>",
+            aws_region=aws_region,
+            email_type="welcome_user",
+            report_type="welcome_user"
+        )
+        
+        if result.get('success'):
+            logger.info(f"Successfully sent welcome email to {user_email}")
+            return {
+                "success": True,
+                "message": f"Welcome email sent to {user_email}",
+                "message_id": result.get('message_id'),
+                "recipient": user_email
+            }
+        else:
+            logger.error(f"Failed to send welcome email to {user_email}: {result.get('error', 'Unknown error')}")
+            return {
+                "success": False,
+                "message": f"Failed to send welcome email to {user_email}: {result.get('error', 'Unknown error')}",
+                "recipient": user_email
+            }
+        
+    except Exception as e:
+        error_msg = f"Error sending welcome email to {user_email}: {str(e)}"
+        logger.error(error_msg)
+        return {
+            "success": False,
+            "message": error_msg,
+            "recipient": user_email
         }

@@ -155,3 +155,5 @@ case_export_*
 # Claude Code
 .claude/
 
+# EC2 Monitoring
+tests/ec2_monitoring_*

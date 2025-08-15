@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-06 15:18:59
+# Last Modified: 2025-08-15 20:35:19
 # Author: Scott Cadreau
 
 # endpoints/user/create_user.py
@@ -211,6 +211,22 @@ def add_user(request: Request, user: UserCreate):
             
             # Record successful user creation
             business_metrics.record_user_operation("create", "success", user.user_id)
+            
+            # Send welcome email to new user
+            try:
+                from utils.email_service import send_welcome_email
+                welcome_result = send_welcome_email(
+                    user_email=user.user_email,
+                    first_name=user.first_name,
+                    last_name=user.last_name
+                )
+                if welcome_result.get('success'):
+                    print(f"Welcome email sent successfully to {user.user_email}")
+                else:
+                    print(f"Failed to send welcome email to {user.user_email}: {welcome_result.get('message')}")
+            except Exception as email_error:
+                # Don't fail user creation if email fails
+                print(f"Error sending welcome email to {user.user_email}: {str(email_error)}")
             
         response_data = {
             "statusCode": 201,
