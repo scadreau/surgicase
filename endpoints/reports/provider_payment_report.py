@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-08-08 14:52:46
+# Last Modified: 2025-08-18 13:17:54
 # Author: Scott Cadreau
 
 # endpoints/reports/provider_payment_report.py
@@ -1032,7 +1032,7 @@ def generate_single_provider_report(
                         metadata={
                             'report_type': 'individual_provider_payment',
                             'provider_id': user_id,
-                            'npi': npi,
+                            'npi': str(npi),
                             'creation_date': datetime.now().isoformat(),
                             'case_count': str(len(cases)),
                             'total_amount': str(total_amount)
