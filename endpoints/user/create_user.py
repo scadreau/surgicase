@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-15 20:35:19
+# Last Modified: 2025-08-18 23:50:10
 # Author: Scott Cadreau
 
 # endpoints/user/create_user.py
@@ -227,6 +227,56 @@ def add_user(request: Request, user: UserCreate):
             except Exception as email_error:
                 # Don't fail user creation if email fails
                 print(f"Error sending welcome email to {user.user_email}: {str(email_error)}")
+            
+            # Send email notification to admin about new user signup
+            try:
+                from utils.email_service import send_email
+                from datetime import datetime
+                
+                # Format timestamp for email
+                signup_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                
+                # Create email content
+                subject = f"New SurgiCase User Signup - {user.first_name} {user.last_name}"
+                
+                body = f"""New SurgiCase user created:
+
+User Details:
+- Email: {user.user_email}
+- Name: {user.first_name} {user.last_name}
+- User ID: {user.user_id}
+- Signup Time: {signup_timestamp}
+
+Additional Information:
+- Address: {user.addr1 or 'Not provided'}{', ' + user.addr2 if user.addr2 else ''}
+- City: {user.city or 'Not provided'}
+- State: {user.state or 'Not provided'}
+- ZIP: {user.zipcode or 'Not provided'}
+- Phone: {user.telephone or 'Not provided'}
+- NPI: {user.user_npi or 'Not provided'}
+- Referred by: {user.referred_by_user or 'Not provided'}
+- States Licensed: {user.states_licensed or 'Not provided'}
+- Timezone: {user.timezone or 'Not provided'}
+
+This is an automated notification from the SurgiCase user registration system.
+"""
+                
+                email_result = send_email(
+                    to_addresses="support@metoraymedical.com",
+                    subject=subject,
+                    body=body,
+                    from_address="SurgiCase System <noreply@metoraymedical.com>",
+                    email_type="new_user_signup_admin",
+                    report_type="new_user_signup"
+                )
+                
+                if email_result.get('success'):
+                    print(f"New user signup email notification sent successfully to support@metoraymedical.com for {user.user_email}")
+                else:
+                    print(f"Failed to send email notification for {user.user_email}: {email_result.get('error')}")
+            except Exception as email_error:
+                # Don't fail user creation if email fails
+                print(f"Error sending email notification for {user.user_email}: {str(email_error)}")
             
         response_data = {
             "statusCode": 201,
