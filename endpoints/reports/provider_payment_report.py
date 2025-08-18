@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-08-18 13:17:54
+# Last Modified: 2025-08-18 13:42:06
 # Author: Scott Cadreau
 
 # endpoints/reports/provider_payment_report.py
@@ -582,7 +582,9 @@ def generate_provider_payment_report(
                     elif end_date:
                         report_date_range = f"through {end_date}"
                     else:
-                        report_date_range = "all dates"
+                        # For weekly reports, show the current week date
+                        current_date = datetime.now()
+                        report_date_range = f"week of {current_date.strftime('%B %d')}"
                     
                     # Store the current UTC datetime for timezone conversion in emails
                     current_utc = datetime.utcnow()
