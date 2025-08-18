@@ -1,5 +1,5 @@
 # Created: 2025-08-08 02:31:02
-# Last Modified: 2025-08-13 20:08:02
+# Last Modified: 2025-08-18 13:37:31
 # Author: Scott Cadreau
 
 # endpoints/reports/provider_payment_summary_report.py
@@ -93,8 +93,9 @@ class ProviderPaymentSummaryReportPDF(FPDF):
         # Table header
         self.set_font("Arial", 'B', 10)
         header_height = self.font_size + 2
-        self.cell(80, header_height, "Provider Name", border=1)
-        self.cell(40, header_height, "NPI", border=1)
+        self.cell(60, header_height, "Provider Name", border=1)
+        self.cell(30, header_height, "NPI", border=1)
+        self.cell(30, header_height, "Total Cases", border=1, align="C")
         self.cell(40, header_height, "Total Amount", border=1, ln=True, align="R")
 
         # Table data
@@ -118,11 +119,13 @@ class ProviderPaymentSummaryReportPDF(FPDF):
             if npi:
                 npi = str(npi)
             
-            # Format amount
+            # Format amount and case count
             total_amount = provider.get('total_amount', 0) or 0
+            case_count = provider.get('case_count', 0) or 0
             
-            self.cell(80, data_height, provider_name, border=1)
-            self.cell(40, data_height, npi, border=1)
+            self.cell(60, data_height, provider_name, border=1)
+            self.cell(30, data_height, npi, border=1)
+            self.cell(30, data_height, str(case_count), border=1, align="C")
             self.cell(40, data_height, f"${total_amount:.2f}", border=1, ln=True, align="R")
             state_total += total_amount
 
@@ -135,7 +138,7 @@ class ProviderPaymentSummaryReportPDF(FPDF):
         
         return state_total
 
-    def add_summary(self, total_amount, state_count, provider_count):
+    def add_summary(self, total_amount, state_count, provider_count, case_count):
         """Add summary section at the end"""
         self.add_page()
         
@@ -146,6 +149,7 @@ class ProviderPaymentSummaryReportPDF(FPDF):
         self.set_font("Arial", '', 12)
         self.cell(0, 8, f"Total States: {state_count}", ln=True)
         self.cell(0, 8, f"Total Providers: {provider_count}", ln=True)
+        self.cell(0, 8, f"Total Cases: {case_count}", ln=True)
         self.cell(0, 8, f"Total Amount: ${total_amount:.2f}", ln=True)
 
 @router.get("/provider_payment_summary_report")
@@ -403,6 +407,7 @@ def generate_provider_payment_summary_report(
                 
                 total_amount = 0
                 total_providers = 0
+                total_cases = 0
                 
                 # Add each state's section
                 first_state = True
@@ -415,10 +420,13 @@ def generate_provider_payment_summary_report(
                     )
                     total_amount += state_total
                     total_providers += len(state_providers)
+                    # Add up case counts for each provider in this state
+                    for provider in state_providers:
+                        total_cases += provider.get('case_count', 0) or 0
                     first_state = False
                 
                 # Add summary
-                pdf.add_summary(total_amount, len(states_data), total_providers)
+                pdf.add_summary(total_amount, len(states_data), total_providers, total_cases)
                 
                 # Create reports directory if it doesn't exist
                 reports_dir = os.path.join(os.getcwd(), "reports")
