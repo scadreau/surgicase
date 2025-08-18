@@ -1,5 +1,5 @@
 # Created: 2025-08-14 17:38:38
-# Last Modified: 2025-08-14 17:52:21
+# Last Modified: 2025-08-18 14:30:24
 # Author: Scott Cadreau
 
 """
@@ -404,18 +404,18 @@ def create_system_overview_chart(current_data: Dict) -> go.Figure:
     fig = make_subplots(
         rows=1, cols=2,
         specs=[[{'type': 'indicator'}, {'type': 'indicator'}]],
-        subplot_titles=("CPU Usage", "Memory Usage")
+        subplot_titles=("", "")
     )
     
     # CPU gauge
     fig.add_trace(go.Indicator(
         mode="gauge+number",
         value=cpu_value,
-        domain={'x': [0, 0.5], 'y': [0, 1]},
+        domain={'x': [0, 0.5], 'y': [0, 0.85]},
         title={'text': "CPU (%)"},
         gauge={
             'axis': {'range': [None, 100]},
-            'bar': {'color': "darkblue"},
+            'bar': {'color': "#4169E1"},
             'steps': [
                 {'range': [0, 50], 'color': "lightgray"},
                 {'range': [50, 80], 'color': "yellow"},
@@ -433,7 +433,7 @@ def create_system_overview_chart(current_data: Dict) -> go.Figure:
     fig.add_trace(go.Indicator(
         mode="gauge+number",
         value=memory_value,
-        domain={'x': [0.5, 1], 'y': [0, 1]},
+        domain={'x': [0.5, 1], 'y': [0, 0.85]},
         title={'text': "Memory (%)"},
         gauge={
             'axis': {'range': [None, 100]},
@@ -454,7 +454,7 @@ def create_system_overview_chart(current_data: Dict) -> go.Figure:
     fig.update_layout(
         title="Current System Metrics",
         height=300,
-        font={'color': "darkblue", 'family': "Arial"}
+        font={'color': "#87CEEB", 'family': "Arial"}
     )
     
     return fig
