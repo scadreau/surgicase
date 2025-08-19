@@ -1,5 +1,5 @@
 # Created: 2025-01-15
-# Last Modified: 2025-08-15 21:45:59
+# Last Modified: 2025-08-19 00:44:22
 # Author: Scott Cadreau
 
 import schedule
@@ -443,7 +443,7 @@ def setup_weekly_scheduler():
     schedule.every().tuesday.at("08:00").do(weekly_npi_update)
     
     # Schedule paid update for Thursday at 08:00 UTC
-    schedule.every().friday.at("08:00").do(weekly_paid_update)
+    # schedule.every().friday.at("08:00").do(weekly_paid_update)  # Commented out - client wants to run manually for now
     
     logger.info("Scheduler configured:")
     logger.info("  - Database backup: Daily at 08:00 UTC")
