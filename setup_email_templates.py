@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Created: 2025-08-08 02:41:28
-# Last Modified: 2025-08-08 02:47:31
+# Last Modified: 2025-08-19 00:02:25
 # Author: Scott Cadreau
 
 """
@@ -27,6 +27,64 @@ logger = logging.getLogger(__name__)
 
 # Email template definitions
 EMAIL_TEMPLATES = {
+    "provider_payment_report": {
+        "weekly": {
+            "subject": "Weekly Provider Payment Report for week of {report_date}",
+            "body": """Hello {first_name},
+
+Please find the attached Provider Payment Report for the week of {report_date}.
+
+Report Summary:
+• Total Providers: {total_providers}
+• Total Cases: {total_cases}
+• Total Amount: ${total_amount}
+
+IMPORTANT SECURITY INFORMATION:
+The attached PDF report is password-protected for security. To open the report, use the following password:
+Password: {password}
+
+Please keep this password secure and do not share it with others. The report contains confidential patient and financial information.
+
+The report was created on {creation_date}.
+
+If you have any questions about this report or need assistance accessing the document, please contact our office.
+
+Thank you,
+SurgiCase Automation System
+
+----
+This is an automated weekly report from the SurgiCase system.
+Report filename: {filename}"""
+        },
+        "on_demand": {
+            "subject": "Provider Payment Report - Generated {creation_date}",
+            "body": """Hello {first_name},
+
+Please find the attached Provider Payment Report that you requested on {creation_date}.
+
+Report Summary:
+• Total Providers: {total_providers}
+• Total Cases: {total_cases}
+• Total Amount: ${total_amount}
+
+IMPORTANT SECURITY INFORMATION:
+The attached PDF report is password-protected for security. To open the report, use the following password:
+Password: {password}
+
+Please keep this password secure and do not share it with others. The report contains confidential patient and financial information.
+
+The report was created on {creation_date}.
+
+If you have any questions about this report or need assistance accessing the document, please contact our office.
+
+Thank you,
+SurgiCase Automation System
+
+----
+This is an on-demand report from the SurgiCase system.
+Report filename: {filename}"""
+        }
+    },
     "provider_payment_summary_report": {
         "weekly": {
             "subject": "Weekly Provider Payment Summary Report - {creation_date}",
