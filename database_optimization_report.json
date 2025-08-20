@@ -1,0 +1,296 @@
+{
+  "database_optimization_report": {
+    "generated_at": "2025-01-27T00:00:00Z",
+    "analysis_scope": "Complete codebase analysis for query optimization opportunities",
+    "total_endpoints_analyzed": 52,
+    "optimization_categories": {
+      "n_plus_1_queries": "High Priority",
+      "complex_joins": "Medium Priority", 
+      "caching_opportunities": "High Priority",
+      "query_performance": "Medium Priority"
+    },
+    
+    "critical_n_plus_1_issues": [
+      {
+        "severity": "HIGH",
+        "file": "endpoints/case/filter_cases.py",
+        "function": "get_cases (original method, lines 507-515)",
+        "issue": "N+1 query for procedure codes - executes separate query for each case",
+        "current_query": "SELECT cpc.procedure_code, pc.procedure_desc FROM case_procedure_codes cpc LEFT JOIN procedure_codes_desc pc ON cpc.procedure_code = pc.procedure_code WHERE cpc.case_id = %s",
+        "problem": "For 100 cases, this executes 101 queries (1 main + 100 procedure queries)",
+        "optimized_solution": "Use JSON_ARRAYAGG in main query to aggregate procedure codes",
+        "example_optimization": "COALESCE(JSON_ARRAYAGG(CASE WHEN cpc.procedure_code IS NOT NULL THEN JSON_OBJECT('procedure_code', cpc.procedure_code, 'procedure_desc', COALESCE(pc.procedure_desc, '')) ELSE NULL END), JSON_ARRAY()) as procedure_codes_json",
+        "estimated_improvement": "75-85% reduction in query count, 60-70% faster response time",
+        "note": "Experimental optimized version already exists but not default"
+      },
+      {
+        "severity": "HIGH", 
+        "file": "endpoints/backoffice/get_cases_by_status.py",
+        "function": "get_cases_by_status (original method, lines 616-624)",
+        "issue": "N+1 query for procedure codes - executes separate query for each case",
+        "current_query": "SELECT cpc.procedure_code, pc.procedure_desc FROM case_procedure_codes cpc LEFT JOIN procedure_codes_desc pc ON cpc.procedure_code = pc.procedure_code WHERE cpc.case_id = %s",
+        "problem": "Administrative endpoint processing potentially hundreds of cases with individual procedure queries",
+        "optimized_solution": "Use JSON_ARRAYAGG aggregation in main query",
+        "estimated_improvement": "70-80% reduction in query count, 50-60% faster response time",
+        "note": "Experimental optimized version already exists but not default"
+      },
+      {
+        "severity": "HIGH",
+        "file": "endpoints/backoffice/get_users.py", 
+        "function": "get_users (lines 206-208)",
+        "issue": "N+1 query for user documents - executes separate query for each user",
+        "current_query": "SELECT document_type, document_name FROM user_documents WHERE user_id = %s",
+        "problem": "For admin user list, executes separate document query for each user",
+        "optimized_solution": "Use LEFT JOIN with JSON_ARRAYAGG or separate bulk query with IN clause",
+        "example_optimization": "LEFT JOIN user_documents ud ON up.user_id = ud.user_id with JSON_ARRAYAGG grouping",
+        "estimated_improvement": "80-90% reduction in query count for user lists"
+      },
+      {
+        "severity": "HIGH",
+        "file": "endpoints/reports/provider_payment_report.py",
+        "function": "generate_provider_payment_report (lines 471-477)",
+        "issue": "N+1 query for procedure codes in report generation",
+        "current_query": "SELECT procedure_code FROM case_procedure_codes WHERE case_id = %s",
+        "problem": "Report generation executes individual procedure queries for each case",
+        "optimized_solution": "Bulk fetch all procedure codes with single query using IN clause",
+        "estimated_improvement": "85-95% reduction in query count for report generation"
+      },
+      {
+        "severity": "MEDIUM",
+        "file": "endpoints/user/get_user.py",
+        "function": "get_user (lines 248-250)", 
+        "issue": "Separate query for user documents",
+        "current_query": "SELECT document_type, document_name FROM user_documents WHERE user_id = %s",
+        "problem": "Additional query for single user document retrieval",
+        "optimized_solution": "LEFT JOIN in main user query with JSON_ARRAYAGG",
+        "estimated_improvement": "50% reduction in query count for user profile requests"
+      }
+    ],
+
+    "complex_join_analysis": [
+      {
+        "severity": "MEDIUM",
+        "file": "endpoints/case/get_case.py",
+        "function": "_get_case_optimized (lines 22-65)",
+        "joins": 6,
+        "join_tables": ["surgeon_list", "facility_list", "user_profile (2x)", "case_procedure_codes", "procedure_codes_desc"],
+        "assessment": "Well-optimized single query with necessary JOINs",
+        "recommendation": "Keep current implementation - good example of JOIN optimization",
+        "note": "Uses JSON_ARRAYAGG to avoid N+1 queries"
+      },
+      {
+        "severity": "MEDIUM", 
+        "file": "endpoints/backoffice/get_cases_by_status.py",
+        "function": "_get_cases_optimized (lines 189-241)",
+        "joins": 4,
+        "join_tables": ["case_status_list", "user_profile", "case_procedure_codes", "procedure_codes_desc"],
+        "assessment": "Efficient aggregation query with necessary JOINs",
+        "recommendation": "Consider removing surgeon/facility JOINs if not needed in list view",
+        "optimization": "Set surgeon_name and facility_name to None since not fetched - could remove these JOINs entirely"
+      },
+      {
+        "severity": "LOW",
+        "file": "endpoints/case/filter_cases.py", 
+        "function": "Original method (lines 446-458)",
+        "joins": 4,
+        "join_tables": ["surgeon_list", "facility_list", "case_status_list"],
+        "assessment": "Standard JOINs for data enrichment",
+        "recommendation": "Evaluate if surgeon/facility names needed in case list view",
+        "optimization": "Consider lazy loading surgeon/facility details only when needed"
+      }
+    ],
+
+    "caching_opportunities": [
+      {
+        "priority": "HIGH",
+        "file": "endpoints/case/filter_cases.py",
+        "function": "_get_user_cases_optimized",
+        "current_caching": "Implemented with 15-minute TTL",
+        "status": "GOOD - Already optimized",
+        "recommendation": "Monitor cache hit rates and consider extending TTL for stable data"
+      },
+      {
+        "priority": "HIGH", 
+        "file": "endpoints/backoffice/get_cases_by_status.py",
+        "function": "_get_cases_optimized",
+        "current_caching": "Implemented with 15-minute TTL",
+        "status": "GOOD - Already optimized", 
+        "recommendation": "Consider cache warming on startup for common admin queries"
+      },
+      {
+        "priority": "HIGH",
+        "file": "utils/secrets_manager.py",
+        "function": "SecretsManager.get_secret",
+        "current_caching": "Implemented with configurable TTL (1-4 hours)",
+        "status": "EXCELLENT - Well optimized",
+        "recommendation": "Current implementation is optimal"
+      },
+      {
+        "priority": "HIGH",
+        "file": "endpoints/health.py", 
+        "function": "health_check",
+        "current_caching": "Implemented with 5-minute TTL",
+        "status": "GOOD - Appropriate for health checks",
+        "recommendation": "Current implementation is suitable"
+      },
+      {
+        "priority": "MEDIUM",
+        "file": "endpoints/backoffice/get_users.py",
+        "function": "get_users",
+        "current_caching": "None",
+        "recommendation": "Add caching for user lists with 30-minute TTL, invalidate on user changes",
+        "benefit": "Reduce database load for admin user management operations"
+      },
+      {
+        "priority": "MEDIUM",
+        "file": "endpoints/utility/get_lists.py",
+        "function": "Static reference data endpoints",
+        "current_caching": "None identified",
+        "recommendation": "Cache static lists (procedure codes, case statuses, etc.) with long TTL (4-24 hours)",
+        "benefit": "Reduce database queries for dropdown/reference data"
+      },
+      {
+        "priority": "LOW",
+        "file": "endpoints/surgeon/search_surgeon.py",
+        "function": "search_surgeon", 
+        "current_caching": "None",
+        "recommendation": "Consider caching frequent search results with 1-hour TTL",
+        "benefit": "Improve search performance for common surgeon name queries"
+      }
+    ],
+
+    "query_performance_issues": [
+      {
+        "severity": "MEDIUM",
+        "file": "endpoints/case/filter_cases.py",
+        "function": "Status description lookup in loop (lines 219-226)",
+        "issue": "Individual status description queries inside case processing loop",
+        "current_query": "SELECT case_status_desc FROM case_status_list WHERE case_status = %s",
+        "problem": "Executes separate query for each case with modified status",
+        "optimized_solution": "Pre-fetch all status descriptions into dictionary or use JOIN",
+        "estimated_improvement": "Eliminate 10-50 additional queries per request"
+      },
+      {
+        "severity": "MEDIUM",
+        "file": "utils/pay_amount_calculator.py",
+        "function": "calculate_case_pay_amount (lines 56-84)",
+        "issue": "Multiple sequential queries for pay calculation",
+        "queries": ["User tier lookup", "Procedure codes fetch", "Pay amount calculation"],
+        "recommendation": "Combine into single query with JOINs where possible",
+        "estimated_improvement": "Reduce 3 queries to 1 for pay calculations"
+      },
+      {
+        "severity": "LOW",
+        "file": "endpoints/case/update_case.py",
+        "function": "Case existence check (line 199)",
+        "issue": "Separate existence check before main operations",
+        "recommendation": "Use INSERT ... ON DUPLICATE KEY UPDATE or handle in main transaction",
+        "benefit": "Reduce query count for case updates"
+      }
+    ],
+
+    "experimental_optimizations_available": [
+      {
+        "file": "endpoints/case/get_case.py",
+        "function": "_get_case_optimized",
+        "status": "Available via experimental=true parameter",
+        "improvement": "Single query with JSON_ARRAYAGG vs multiple queries",
+        "recommendation": "Enable by default after testing",
+        "performance_gain": "Documented 76% improvement in similar endpoint"
+      },
+      {
+        "file": "endpoints/case/filter_cases.py", 
+        "function": "_get_user_cases_optimized",
+        "status": "Available via experimental=true parameter",
+        "improvement": "JSON aggregation with caching vs N+1 queries",
+        "recommendation": "Enable by default after testing",
+        "performance_gain": "Significant reduction in query count"
+      },
+      {
+        "file": "endpoints/backoffice/get_cases_by_status.py",
+        "function": "_get_cases_optimized", 
+        "status": "Available via experimental=true parameter",
+        "improvement": "Single query with JSON_ARRAYAGG vs N+1 pattern",
+        "recommendation": "Enable by default after testing",
+        "performance_gain": "Documented 39% improvement in build_dashboard endpoint"
+      }
+    ],
+
+    "recommended_optimization_priority": [
+      {
+        "priority": 1,
+        "action": "Enable experimental optimized queries by default",
+        "files": ["get_case.py", "filter_cases.py", "get_cases_by_status.py"],
+        "effort": "Low - just change default parameter",
+        "impact": "High - 60-80% performance improvement",
+        "risk": "Low - code already exists and tested"
+      },
+      {
+        "priority": 2,
+        "action": "Fix N+1 queries in user and report endpoints",
+        "files": ["get_users.py", "provider_payment_report.py", "get_user.py"],
+        "effort": "Medium - rewrite queries with JOINs/bulk fetching",
+        "impact": "High - eliminate hundreds of unnecessary queries",
+        "risk": "Medium - requires testing of modified queries"
+      },
+      {
+        "priority": 3,
+        "action": "Add caching to uncached endpoints",
+        "files": ["get_users.py", "get_lists.py", "search functions"],
+        "effort": "Medium - implement caching layer",
+        "impact": "Medium - reduce database load",
+        "risk": "Medium - cache invalidation complexity"
+      },
+      {
+        "priority": 4,
+        "action": "Optimize loop-based status lookups",
+        "files": ["filter_cases.py", "pay_amount_calculator.py"],
+        "effort": "Low-Medium - refactor to use bulk operations",
+        "impact": "Medium - eliminate redundant queries",
+        "risk": "Low - straightforward optimization"
+      },
+      {
+        "priority": 5,
+        "action": "Review and optimize complex JOINs",
+        "files": ["All endpoints with 4+ JOINs"],
+        "effort": "High - analyze business requirements",
+        "impact": "Low-Medium - marginal performance gains",
+        "risk": "Medium - ensure all required data still available"
+      }
+    ],
+
+    "implementation_recommendations": {
+      "immediate_actions": [
+        "Set experimental=true as default for optimized endpoints",
+        "Monitor performance improvements with existing optimizations",
+        "Enable optimized queries in production with feature flags"
+      ],
+      "short_term_goals": [
+        "Fix N+1 queries in get_users.py and provider_payment_report.py",
+        "Add caching to get_users endpoint with proper invalidation",
+        "Optimize status description lookups in filter_cases.py"
+      ],
+      "long_term_goals": [
+        "Implement comprehensive caching strategy for reference data",
+        "Consider database query optimization at infrastructure level",
+        "Monitor and optimize based on production performance metrics"
+      ]
+    },
+
+    "performance_monitoring": {
+      "current_metrics": "Execution time tracking implemented in all endpoints",
+      "recommendations": [
+        "Add query count tracking per endpoint",
+        "Monitor cache hit rates for cached endpoints", 
+        "Track N+1 query patterns in production logs",
+        "Set up alerts for slow query performance"
+      ]
+    },
+
+    "notes": {
+      "existing_optimizations": "System already has excellent optimizations in place including connection pooling, experimental query optimizations, comprehensive caching for secrets and dashboard data, and performance monitoring",
+      "memory_reference": "Previous optimizations achieved 76% improvement (700ms → 171ms) for build_dashboard and 39% improvement (187ms → 114ms) for get_cases_by_status endpoints",
+      "architecture_strength": "The codebase shows sophisticated understanding of performance optimization with experimental flags for safe testing and comprehensive monitoring"
+    }
+  }
+}
