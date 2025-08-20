@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-20 10:03:15
+# Last Modified: 2025-08-20 10:22:33
 # Author: Scott Cadreau
 
 # main.py
@@ -180,24 +180,25 @@ except Exception as e:
     logger.warning("Application will continue with on-demand connection creation")
 
 # Start the scheduler service in background
-# Handles: Case status updates (Mon/Thu), NPI data updates (Tue)
+# Handles: Case status updates (Mon/Thu), NPI data updates (Tue), Pool/Cache maintenance
 # Configuration stored in AWS Secrets Manager: surgicase/main
 try:
     main_config = get_main_config()
     enable_scheduler = main_config.get("ENABLE_SCHEDULER", "true").lower() == "true"
+    scheduler_role = main_config.get("SCHEDULER_ROLE", "leader").lower()  # "leader" or "worker"
     
     if enable_scheduler:
         from utils.scheduler import run_scheduler_in_background
-        run_scheduler_in_background()
-        logger.info("Scheduler enabled via AWS Secrets Manager configuration")
+        run_scheduler_in_background(scheduler_role=scheduler_role)
+        logger.info(f"Scheduler enabled in {scheduler_role.upper()} mode via AWS Secrets Manager configuration")
     else:
         logger.info("Scheduler disabled via AWS Secrets Manager configuration")
 except Exception as e:
     logger.error(f"Failed to initialize scheduler: {str(e)}")
-    # Fallback: enable scheduler if configuration cannot be retrieved
+    # Fallback: enable scheduler in leader mode if configuration cannot be retrieved
     from utils.scheduler import run_scheduler_in_background
-    run_scheduler_in_background()
-    logger.warning("Scheduler enabled as fallback due to configuration error")
+    run_scheduler_in_background(scheduler_role="leader")
+    logger.warning("Scheduler enabled in LEADER mode as fallback due to configuration error")
 
 if __name__ == "__main__":
     import uvicorn

@@ -1,5 +1,5 @@
 # Created: 2025-01-15
-# Last Modified: 2025-08-20 09:59:36
+# Last Modified: 2025-08-20 10:24:32
 # Author: Scott Cadreau
 
 import schedule
@@ -499,11 +499,47 @@ def pool_stats_job():
     except Exception as e:
         logger.error(f"❌ Error in pool stats job: {str(e)}")
 
-def setup_weekly_scheduler():
+def secrets_warming_job():
     """
-    Set up the weekly scheduler for case status updates, NPI data updates, and daily backups.
+    Scheduled function to refresh the secrets cache.
     
-    Schedules all update functions:
+    This function:
+    1. Pre-loads all application secrets to prevent cache misses
+    2. Refreshes secrets before they expire (proactive warming)
+    3. Eliminates AWS API call latency during normal operations
+    4. Logs warming statistics and any failures
+    """
+    logger.info("Starting scheduled secrets cache warming...")
+    
+    try:
+        from utils.secrets_manager import warm_all_secrets
+        
+        results = warm_all_secrets()
+        
+        if results["failed"] == 0:
+            logger.info(f"✅ Secrets warming completed: {results['successful']} secrets refreshed in {results['duration_seconds']:.2f}s")
+        else:
+            logger.warning(f"⚠️ Secrets warming partial: {results['successful']}/{results['total_secrets']} secrets refreshed")
+            logger.warning(f"   Duration: {results['duration_seconds']:.2f}s, Failed: {results['failed']}")
+            
+            # Log failed secrets for monitoring
+            for detail in results["details"]:
+                if detail["status"] == "failed":
+                    logger.error(f"   Failed secret: {detail['secret_name']} - {detail['error']}")
+                    
+    except Exception as e:
+        logger.error(f"❌ Error in secrets warming job: {str(e)}")
+
+def setup_weekly_scheduler(scheduler_role: str = "leader"):
+    """
+    Set up the scheduler based on server role.
+    
+    Args:
+        scheduler_role: "leader" or "worker"
+            - leader: Runs all scheduled jobs (business operations + maintenance)
+            - worker: Runs only maintenance jobs (backups, cache/pool management)
+    
+    Leader schedules (business operations + maintenance):
     - daily_database_backup: Every day at 08:00 UTC (database backup)
     - weekly_pending_payment_update: Monday at 08:00 UTC (status 10 -> 15)
     - weekly_provider_payment_report: Monday at 09:00 UTC (generate consolidated report + send emails)
@@ -511,50 +547,64 @@ def setup_weekly_scheduler():
     - weekly_individual_provider_reports: Monday at 10:00 UTC (generate individual provider reports + send emails)
     - weekly_npi_update: Tuesday at 08:00 UTC (NPI data refresh)
     - weekly_paid_update: Friday at 08:00 UTC (status 15 -> 20)
+    - pool_cleanup_job: Every hour
+    - pool_prewarm_job: Daily at 10:30 UTC
+    - pool_stats_job: Daily at 17:00 UTC
+    - secrets_warming_job: Every 30 minutes
+    
+    Worker schedules (maintenance only):
+    - daily_database_backup: Every day at 08:00 UTC (database backup)
+    - pool_cleanup_job: Every hour
+    - pool_prewarm_job: Daily at 10:30 UTC
+    - pool_stats_job: Daily at 17:00 UTC
+    - secrets_warming_job: Every 30 minutes
     
     To change days/times: modify the schedule lines below
     """
-    # Schedule daily database backup at 08:00 UTC
-    schedule.every().day.at("08:00").do(daily_database_backup)
-    
-    # Schedule pending payment update for Monday at 08:00 UTC
-    schedule.every().monday.at("08:00").do(weekly_pending_payment_update)
-    
-    # Schedule consolidated provider payment report for Monday at 09:00 UTC (1 hour after status update)
-    schedule.every().monday.at("09:00").do(weekly_provider_payment_report)
-    
-    # Schedule provider payment summary report for Monday at 09:15 UTC (15 minutes after consolidated report)
-    schedule.every().monday.at("09:15").do(weekly_provider_payment_summary_report)
-    
-    # Schedule individual provider reports for Monday at 10:00 UTC (1 hour after consolidated report)
-    schedule.every().monday.at("10:00").do(weekly_individual_provider_reports)
-    
-    # Schedule NPI data update for Tuesday at 08:00 UTC
-    schedule.every().tuesday.at("08:00").do(weekly_npi_update)
-    
-    # Schedule paid update for Thursday at 08:00 UTC
-    # schedule.every().friday.at("08:00").do(weekly_paid_update)  # Commented out - client wants to run manually for now
-    
-    # Schedule database connection pool management
+    # Always schedule maintenance tasks (both leader and worker servers)
     schedule.every().hour.do(pool_cleanup_job)  # Clean up stale connections every hour
-    schedule.every().day.at("10:30").do(pool_prewarm_job)  # Pre-warm pool 30 minutes before business hours
-    schedule.every().day.at("17:00").do(pool_stats_job)  # Log pool stats at noon
+    schedule.every().day.at("10:30").do(pool_prewarm_job)  # Pre-warm pool before business hours
+    schedule.every().day.at("17:00").do(pool_stats_job)  # Log pool stats
+    schedule.every(30).minutes.do(secrets_warming_job)  # Refresh secrets cache every 30 minutes
     
-    logger.info("Scheduler configured:")
-    logger.info("  - Database backup: Daily at 08:00 UTC")
-    logger.info("  - Pending payment update: Monday at 08:00 UTC")
-    logger.info("  - Consolidated provider payment report: Monday at 09:00 UTC")
-    logger.info("  - Provider payment summary report: Monday at 09:15 UTC")
-    logger.info("  - Individual provider reports: Monday at 10:00 UTC")
-    logger.info("  - NPI data update: Tuesday at 08:00 UTC")
-    logger.info("  - Paid update: Friday at 08:00 UTC")
-    logger.info("  - Pool cleanup: Every hour")
-    logger.info("  - Pool pre-warming: Daily at 10:30 UTC (before business hours)")
-    logger.info("  - Pool statistics: Daily at 17:00 UTC")
+    # Schedule business operations only on leader server
+    if scheduler_role.lower() == "leader":
+        schedule.every().day.at("08:00").do(daily_database_backup)  # Database backup
+        schedule.every().monday.at("08:00").do(weekly_pending_payment_update)
+        schedule.every().monday.at("09:00").do(weekly_provider_payment_report)
+        schedule.every().monday.at("09:15").do(weekly_provider_payment_summary_report)
+        schedule.every().monday.at("10:00").do(weekly_individual_provider_reports)
+        schedule.every().tuesday.at("08:00").do(weekly_npi_update)
+        # schedule.every().friday.at("08:00").do(weekly_paid_update)  # Commented out - client wants to run manually
+    
+    logger.info(f"Scheduler configured in {scheduler_role.upper()} mode:")
+    
+    # Always log maintenance tasks
+    logger.info("  📋 MAINTENANCE TASKS (All Servers):")
+    logger.info("    - Database backup: Daily at 08:00 UTC")
+    logger.info("    - Pool cleanup: Every hour")
+    logger.info("    - Pool pre-warming: Daily at 10:30 UTC")
+    logger.info("    - Pool statistics: Daily at 17:00 UTC")
+    logger.info("    - Secrets cache warming: Every 30 minutes")
+    
+    # Log business operations only for leader
+    if scheduler_role.lower() == "leader":
+        logger.info("  🏢 BUSINESS OPERATIONS (Leader Only):")
+        logger.info("    - Pending payment update: Monday at 08:00 UTC")
+        logger.info("    - Consolidated provider payment report: Monday at 09:00 UTC")
+        logger.info("    - Provider payment summary report: Monday at 09:15 UTC")
+        logger.info("    - Individual provider reports: Monday at 10:00 UTC")
+        logger.info("    - NPI data update: Tuesday at 08:00 UTC")
+        logger.info("    - Paid update: Friday at 08:00 UTC (manual)")
+    else:
+        logger.info("  🏢 BUSINESS OPERATIONS: Disabled (Worker Mode)")
 
-def run_scheduler():
+def run_scheduler(scheduler_role: str = "leader"):
     """
     Run the scheduler in a continuous loop.
+    
+    Args:
+        scheduler_role: "leader" or "worker" - determines which jobs to schedule
     
     This function should be called to start the scheduling service.
     It will run indefinitely, checking for scheduled jobs every hour.
@@ -565,9 +615,9 @@ def run_scheduler():
     # Note: Signal handlers can only be set up in the main thread
     # When running in background, we rely on the daemon thread behavior
     
-    setup_weekly_scheduler()
+    setup_weekly_scheduler(scheduler_role=scheduler_role)
     
-    logger.info("Case status scheduler started. Running continuously...")
+    logger.info(f"Scheduler started in {scheduler_role.upper()} mode. Running continuously...")
     
     while not shutdown_requested:
         schedule.run_pending()
@@ -581,15 +631,18 @@ def run_scheduler():
     logger.info("Case status scheduler shutting down gracefully...")
     sys.exit(0)
 
-def run_scheduler_in_background():
+def run_scheduler_in_background(scheduler_role: str = "leader"):
     """
     Start the scheduler in a background thread.
     
+    Args:
+        scheduler_role: "leader" or "worker" - determines which jobs to schedule
+    
     This allows the scheduler to run alongside the main FastAPI application.
     """
-    scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
+    scheduler_thread = threading.Thread(target=lambda: run_scheduler(scheduler_role), daemon=True)
     scheduler_thread.start()
-    logger.info("Case status scheduler started in background thread")
+    logger.info(f"Scheduler started in background thread ({scheduler_role.upper()} mode)")
 
 def run_pending_payment_update_now():
     """
