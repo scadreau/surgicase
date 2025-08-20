@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-20 08:45:25
+# Last Modified: 2025-08-20 10:03:15
 # Author: Scott Cadreau
 
 # main.py
@@ -163,6 +163,21 @@ try:
 except Exception as e:
     logger.error(f"Failed to warm secrets cache: {str(e)}")
     logger.warning("Application will continue with on-demand secret loading")
+
+# Warm database connection pool on startup for optimal performance
+# Pre-creates database connections to eliminate first-request latency
+try:
+    from core.database import prewarm_connection_pool
+    pool_results = prewarm_connection_pool(target_connections=50)
+    if pool_results["status"] == "success":
+        logger.info(f"🔥 Database pool warming completed: {pool_results['created']} connections created, {pool_results['current_size']}/{pool_results['target_size']} ready")
+    elif pool_results["status"] == "already_warm":
+        logger.info(f"✅ Database pool already warm: {pool_results['current_size']}/{pool_results['target_size']} connections ready")
+    else:
+        logger.warning(f"⚠️ Database pool warming status: {pool_results['status']}")
+except Exception as e:
+    logger.error(f"Failed to warm database connection pool: {str(e)}")
+    logger.warning("Application will continue with on-demand connection creation")
 
 # Start the scheduler service in background
 # Handles: Case status updates (Mon/Thu), NPI data updates (Tue)
