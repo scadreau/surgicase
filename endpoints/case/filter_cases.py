@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-20 13:21:58
+# Last Modified: 2025-08-20 21:52:28
 # Author: Scott Cadreau
 
 # endpoints/case/filter_cases.py
@@ -258,7 +258,13 @@ def _get_user_cases_optimized(cursor, user_id, status_list, max_case_status):
 
 @router.get("/case_filter")
 @track_business_operation("filter", "case")
-def get_cases(request: Request, user_id: str = Query(..., description="The user ID to retrieve cases for"), filter: str = Query("", description="Comma-separated list of case_status values (e.g. 0,1,2) or 'all' for all statuses"), experimental: bool = Query(False, description="Use experimental optimized single query (default: false)")):
+def get_cases(
+    request: Request, 
+    user_id: str = Query(..., description="The user ID to retrieve cases for"), 
+    filter: str = Query("", description="Comma-separated list of case_status values (e.g. 0,1,2) or 'all' for all statuses"), 
+
+):
+
     """
     Retrieve and filter surgical cases for a specific user with advanced status visibility controls.
     
@@ -274,6 +280,9 @@ def get_cases(request: Request, user_id: str = Query(..., description="The user 
     - Automatic case status capping based on user permissions
     - Comprehensive monitoring and performance tracking
     - Flexible filtering: specific statuses, ranges, or all cases
+    - Optimized single-query implementation with intelligent caching
+    - JSON aggregation for procedure codes to eliminate N+1 queries
+    - Background cache re-warming for enhanced user experience
     
     Args:
         request (Request): FastAPI request object for logging and monitoring
@@ -315,11 +324,12 @@ def get_cases(request: Request, user_id: str = Query(..., description="The user 
     
     Database Operations:
         1. Retrieves user's max_case_status from user_profile table
-        2. Constructs dynamic SQL query based on filter parameters
-        3. Joins with surgeon_list and facility_list for enriched data
-        4. Joins with case_status_list for status descriptions
-        5. Fetches procedure codes with descriptions for each case
-        6. Applies case status visibility restrictions per user permissions
+        2. Executes optimized single query with JSON aggregation for procedure codes
+        3. Joins with case_status_list for status descriptions in single operation
+        4. Uses intelligent caching with 15-minute TTL for user-specific data
+        5. Applies case status visibility restrictions per user permissions
+        6. Eliminates N+1 queries through JSON_ARRAYAGG for procedure codes
+        7. Supports background cache re-warming for improved performance
     
     User Permission Logic:
         - Each user has a max_case_status value in their profile (default: 20)
@@ -428,91 +438,8 @@ def get_cases(request: Request, user_id: str = Query(..., description="The user 
                 else:
                     max_case_status = user_profile["max_case_status"] or 20
                 
-                # Use experimental optimized single query if requested
-                if experimental:
-                    try:
-                        result = _get_user_cases_optimized(cursor, user_id, status_list, max_case_status)
-                        
-                        # Record successful case filtering
-                        business_metrics.record_case_operation("filter", "success", f"user_{user_id}")
-                        
-                    except Exception as e:
-                        logging.error(f"Experimental user cases query failed for user {user_id}: {str(e)}")
-                        # Continue to original method below
-                        experimental = False
-
-                if not experimental:
-                    # Build query with special handling for max_case_status filter and "all" option with surgeon and facility names (original method)
-                    sql = """
-                        SELECT 
-                            c.user_id, c.case_id, c.case_date, c.patient_first, c.patient_last, 
-                            c.ins_provider, c.surgeon_id, c.facility_id, c.case_status, 
-                            csl.case_status_desc,
-                            c.demo_file, c.note_file, c.misc_file, c.pay_amount,
-                            CONCAT(s.first_name, ' ', s.last_name) as surgeon_name,
-                            f.facility_name
-                        FROM cases c
-                        LEFT JOIN surgeon_list s ON c.surgeon_id = s.surgeon_id
-                        LEFT JOIN facility_list f ON c.facility_id = f.facility_id
-                        LEFT JOIN case_status_list csl ON c.case_status = csl.case_status
-                        WHERE c.user_id = %s and c.active = 1 order by case_id desc
-                    """
-                    params = [user_id]
-                    
-                    if status_list and status_list != ["all"]:
-                        # Check if max_case_status is in the filter list
-                        if max_case_status in status_list:
-                            # Remove max_case_status from the list for separate handling
-                            other_statuses = [s for s in status_list if s != max_case_status]
-                            
-                            if other_statuses:
-                                # Query for both specific statuses and >= max_case_status
-                                sql += " AND (c.case_status IN (%s) OR c.case_status >= %%s)" % (",".join(["%s"] * len(other_statuses)))
-                                params.extend([str(s) for s in other_statuses])
-                                params.append(max_case_status)
-                            else:
-                                # Only max_case_status requested, get all >= max_case_status
-                                sql += " AND c.case_status >= %s"
-                                params.append(max_case_status)
-                        else:
-                            # Normal filtering without max_case_status special handling
-                            sql += " AND c.case_status IN (%s)" % (",".join(["%s"] * len(status_list)))
-                            params.extend([str(s) for s in status_list])
-                    # If status_list is empty or ["all"], no additional WHERE clause needed
-                    
-                    cursor.execute(sql, params)
-                    cases = cursor.fetchall()
-
-                    result = []
-                    for case_data in cases:
-                        # Apply case status visibility restriction
-                        original_case_status = case_data["case_status"]
-                        if original_case_status > max_case_status:
-                            case_data["case_status"] = max_case_status
-                            # Update case_status_desc to match the modified case_status
-                            cursor.execute("""
-                                SELECT case_status_desc 
-                                FROM case_status_list 
-                                WHERE case_status = %s
-                            """, (max_case_status,))
-                            status_desc_result = cursor.fetchone()
-                            if status_desc_result:
-                                case_data["case_status_desc"] = status_desc_result["case_status_desc"]
-                        
-                        # Convert datetime to ISO format
-                        if case_data["case_date"]:
-                            case_data["case_date"] = case_data["case_date"].isoformat()
-                        
-                        # fetch procedure codes with descriptions - JOIN with procedure_codes table
-                        cursor.execute("""
-                            SELECT cpc.procedure_code, pc.procedure_desc 
-                            FROM case_procedure_codes cpc 
-                            LEFT JOIN procedure_codes_desc pc ON cpc.procedure_code = pc.procedure_code 
-                            WHERE cpc.case_id = %s
-                        """, (case_data["case_id"],))
-                        procedure_data = [{'procedure_code': row['procedure_code'], 'procedure_desc': row['procedure_desc']} for row in cursor.fetchall()]
-                        case_data['procedure_codes'] = procedure_data
-                        result.append(case_data)
+                # Use optimized single query implementation
+                result = _get_user_cases_optimized(cursor, user_id, status_list, max_case_status)
                 
                 # Record successful case filtering
                 business_metrics.record_case_operation("filter", "success", f"user_{user_id}")

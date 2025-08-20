@@ -1,5 +1,5 @@
 # Created: 2025-07-15 11:54:13
-# Last Modified: 2025-08-20 12:38:23
+# Last Modified: 2025-08-20 21:09:41
 # Author: Scott Cadreau
 
 # endpoints/backoffice/get_cases_by_status.py
@@ -237,7 +237,7 @@ def _get_cases_optimized(cursor, status_list, parsed_start_date, parsed_end_date
             c.ins_provider, c.surgeon_id, c.facility_id, c.case_status,
             csl.case_status_desc, c.demo_file, c.note_file, c.misc_file, c.pay_amount,
             up.first_name, up.last_name
-        ORDER BY c.case_date DESC, c.case_id
+        ORDER BY up.first_name, up.last_name, c.case_id DESC
     """
     
     cursor.execute(sql, params)
@@ -304,7 +304,7 @@ def get_cases_by_status(
     filter: str = Query("", description="Comma-separated list of case_status values (e.g. 0,1,2) or 'all' to get all cases"),
     start_date: str = Query(None, description="Start date filter in YYYY-MM-DD format (optional)"),
     end_date: str = Query(None, description="End date filter in YYYY-MM-DD format (optional)"),
-    experimental: bool = Query(False, description="Use experimental optimized single query (default: false)")
+
 ):
     """
     Retrieve comprehensive case listings with advanced filtering for administrative oversight and case management.
@@ -322,6 +322,8 @@ def get_cases_by_status(
     - Administrative access control with permission validation
     - Flexible filtering options for various administrative needs
     - Real-time case data with status descriptions
+    - Optimized single-query implementation with caching for enhanced performance
+    - JSON aggregation for procedure codes to eliminate N+1 queries
     
     Args:
         request (Request): FastAPI request object for logging and monitoring
@@ -373,11 +375,12 @@ def get_cases_by_status(
     Database Operations:
         1. Validates requesting user's permission level (user_type >= 10)
         2. Parses and validates date filter parameters
-        3. Constructs dynamic case query with status and date filtering
-        4. Joins with surgeon_list, facility_list, case_status_list, and user_profile
-        5. Retrieves procedure codes with descriptions for each case
+        3. Executes optimized single query with JSON aggregation for procedure codes
+        4. Joins with case_status_list and user_profile in single operation
+        5. Uses intelligent caching with 15-minute TTL for frequently accessed data
         6. Applies name formatting to provider information
         7. Only includes active cases (active = 1) in results
+        8. Eliminates N+1 queries through JSON_ARRAYAGG for procedure codes
     
     Filtering Logic:
         Status Filtering:
@@ -539,89 +542,8 @@ def get_cases_by_status(
                     error_message = "User does not have permission to access all cases"
                     raise HTTPException(status_code=403, detail="User does not have permission to access all cases.")
 
-                # Use experimental optimized single query if requested
-                if experimental:
-                    try:
-                        result = _get_cases_optimized(cursor, status_list, parsed_start_date, parsed_end_date)
-                    except Exception as e:
-                        logging.error(f"Experimental query failed for user {user_id}: {str(e)}")
-                        # Continue to original method below
-                        experimental = False
-
-                if not experimental:
-                    # Build query for all cases with surgeon, facility, and provider names (original method)
-                    sql = """
-                        SELECT 
-                            c.user_id, c.case_id, c.case_date, c.patient_first, c.patient_last, 
-                            c.ins_provider, c.surgeon_id, c.facility_id, c.case_status, 
-                            csl.case_status_desc,
-                            c.demo_file, c.note_file, c.misc_file, c.pay_amount,
-                            CONCAT(s.first_name, ' ', s.last_name) as surgeon_name,
-                            f.facility_name,
-                            up.first_name as provider_first_name,
-                            up.last_name as provider_last_name
-                        FROM cases c
-                        LEFT JOIN surgeon_list s ON c.surgeon_id = s.surgeon_id
-                        LEFT JOIN facility_list f ON c.facility_id = f.facility_id
-                        LEFT JOIN case_status_list csl ON c.case_status = csl.case_status
-                        LEFT JOIN user_profile up ON c.user_id = up.user_id
-                        WHERE c.active = 1
-                    """
-                    params = []
-                    
-                    # Only add status filter if not "all"
-                    if status_list != "all" and status_list:
-                        placeholders = ",".join(["%s"] * len(status_list))
-                        sql += f" AND c.case_status IN ({placeholders})"
-                        params.extend(status_list)
-                    
-                    # Add date filters if provided
-                    if parsed_start_date:
-                        sql += " AND c.case_date >= %s"
-                        params.append(parsed_start_date)
-                    
-                    if parsed_end_date:
-                        sql += " AND c.case_date <= %s"
-                        params.append(parsed_end_date)
-                        
-                    cursor.execute(sql, params)
-                    cases = cursor.fetchall()
-
-                    result = []
-                    for case_data in cases:
-                        # Convert datetime to ISO format if it's a datetime object
-                        if case_data["case_date"] and hasattr(case_data["case_date"], 'isoformat'):
-                            case_data["case_date"] = case_data["case_date"].isoformat()
-                        
-                        # Apply proper capitalization to provider names and combine them
-                        provider_first = case_data.get("provider_first_name")
-                        provider_last = case_data.get("provider_last_name")
-                        
-                        if provider_first or provider_last:
-                            # Apply capitalization to each name component
-                            capitalized_first = capitalize_name_field(provider_first) if provider_first else ""
-                            capitalized_last = capitalize_name_field(provider_last) if provider_last else ""
-                            
-                            # Combine into full provider name
-                            provider_name_parts = [part for part in [capitalized_first, capitalized_last] if part.strip()]
-                            case_data["provider_name"] = " ".join(provider_name_parts) if provider_name_parts else None
-                        else:
-                            case_data["provider_name"] = None
-                        
-                        # Remove the separate first/last name fields from the response
-                        case_data.pop("provider_first_name", None)
-                        case_data.pop("provider_last_name", None)
-                        
-                        # fetch procedure codes with descriptions - JOIN with procedure_codes table
-                        cursor.execute("""
-                            SELECT cpc.procedure_code, pc.procedure_desc 
-                            FROM case_procedure_codes cpc 
-                            LEFT JOIN procedure_codes_desc pc ON cpc.procedure_code = pc.procedure_code 
-                            WHERE cpc.case_id = %s
-                        """, (case_data["case_id"],))
-                        procedure_data = [{'procedure_code': row['procedure_code'], 'procedure_desc': row['procedure_desc']} for row in cursor.fetchall()]
-                        case_data['procedure_codes'] = procedure_data
-                        result.append(case_data)
+                # Use optimized single query implementation
+                result = _get_cases_optimized(cursor, status_list, parsed_start_date, parsed_end_date)
 
                 # Record successful cases retrieval
                 business_metrics.record_utility_operation("get_cases_by_status", "success")
