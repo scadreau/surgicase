@@ -1,5 +1,5 @@
 # Created: 2025-01-15
-# Last Modified: 2025-08-19 00:44:22
+# Last Modified: 2025-08-20 09:59:36
 # Author: Scott Cadreau
 
 import schedule
@@ -409,6 +409,96 @@ def daily_database_backup():
     except Exception as e:
         logger.error(f"❌ Error in daily database backup job: {str(e)}")
 
+def pool_cleanup_job():
+    """
+    Scheduled function to clean up stale database connections.
+    
+    This function:
+    1. Removes connections that have been idle > max_idle_time (1 hour)
+    2. Removes connections older than max_lifetime (4 hours)
+    3. Removes invalid/stale connections
+    4. Logs cleanup statistics
+    """
+    logger.info("Starting database connection pool cleanup...")
+    
+    try:
+        from core.database import cleanup_stale_connections
+        
+        result = cleanup_stale_connections()
+        
+        if result["status"] == "success":
+            if result["cleaned"] > 0:
+                logger.info(f"✅ Pool cleanup completed: removed {result['cleaned']} stale connections")
+                logger.info(f"📊 Remaining in pool: {result['remaining_in_pool']}, Tracked: {result['tracked_connections']}")
+            else:
+                logger.info("✅ Pool cleanup completed: no stale connections found")
+        else:
+            logger.warning(f"⚠️ Pool cleanup status: {result['status']}")
+            
+    except Exception as e:
+        logger.error(f"❌ Error in pool cleanup job: {str(e)}")
+
+def pool_prewarm_job():
+    """
+    Scheduled function to pre-warm the database connection pool.
+    
+    This function:
+    1. Ensures the pool has the target number of connections ready
+    2. Creates new connections if needed
+    3. Prepares for expected traffic increases
+    4. Logs prewarming statistics
+    """
+    logger.info("Starting database connection pool pre-warming...")
+    
+    try:
+        from core.database import prewarm_connection_pool
+        
+        # Pre-warm to full pool size (50 connections)
+        result = prewarm_connection_pool(target_connections=50)
+        
+        if result["status"] == "success":
+            if result["created"] > 0:
+                logger.info(f"🔥 Pool pre-warming completed: created {result['created']} new connections")
+                logger.info(f"📊 Pool size: {result['current_size']}/{result['target_size']}")
+            else:
+                logger.info("✅ Pool already warm: no new connections needed")
+        elif result["status"] == "already_warm":
+            logger.info(f"✅ Pool already warm: {result['current_size']}/{result['target_size']} connections")
+        else:
+            logger.warning(f"⚠️ Pool pre-warming status: {result['status']}")
+            
+    except Exception as e:
+        logger.error(f"❌ Error in pool pre-warming job: {str(e)}")
+
+def pool_stats_job():
+    """
+    Scheduled function to log database connection pool statistics.
+    
+    This function provides visibility into:
+    1. Current pool utilization
+    2. Connection ages and idle times
+    3. Pool health metrics
+    """
+    try:
+        from core.database import get_pool_stats
+        
+        stats = get_pool_stats()
+        
+        if stats.get("status") == "no_pool":
+            logger.info("📊 Pool stats: No connection pool initialized")
+            return
+        
+        logger.info("📊 Database Connection Pool Statistics:")
+        logger.info(f"   Pool Size: {stats['pool_size']}/{stats['max_pool_size']} (max overflow: {stats['max_overflow']})")
+        logger.info(f"   Tracked Connections: {stats['tracked_connections']}")
+        
+        if stats.get("avg_connection_age"):
+            logger.info(f"   Avg Connection Age: {stats['avg_connection_age']:.1f}s (max: {stats['max_connection_age']:.1f}s)")
+            logger.info(f"   Avg Idle Time: {stats['avg_idle_time']:.1f}s (max: {stats['max_idle_time']:.1f}s)")
+            
+    except Exception as e:
+        logger.error(f"❌ Error in pool stats job: {str(e)}")
+
 def setup_weekly_scheduler():
     """
     Set up the weekly scheduler for case status updates, NPI data updates, and daily backups.
@@ -445,6 +535,11 @@ def setup_weekly_scheduler():
     # Schedule paid update for Thursday at 08:00 UTC
     # schedule.every().friday.at("08:00").do(weekly_paid_update)  # Commented out - client wants to run manually for now
     
+    # Schedule database connection pool management
+    schedule.every().hour.do(pool_cleanup_job)  # Clean up stale connections every hour
+    schedule.every().day.at("10:30").do(pool_prewarm_job)  # Pre-warm pool 30 minutes before business hours
+    schedule.every().day.at("17:00").do(pool_stats_job)  # Log pool stats at noon
+    
     logger.info("Scheduler configured:")
     logger.info("  - Database backup: Daily at 08:00 UTC")
     logger.info("  - Pending payment update: Monday at 08:00 UTC")
@@ -453,6 +548,9 @@ def setup_weekly_scheduler():
     logger.info("  - Individual provider reports: Monday at 10:00 UTC")
     logger.info("  - NPI data update: Tuesday at 08:00 UTC")
     logger.info("  - Paid update: Friday at 08:00 UTC")
+    logger.info("  - Pool cleanup: Every hour")
+    logger.info("  - Pool pre-warming: Daily at 10:30 UTC (before business hours)")
+    logger.info("  - Pool statistics: Daily at 17:00 UTC")
 
 def run_scheduler():
     """
