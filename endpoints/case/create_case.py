@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-06 15:12:18
+# Last Modified: 2025-08-20 13:21:58
 # Author: Scott Cadreau
 
 # endpoints/case/create_case.py
@@ -194,6 +194,14 @@ def add_case(case: CaseCreate, request: Request):
         
         # Commit all changes at once
         conn.commit()
+        
+        # Invalidate and re-warm user cases cache after successful creation
+        try:
+            from endpoints.case.filter_cases import invalidate_and_rewarm_user_cache
+            invalidate_and_rewarm_user_cache(case.user_id)
+        except Exception as e:
+            # Don't fail the main operation if cache invalidation fails
+            logging.error(f"Failed to invalidate cache for user {case.user_id} after case creation: {str(e)}")
         
         response_status = 201
         response_data = {

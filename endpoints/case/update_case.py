@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-06 15:15:22
+# Last Modified: 2025-08-20 13:21:58
 # Author: Scott Cadreau
 
 # endpoints/case/update_case.py
@@ -267,6 +267,24 @@ def update_case(request: Request, case: CaseUpdate = Body(...)):
 
             # Record successful case update
             business_metrics.record_case_operation("update", "success", case.case_id)
+            
+            # Invalidate and re-warm user cases cache after successful update
+            try:
+                from endpoints.case.filter_cases import invalidate_and_rewarm_user_cache
+                # Get user_id from the case data (either provided or from database)
+                target_user_id = case.user_id
+                if not target_user_id:
+                    # Get user_id from database if not provided in update
+                    cursor.execute("SELECT user_id FROM cases WHERE case_id = %s", (case.case_id,))
+                    case_user = cursor.fetchone()
+                    if case_user:
+                        target_user_id = case_user['user_id']
+                
+                if target_user_id:
+                    invalidate_and_rewarm_user_cache(target_user_id)
+            except Exception as e:
+                # Don't fail the main operation if cache invalidation fails
+                logging.error(f"Failed to invalidate cache after case update {case.case_id}: {str(e)}")
 
         response_data = {
             "statusCode": 200,

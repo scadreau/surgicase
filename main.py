@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-20 10:22:33
+# Last Modified: 2025-08-20 12:20:41
 # Author: Scott Cadreau
 
 # main.py
@@ -178,6 +178,20 @@ try:
 except Exception as e:
     logger.error(f"Failed to warm database connection pool: {str(e)}")
     logger.warning("Application will continue with on-demand connection creation")
+
+# Warm cases cache on startup for optimal performance
+# Pre-loads common admin queries to eliminate cold start latency
+try:
+    from endpoints.backoffice.get_cases_by_status import warm_cases_cache
+    cache_results = warm_cases_cache()
+    if cache_results["failed"] == 0:
+        total_cases = sum(detail.get("case_count", 0) for detail in cache_results["details"] if detail["status"] == "success")
+        logger.info(f"🔥 Cases cache warming completed: {cache_results['successful']} queries warmed ({total_cases} total cases) in {cache_results['duration_seconds']:.2f}s")
+    else:
+        logger.warning(f"⚠️ Cases cache warming partial: {cache_results['successful']}/{cache_results['total_queries']} queries warmed in {cache_results['duration_seconds']:.2f}s")
+except Exception as e:
+    logger.error(f"Failed to warm cases cache: {str(e)}")
+    logger.warning("Application will continue with on-demand cache population")
 
 # Start the scheduler service in background
 # Handles: Case status updates (Mon/Thu), NPI data updates (Tue), Pool/Cache maintenance

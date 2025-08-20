@@ -1,5 +1,5 @@
 # Created: 2025-07-15 11:54:13
-# Last Modified: 2025-08-06 15:23:15
+# Last Modified: 2025-08-20 12:38:23
 # Author: Scott Cadreau
 
 # endpoints/backoffice/get_cases_by_status.py
@@ -9,9 +9,292 @@ from core.database import get_db_connection, close_db_connection
 from utils.monitoring import track_business_operation, business_metrics
 from utils.text_formatting import capitalize_name_field
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
+import json
+import logging
+import threading
+import hashlib
 
 router = APIRouter()
+
+# Global cache for cases data following established patterns
+_cases_cache = {}
+_cases_cache_lock = threading.Lock()
+
+def _generate_cache_key(status_list, parsed_start_date, parsed_end_date) -> str:
+    """Generate a consistent cache key for the given parameters"""
+    # Convert parameters to strings for hashing
+    status_str = str(sorted(status_list)) if isinstance(status_list, list) else str(status_list)
+    start_str = str(parsed_start_date) if parsed_start_date else "None"
+    end_str = str(parsed_end_date) if parsed_end_date else "None"
+    
+    # Create hash of parameters
+    cache_input = f"{status_str}:{start_str}:{end_str}"
+    return hashlib.md5(cache_input.encode()).hexdigest()
+
+def _is_cache_valid(cache_key: str, cache_ttl: int = 900) -> bool:
+    """Check if cached results are still valid (15 minutes = 900 seconds)"""
+    time_key = f"{cache_key}_time"
+    
+    if cache_key not in _cases_cache or time_key not in _cases_cache:
+        return False
+    
+    return time.time() - _cases_cache[time_key] < cache_ttl
+
+def _get_cached_cases(cache_key: str):
+    """Get cached cases data if valid"""
+    with _cases_cache_lock:
+        if _is_cache_valid(cache_key):
+            logging.debug(f"Returning cached cases data: {cache_key}")
+            return _cases_cache[cache_key]
+    return None
+
+def _cache_cases_data(cache_key: str, data):
+    """Cache the cases data with timestamp"""
+    with _cases_cache_lock:
+        time_key = f"{cache_key}_time"
+        _cases_cache[cache_key] = data
+        _cases_cache[time_key] = time.time()
+        logging.debug(f"Successfully cached cases data: {cache_key}")
+
+def clear_cases_cache(cache_key: str = None) -> None:
+    """Clear cached cases data - for future invalidation use"""
+    with _cases_cache_lock:
+        if cache_key:
+            time_key = f"{cache_key}_time"
+            _cases_cache.pop(cache_key, None)
+            _cases_cache.pop(time_key, None)
+            logging.info(f"Cleared cache for cases key: {cache_key}")
+        else:
+            _cases_cache.clear()
+            logging.info("Cleared all cached cases data")
+
+def warm_cases_cache() -> dict:
+    """
+    Warm cache for common case filter combinations on server startup.
+    
+    Pre-loads frequently accessed case queries to eliminate cold start latency
+    for admin dashboard operations.
+    
+    Returns:
+        Dictionary with warming results including success/failure counts and timing
+    """
+    start_time = time.time()
+    logging.info("Starting cases cache warming for optimal performance")
+    
+    # Define common filter combinations that admins frequently use
+    common_filters = [
+        # All cases - most common admin query
+        {"status_list": "all", "start_date": None, "end_date": None},
+        
+        # Active/pending cases - common workflow queries  
+        {"status_list": [1, 2, 3], "start_date": None, "end_date": None},
+        
+        # Recent cases (last 30 days) - common time-based filter
+        {"status_list": "all", "start_date": (datetime.now() - timedelta(days=30)).date(), "end_date": None},
+        
+        # Completed cases - common status filter
+        {"status_list": [10], "start_date": None, "end_date": None},
+        
+        # Current month cases - common reporting period
+        {"status_list": "all", "start_date": datetime.now().replace(day=1).date(), "end_date": None}
+    ]
+    
+    results = {
+        "total_queries": len(common_filters),
+        "successful": 0,
+        "failed": 0,
+        "details": [],
+        "duration_seconds": 0
+    }
+    
+    # Get database connection for warming
+    conn = None
+    try:
+        conn = get_db_connection()
+        
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            for i, filter_config in enumerate(common_filters):
+                try:
+                    query_start = time.time()
+                    
+                    # Execute the optimized query to warm cache
+                    result = _get_cases_optimized(
+                        cursor=cursor,
+                        status_list=filter_config["status_list"],
+                        parsed_start_date=filter_config["start_date"],
+                        parsed_end_date=filter_config["end_date"]
+                    )
+                    
+                    query_duration = time.time() - query_start
+                    case_count = len(result) if result else 0
+                    
+                    results["successful"] += 1
+                    results["details"].append({
+                        "query_index": i + 1,
+                        "status": "success",
+                        "filter": filter_config,
+                        "case_count": case_count,
+                        "duration_ms": round(query_duration * 1000, 2)
+                    })
+                    
+                    logging.debug(f"Warmed cache query {i+1}/{len(common_filters)}: {case_count} cases in {query_duration*1000:.1f}ms")
+                    
+                except Exception as e:
+                    results["failed"] += 1
+                    results["details"].append({
+                        "query_index": i + 1,
+                        "status": "failed",
+                        "filter": filter_config,
+                        "error": str(e)
+                    })
+                    logging.error(f"Failed to warm cache query {i+1}: {str(e)}")
+                    
+    except Exception as e:
+        logging.error(f"Failed to establish database connection for cache warming: {str(e)}")
+        results["failed"] = len(common_filters)
+        
+    finally:
+        if conn:
+            close_db_connection(conn)
+    
+    results["duration_seconds"] = time.time() - start_time
+    
+    # Log warming summary
+    if results["failed"] == 0:
+        total_cases = sum(detail.get("case_count", 0) for detail in results["details"] if detail["status"] == "success")
+        logging.info(f"✅ Cases cache warming successful: {results['successful']} queries warmed ({total_cases} total cases) in {results['duration_seconds']:.2f}s")
+    else:
+        logging.warning(f"⚠️ Cases cache warming partial: {results['successful']}/{results['total_queries']} queries warmed in {results['duration_seconds']:.2f}s")
+    
+    return results
+
+def _get_cases_optimized(cursor, status_list, parsed_start_date, parsed_end_date):
+    """
+    Experimental optimized single query implementation using JSON_ARRAYAGG with caching.
+    Returns results in the same format as the original method.
+    """
+    # Generate cache key for this request
+    cache_key = _generate_cache_key(status_list, parsed_start_date, parsed_end_date)
+    
+    # Check cache first
+    cached_result = _get_cached_cases(cache_key)
+    if cached_result is not None:
+        return cached_result
+    
+    # Cache miss - execute query
+    logging.info(f"Cache miss for cases query: {cache_key}")
+    
+    # Build optimized single query with JSON aggregation
+    sql = """
+        SELECT 
+            c.user_id, c.case_id, c.case_date, c.patient_first, c.patient_last, 
+            c.ins_provider, c.surgeon_id, c.facility_id, c.case_status, 
+            csl.case_status_desc,
+            c.demo_file, c.note_file, c.misc_file, c.pay_amount,
+            up.first_name as provider_first_name,
+            up.last_name as provider_last_name,
+            COALESCE(
+                JSON_ARRAYAGG(
+                    CASE 
+                        WHEN cpc.procedure_code IS NOT NULL 
+                        THEN JSON_OBJECT(
+                            'procedure_code', cpc.procedure_code,
+                            'procedure_desc', ''
+                        )
+                        ELSE NULL
+                    END
+                ), 
+                JSON_ARRAY()
+            ) as procedure_codes_json
+        FROM cases c
+        LEFT JOIN case_status_list csl ON c.case_status = csl.case_status
+        LEFT JOIN user_profile up ON c.user_id = up.user_id
+        LEFT JOIN case_procedure_codes cpc ON c.case_id = cpc.case_id
+        WHERE c.active = 1
+    """
+    params = []
+    
+    # Only add status filter if not "all"
+    if status_list != "all" and status_list:
+        placeholders = ",".join(["%s"] * len(status_list))
+        sql += f" AND c.case_status IN ({placeholders})"
+        params.extend(status_list)
+    
+    # Add date filters if provided
+    if parsed_start_date:
+        sql += " AND c.case_date >= %s"
+        params.append(parsed_start_date)
+    
+    if parsed_end_date:
+        sql += " AND c.case_date <= %s"
+        params.append(parsed_end_date)
+        
+    # Group by all non-aggregated columns
+    sql += """
+        GROUP BY 
+            c.case_id, c.user_id, c.case_date, c.patient_first, c.patient_last,
+            c.ins_provider, c.surgeon_id, c.facility_id, c.case_status,
+            csl.case_status_desc, c.demo_file, c.note_file, c.misc_file, c.pay_amount,
+            up.first_name, up.last_name
+        ORDER BY c.case_date DESC, c.case_id
+    """
+    
+    cursor.execute(sql, params)
+    cases = cursor.fetchall()
+
+    result = []
+    for case_data in cases:
+        # Convert datetime to ISO format if it's a datetime object
+        if case_data["case_date"] and hasattr(case_data["case_date"], 'isoformat'):
+            case_data["case_date"] = case_data["case_date"].isoformat()
+        
+        # Apply proper capitalization to provider names and combine them
+        provider_first = case_data.get("provider_first_name")
+        provider_last = case_data.get("provider_last_name")
+        
+        if provider_first or provider_last:
+            # Apply capitalization to each name component
+            capitalized_first = capitalize_name_field(provider_first) if provider_first else ""
+            capitalized_last = capitalize_name_field(provider_last) if provider_last else ""
+            
+            # Combine into full provider name
+            provider_name_parts = [part for part in [capitalized_first, capitalized_last] if part.strip()]
+            case_data["provider_name"] = " ".join(provider_name_parts) if provider_name_parts else None
+        else:
+            case_data["provider_name"] = None
+        
+        # Remove the separate first/last name fields from the response
+        case_data.pop("provider_first_name", None)
+        case_data.pop("provider_last_name", None)
+        
+        # Set surgeon and facility names to None since they're not fetched in list view
+        case_data["surgeon_name"] = None
+        case_data["facility_name"] = None
+        
+        # Parse JSON aggregated procedure codes
+        procedure_codes_json = case_data.pop("procedure_codes_json", "[]")
+        if isinstance(procedure_codes_json, str):
+            try:
+                procedure_codes = json.loads(procedure_codes_json)
+            except json.JSONDecodeError:
+                procedure_codes = []
+        else:
+            # Already parsed by MySQL JSON functions
+            procedure_codes = procedure_codes_json if procedure_codes_json else []
+        
+        # Filter out null entries and ensure proper format
+        case_data['procedure_codes'] = [
+            pc for pc in procedure_codes 
+            if pc is not None and isinstance(pc, dict) and pc.get('procedure_code')
+        ]
+        
+        result.append(case_data)
+    
+    # Cache the result before returning
+    _cache_cases_data(cache_key, result)
+    
+    return result
 
 @router.get("/cases_by_status")
 @track_business_operation("get", "cases_by_status")
@@ -20,7 +303,8 @@ def get_cases_by_status(
     user_id: str = Query(..., description="The user ID making the request (must be user_type >= 10)"), 
     filter: str = Query("", description="Comma-separated list of case_status values (e.g. 0,1,2) or 'all' to get all cases"),
     start_date: str = Query(None, description="Start date filter in YYYY-MM-DD format (optional)"),
-    end_date: str = Query(None, description="End date filter in YYYY-MM-DD format (optional)")
+    end_date: str = Query(None, description="End date filter in YYYY-MM-DD format (optional)"),
+    experimental: bool = Query(False, description="Use experimental optimized single query (default: false)")
 ):
     """
     Retrieve comprehensive case listings with advanced filtering for administrative oversight and case management.
@@ -255,79 +539,89 @@ def get_cases_by_status(
                     error_message = "User does not have permission to access all cases"
                     raise HTTPException(status_code=403, detail="User does not have permission to access all cases.")
 
-                # Build query for all cases with surgeon, facility, and provider names
-                sql = """
-                    SELECT 
-                        c.user_id, c.case_id, c.case_date, c.patient_first, c.patient_last, 
-                        c.ins_provider, c.surgeon_id, c.facility_id, c.case_status, 
-                        csl.case_status_desc,
-                        c.demo_file, c.note_file, c.misc_file, c.pay_amount,
-                        CONCAT(s.first_name, ' ', s.last_name) as surgeon_name,
-                        f.facility_name,
-                        up.first_name as provider_first_name,
-                        up.last_name as provider_last_name
-                    FROM cases c
-                    LEFT JOIN surgeon_list s ON c.surgeon_id = s.surgeon_id
-                    LEFT JOIN facility_list f ON c.facility_id = f.facility_id
-                    LEFT JOIN case_status_list csl ON c.case_status = csl.case_status
-                    LEFT JOIN user_profile up ON c.user_id = up.user_id
-                    WHERE c.active = 1
-                """
-                params = []
-                
-                # Only add status filter if not "all"
-                if status_list != "all" and status_list:
-                    placeholders = ",".join(["%s"] * len(status_list))
-                    sql += f" AND c.case_status IN ({placeholders})"
-                    params.extend(status_list)
-                
-                # Add date filters if provided
-                if parsed_start_date:
-                    sql += " AND c.case_date >= %s"
-                    params.append(parsed_start_date)
-                
-                if parsed_end_date:
-                    sql += " AND c.case_date <= %s"
-                    params.append(parsed_end_date)
-                    
-                cursor.execute(sql, params)
-                cases = cursor.fetchall()
+                # Use experimental optimized single query if requested
+                if experimental:
+                    try:
+                        result = _get_cases_optimized(cursor, status_list, parsed_start_date, parsed_end_date)
+                    except Exception as e:
+                        logging.error(f"Experimental query failed for user {user_id}: {str(e)}")
+                        # Continue to original method below
+                        experimental = False
 
-                result = []
-                for case_data in cases:
-                    # Convert datetime to ISO format if it's a datetime object
-                    if case_data["case_date"] and hasattr(case_data["case_date"], 'isoformat'):
-                        case_data["case_date"] = case_data["case_date"].isoformat()
+                if not experimental:
+                    # Build query for all cases with surgeon, facility, and provider names (original method)
+                    sql = """
+                        SELECT 
+                            c.user_id, c.case_id, c.case_date, c.patient_first, c.patient_last, 
+                            c.ins_provider, c.surgeon_id, c.facility_id, c.case_status, 
+                            csl.case_status_desc,
+                            c.demo_file, c.note_file, c.misc_file, c.pay_amount,
+                            CONCAT(s.first_name, ' ', s.last_name) as surgeon_name,
+                            f.facility_name,
+                            up.first_name as provider_first_name,
+                            up.last_name as provider_last_name
+                        FROM cases c
+                        LEFT JOIN surgeon_list s ON c.surgeon_id = s.surgeon_id
+                        LEFT JOIN facility_list f ON c.facility_id = f.facility_id
+                        LEFT JOIN case_status_list csl ON c.case_status = csl.case_status
+                        LEFT JOIN user_profile up ON c.user_id = up.user_id
+                        WHERE c.active = 1
+                    """
+                    params = []
                     
-                    # Apply proper capitalization to provider names and combine them
-                    provider_first = case_data.get("provider_first_name")
-                    provider_last = case_data.get("provider_last_name")
+                    # Only add status filter if not "all"
+                    if status_list != "all" and status_list:
+                        placeholders = ",".join(["%s"] * len(status_list))
+                        sql += f" AND c.case_status IN ({placeholders})"
+                        params.extend(status_list)
                     
-                    if provider_first or provider_last:
-                        # Apply capitalization to each name component
-                        capitalized_first = capitalize_name_field(provider_first) if provider_first else ""
-                        capitalized_last = capitalize_name_field(provider_last) if provider_last else ""
+                    # Add date filters if provided
+                    if parsed_start_date:
+                        sql += " AND c.case_date >= %s"
+                        params.append(parsed_start_date)
+                    
+                    if parsed_end_date:
+                        sql += " AND c.case_date <= %s"
+                        params.append(parsed_end_date)
                         
-                        # Combine into full provider name
-                        provider_name_parts = [part for part in [capitalized_first, capitalized_last] if part.strip()]
-                        case_data["provider_name"] = " ".join(provider_name_parts) if provider_name_parts else None
-                    else:
-                        case_data["provider_name"] = None
-                    
-                    # Remove the separate first/last name fields from the response
-                    case_data.pop("provider_first_name", None)
-                    case_data.pop("provider_last_name", None)
-                    
-                    # fetch procedure codes with descriptions - JOIN with procedure_codes table
-                    cursor.execute("""
-                        SELECT cpc.procedure_code, pc.procedure_desc 
-                        FROM case_procedure_codes cpc 
-                        LEFT JOIN procedure_codes_desc pc ON cpc.procedure_code = pc.procedure_code 
-                        WHERE cpc.case_id = %s
-                    """, (case_data["case_id"],))
-                    procedure_data = [{'procedure_code': row['procedure_code'], 'procedure_desc': row['procedure_desc']} for row in cursor.fetchall()]
-                    case_data['procedure_codes'] = procedure_data
-                    result.append(case_data)
+                    cursor.execute(sql, params)
+                    cases = cursor.fetchall()
+
+                    result = []
+                    for case_data in cases:
+                        # Convert datetime to ISO format if it's a datetime object
+                        if case_data["case_date"] and hasattr(case_data["case_date"], 'isoformat'):
+                            case_data["case_date"] = case_data["case_date"].isoformat()
+                        
+                        # Apply proper capitalization to provider names and combine them
+                        provider_first = case_data.get("provider_first_name")
+                        provider_last = case_data.get("provider_last_name")
+                        
+                        if provider_first or provider_last:
+                            # Apply capitalization to each name component
+                            capitalized_first = capitalize_name_field(provider_first) if provider_first else ""
+                            capitalized_last = capitalize_name_field(provider_last) if provider_last else ""
+                            
+                            # Combine into full provider name
+                            provider_name_parts = [part for part in [capitalized_first, capitalized_last] if part.strip()]
+                            case_data["provider_name"] = " ".join(provider_name_parts) if provider_name_parts else None
+                        else:
+                            case_data["provider_name"] = None
+                        
+                        # Remove the separate first/last name fields from the response
+                        case_data.pop("provider_first_name", None)
+                        case_data.pop("provider_last_name", None)
+                        
+                        # fetch procedure codes with descriptions - JOIN with procedure_codes table
+                        cursor.execute("""
+                            SELECT cpc.procedure_code, pc.procedure_desc 
+                            FROM case_procedure_codes cpc 
+                            LEFT JOIN procedure_codes_desc pc ON cpc.procedure_code = pc.procedure_code 
+                            WHERE cpc.case_id = %s
+                        """, (case_data["case_id"],))
+                        procedure_data = [{'procedure_code': row['procedure_code'], 'procedure_desc': row['procedure_desc']} for row in cursor.fetchall()]
+                        case_data['procedure_codes'] = procedure_data
+                        result.append(case_data)
 
                 # Record successful cases retrieval
                 business_metrics.record_utility_operation("get_cases_by_status", "success")

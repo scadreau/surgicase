@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-12 17:02:34
+# Last Modified: 2025-08-20 12:43:58
 # Author: Scott Cadreau
 
 # endpoints/case/get_case.py
@@ -8,12 +8,122 @@ import pymysql.cursors
 from core.database import get_db_connection, close_db_connection
 from utils.monitoring import track_business_operation, business_metrics
 import time
+import json
+import logging
 
 router = APIRouter()
 
+def _get_case_optimized(cursor, case_id, calling_user_id):
+    """
+    Experimental optimized single query implementation for case retrieval.
+    Combines case data, user profiles, and procedure codes in one query.
+    """
+    # Single optimized query with all necessary JOINs and JSON aggregation
+    sql = """
+        SELECT 
+            c.user_id, c.case_id, c.case_date, c.patient_first, c.patient_last, 
+            c.ins_provider, c.surgeon_id, c.facility_id, c.case_status, 
+            c.demo_file, c.note_file, c.misc_file, c.pay_amount,
+            CONCAT(s.first_name, ' ', s.last_name) as surgeon_name,
+            f.facility_name,
+            up.max_case_status as owner_max_case_status,
+            up.first_name as owner_first_name,
+            up.last_name as owner_last_name,
+            CASE 
+                WHEN %s IS NOT NULL AND %s != c.user_id 
+                THEN calling_up.max_case_status 
+                ELSE NULL 
+            END as calling_user_max_case_status,
+            COALESCE(
+                JSON_ARRAYAGG(
+                    CASE 
+                        WHEN cpc.procedure_code IS NOT NULL 
+                        THEN JSON_OBJECT(
+                            'procedure_code', cpc.procedure_code,
+                            'procedure_desc', COALESCE(pc.procedure_desc, '')
+                        )
+                        ELSE NULL
+                    END
+                ), 
+                JSON_ARRAY()
+            ) as procedure_codes_json
+        FROM cases c
+        LEFT JOIN surgeon_list s ON c.surgeon_id = s.surgeon_id
+        LEFT JOIN facility_list f ON c.facility_id = f.facility_id
+        LEFT JOIN user_profile up ON c.user_id = up.user_id AND up.active = 1
+        LEFT JOIN user_profile calling_up ON %s = calling_up.user_id AND calling_up.active = 1
+        LEFT JOIN case_procedure_codes cpc ON c.case_id = cpc.case_id
+        LEFT JOIN procedure_codes_desc pc ON cpc.procedure_code = pc.procedure_code
+        WHERE c.case_id = %s AND c.active = 1
+        GROUP BY 
+            c.user_id, c.case_id, c.case_date, c.patient_first, c.patient_last,
+            c.ins_provider, c.surgeon_id, c.facility_id, c.case_status,
+            c.demo_file, c.note_file, c.misc_file, c.pay_amount,
+            s.first_name, s.last_name, f.facility_name,
+            up.max_case_status, up.first_name, up.last_name,
+            calling_up.max_case_status
+    """
+    
+    # Execute with parameters (calling_user_id appears 3 times in the query)
+    cursor.execute(sql, (calling_user_id, calling_user_id, calling_user_id, case_id))
+    case_data = cursor.fetchone()
+    
+    if not case_data:
+        return None
+    
+    # Process the results
+    user_id = case_data["user_id"]
+    
+    # Determine max_case_status to use
+    calling_user_max = case_data.get("calling_user_max_case_status")
+    owner_max = case_data.get("owner_max_case_status", 20)
+    
+    if calling_user_max is not None:
+        max_case_status = calling_user_max or 20
+    else:
+        max_case_status = owner_max or 20
+    
+    # Apply case status visibility restriction
+    original_case_status = case_data["case_status"]
+    if original_case_status > max_case_status:
+        case_data["case_status"] = max_case_status
+    
+    # Create user_name from owner profile
+    owner_first = case_data.get("owner_first_name", "")
+    owner_last = case_data.get("owner_last_name", "")
+    case_data["user_name"] = f"{owner_first} {owner_last}".strip() if owner_first or owner_last else None
+    
+    # Clean up temporary fields
+    case_data.pop("owner_max_case_status", None)
+    case_data.pop("owner_first_name", None)
+    case_data.pop("owner_last_name", None)
+    case_data.pop("calling_user_max_case_status", None)
+    
+    # Convert datetime to ISO format
+    if case_data["case_date"]:
+        case_data["case_date"] = case_data["case_date"].isoformat()
+    
+    # Parse JSON aggregated procedure codes
+    procedure_codes_json = case_data.pop("procedure_codes_json", "[]")
+    if isinstance(procedure_codes_json, str):
+        try:
+            procedure_codes = json.loads(procedure_codes_json)
+        except json.JSONDecodeError:
+            procedure_codes = []
+    else:
+        procedure_codes = procedure_codes_json if procedure_codes_json else []
+    
+    # Filter out null entries and ensure proper format
+    case_data['procedure_codes'] = [
+        pc for pc in procedure_codes 
+        if pc is not None and isinstance(pc, dict) and pc.get('procedure_code')
+    ]
+    
+    return case_data, user_id
+
 @router.get("/case")
 @track_business_operation("read", "case")
-def get_case(request: Request, case_id: str = Query(..., description="The case ID to retrieve"), calling_user_id: str = Query(None, description="Optional user ID to check max_case_status against (for permission-based visibility)")):
+def get_case(request: Request, case_id: str = Query(..., description="The case ID to retrieve"), calling_user_id: str = Query(None, description="Optional user ID to check max_case_status against (for permission-based visibility)"), experimental: bool = Query(False, description="Use experimental optimized single query (default: false)")):
     """
     Retrieve comprehensive surgical case information with user permission-based visibility controls.
     
@@ -186,97 +296,122 @@ def get_case(request: Request, case_id: str = Query(..., description="The case I
 
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-                # fetch from cases table with surgeon and facility names
-                cursor.execute("""
-                    SELECT 
-                        c.user_id, c.case_id, c.case_date, c.patient_first, c.patient_last, 
-                        c.ins_provider, c.surgeon_id, c.facility_id, c.case_status, 
-                        c.demo_file, c.note_file, c.misc_file, c.pay_amount,
-                        CONCAT(s.first_name, ' ', s.last_name) as surgeon_name,
-                        f.facility_name
-                    FROM cases c
-                    LEFT JOIN surgeon_list s ON c.surgeon_id = s.surgeon_id
-                    LEFT JOIN facility_list f ON c.facility_id = f.facility_id
-                    WHERE c.case_id = %s and c.active = 1
-                """, (case_id,))
-                case_data = cursor.fetchone()
+                # Use experimental optimized single query if requested
+                if experimental:
+                    try:
+                        result = _get_case_optimized(cursor, case_id, calling_user_id)
+                        if result is None:
+                            # Case not found
+                            business_metrics.record_case_operation("read", "not_found", case_id)
+                            response_status = 404
+                            error_message = "Case not found"
+                            raise HTTPException(
+                                status_code=404,
+                                detail={"error": "Case not found", "case_id": case_id}
+                            )
+                        
+                        case_data, user_id = result
+                        
+                        # Record successful case read operation
+                        business_metrics.record_case_operation("read", "success", case_id)
+                        
+                    except Exception as e:
+                        logging.error(f"Experimental case query failed for case {case_id}: {str(e)}")
+                        # Continue to original method below
+                        experimental = False
 
-                if not case_data:
-                    # Record failed case read operation
-                    business_metrics.record_case_operation("read", "not_found", case_id)
-                    response_status = 404
-                    error_message = "Case not found"
-                    raise HTTPException(
-                        status_code=404,
-                        detail={"error": "Case not found", "case_id": case_id}
-                    )
-                
-                # Get user's max_case_status and name from user_profile
-                user_id = case_data["user_id"]
-                
-                # Determine which user ID to use for max_case_status check
-                permission_user_id = calling_user_id if calling_user_id else user_id
-                
-                # Get case owner's profile for user_name
-                cursor.execute("""
-                    SELECT max_case_status, first_name, last_name 
-                    FROM user_profile 
-                    WHERE user_id = %s AND active = 1
-                """, (user_id,))
-                user_profile = cursor.fetchone()
-                
-                # Get permission user's max_case_status if different from case owner
-                if calling_user_id and calling_user_id != user_id:
+                if not experimental:
+                    # fetch from cases table with surgeon and facility names (original method)
                     cursor.execute("""
-                        SELECT max_case_status 
+                        SELECT 
+                            c.user_id, c.case_id, c.case_date, c.patient_first, c.patient_last, 
+                            c.ins_provider, c.surgeon_id, c.facility_id, c.case_status, 
+                            c.demo_file, c.note_file, c.misc_file, c.pay_amount,
+                            CONCAT(s.first_name, ' ', s.last_name) as surgeon_name,
+                            f.facility_name
+                        FROM cases c
+                        LEFT JOIN surgeon_list s ON c.surgeon_id = s.surgeon_id
+                        LEFT JOIN facility_list f ON c.facility_id = f.facility_id
+                        WHERE c.case_id = %s and c.active = 1
+                    """, (case_id,))
+                    case_data = cursor.fetchone()
+
+                    if not case_data:
+                        # Record failed case read operation
+                        business_metrics.record_case_operation("read", "not_found", case_id)
+                        response_status = 404
+                        error_message = "Case not found"
+                        raise HTTPException(
+                            status_code=404,
+                            detail={"error": "Case not found", "case_id": case_id}
+                        )
+                    
+                    # Get user's max_case_status and name from user_profile
+                    user_id = case_data["user_id"]
+                    
+                    # Determine which user ID to use for max_case_status check
+                    permission_user_id = calling_user_id if calling_user_id else user_id
+                    
+                    # Get case owner's profile for user_name
+                    cursor.execute("""
+                        SELECT max_case_status, first_name, last_name 
                         FROM user_profile 
                         WHERE user_id = %s AND active = 1
-                    """, (calling_user_id,))
-                    permission_profile = cursor.fetchone()
-                    permission_max_case_status = permission_profile["max_case_status"] if permission_profile else 20
-                else:
-                    permission_max_case_status = None
-                
-                if not user_profile:
-                    # If user profile not found, use default max_case_status of 20
-                    max_case_status = 20
-                    user_name = None
-                else:
-                    # Use calling_user's max_case_status if provided, otherwise use case owner's
-                    if permission_max_case_status is not None:
-                        max_case_status = permission_max_case_status or 20
-                    else:
-                        max_case_status = user_profile["max_case_status"] or 20
+                    """, (user_id,))
+                    user_profile = cursor.fetchone()
                     
-                    # Combine first_name and last_name to create user_name (always from case owner)
-                    first_name = user_profile.get("first_name", "")
-                    last_name = user_profile.get("last_name", "")
-                    user_name = f"{first_name} {last_name}".strip() if first_name or last_name else None
-                
-                # Apply case status visibility restriction
-                original_case_status = case_data["case_status"]
-                if original_case_status > max_case_status:
-                    case_data["case_status"] = max_case_status
-                
-                # Add user name to case data
-                case_data["user_name"] = user_name
-                
-                # Convert datetime to ISO format
-                if case_data["case_date"]:
-                    case_data["case_date"] = case_data["case_date"].isoformat()
+                    # Get permission user's max_case_status if different from case owner
+                    if calling_user_id and calling_user_id != user_id:
+                        cursor.execute("""
+                            SELECT max_case_status 
+                            FROM user_profile 
+                            WHERE user_id = %s AND active = 1
+                        """, (calling_user_id,))
+                        permission_profile = cursor.fetchone()
+                        permission_max_case_status = permission_profile["max_case_status"] if permission_profile else 20
+                    else:
+                        permission_max_case_status = None
+                    
+                    if not user_profile:
+                        # If user profile not found, use default max_case_status of 20
+                        max_case_status = 20
+                        user_name = None
+                    else:
+                        # Use calling_user's max_case_status if provided, otherwise use case owner's
+                        if permission_max_case_status is not None:
+                            max_case_status = permission_max_case_status or 20
+                        else:
+                            max_case_status = user_profile["max_case_status"] or 20
+                        
+                        # Combine first_name and last_name to create user_name (always from case owner)
+                        first_name = user_profile.get("first_name", "")
+                        last_name = user_profile.get("last_name", "")
+                        user_name = f"{first_name} {last_name}".strip() if first_name or last_name else None
+                    
+                    # Apply case status visibility restriction
+                    original_case_status = case_data["case_status"]
+                    if original_case_status > max_case_status:
+                        case_data["case_status"] = max_case_status
+                    
+                    # Add user name to case data
+                    case_data["user_name"] = user_name
+                    
+                    # Convert datetime to ISO format
+                    if case_data["case_date"]:
+                        case_data["case_date"] = case_data["case_date"].isoformat()
 
-                # fetch procedure codes with descriptions - JOIN with procedure_codes table
-                cursor.execute("""
-                    SELECT cpc.procedure_code, pc.procedure_desc 
-                    FROM case_procedure_codes cpc 
-                    LEFT JOIN procedure_codes_desc pc ON cpc.procedure_code = pc.procedure_code 
-                    WHERE cpc.case_id = %s
-                """, (case_id,))
-                procedure_data = [{'procedure_code': row['procedure_code'], 'procedure_desc': row['procedure_desc']} for row in cursor.fetchall()]
-                case_data['procedure_codes'] = procedure_data
+                    # fetch procedure codes with descriptions - JOIN with procedure_codes table
+                    cursor.execute("""
+                        SELECT cpc.procedure_code, pc.procedure_desc 
+                        FROM case_procedure_codes cpc 
+                        LEFT JOIN procedure_codes_desc pc ON cpc.procedure_code = pc.procedure_code 
+                        WHERE cpc.case_id = %s
+                    """, (case_id,))
+                    procedure_data = [{'procedure_code': row['procedure_code'], 'procedure_desc': row['procedure_desc']} for row in cursor.fetchall()]
+                    case_data['procedure_codes'] = procedure_data
 
-            # Record successful case read operation
-            business_metrics.record_case_operation("read", "success", case_id)
+                # Record successful case read operation
+                business_metrics.record_case_operation("read", "success", case_id)
 
         finally:
             close_db_connection(conn)
