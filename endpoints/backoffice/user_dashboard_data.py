@@ -1,5 +1,5 @@
 # Created: 2025-07-30 20:18:11
-# Last Modified: 2025-08-06 15:23:15
+# Last Modified: 2025-08-20 09:09:41
 # Author: Scott Cadreau
 
 # endpoints/backoffice/user_dashboard_data.py
@@ -15,7 +15,8 @@ router = APIRouter()
 @track_business_operation("get", "user_dashboard_data")
 def user_dashboard_data(
     request: Request, 
-    user_id: str = Query(..., description="The user ID making the request (must be user_type >= 10)")
+    user_id: str = Query(..., description="The user ID making the request (must be user_type >= 10)"),
+    validated: bool = False
 ):
     """
     Generate comprehensive user analytics dashboard with user type distribution and organizational insights.
@@ -168,15 +169,16 @@ def user_dashboard_data(
         
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-                # Check user_type for the requesting user
-                cursor.execute("SELECT user_type FROM user_profile WHERE user_id = %s", (user_id,))
-                user_row = cursor.fetchone()
-                if not user_row or user_row.get("user_type", 0) < 10:
-                    # Record failed access (permission denied)
-                    business_metrics.record_utility_operation("user_dashboard_data", "permission_denied")
-                    response_status = 403
-                    error_message = "User does not have permission to access dashboard data"
-                    raise HTTPException(status_code=403, detail="User does not have permission to access dashboard data.")
+                # Check user_type for the requesting user (skip if already validated)
+                if not validated:
+                    cursor.execute("SELECT user_type FROM user_profile WHERE user_id = %s", (user_id,))
+                    user_row = cursor.fetchone()
+                    if not user_row or user_row.get("user_type", 0) < 10:
+                        # Record failed access (permission denied)
+                        business_metrics.record_utility_operation("user_dashboard_data", "permission_denied")
+                        response_status = 403
+                        error_message = "User does not have permission to access dashboard data"
+                        raise HTTPException(status_code=403, detail="User does not have permission to access dashboard data.")
 
                 # Execute the main query to get user counts by user_type with descriptions
                 cursor.execute("""

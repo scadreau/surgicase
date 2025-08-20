@@ -1,5 +1,5 @@
 # Created: 2025-07-27 02:29:13
-# Last Modified: 2025-08-14 14:13:15
+# Last Modified: 2025-08-20 09:14:27
 # Author: Scott Cadreau
 
 # endpoints/backoffice/case_dashboard_data.py
@@ -18,7 +18,8 @@ def case_dashboard_data(
     request: Request, 
     user_id: str = Query(..., description="The user ID making the request (must be user_type >= 10)"),
     start_date: Optional[str] = Query(None, description="Start date for filtering (YYYY-MM-DD format)"),
-    end_date: Optional[str] = Query(None, description="End date for filtering (YYYY-MM-DD format)")
+    end_date: Optional[str] = Query(None, description="End date for filtering (YYYY-MM-DD format)"),
+    validated: bool = False
 ):
     """
     Generate comprehensive case analytics dashboard with status-based aggregation and financial summaries.
@@ -175,23 +176,26 @@ def case_dashboard_data(
         
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-                # Check user_type for the requesting user
-                cursor.execute("SELECT user_type FROM user_profile WHERE user_id = %s", (user_id,))
-                user_row = cursor.fetchone()
-                if not user_row or user_row.get("user_type", 0) < 10:
-                    # Record failed access (permission denied)
-                    business_metrics.record_utility_operation("case_dashboard_data", "permission_denied")
-                    response_status = 403
-                    error_message = "User does not have permission to access dashboard data"
-                    raise HTTPException(status_code=403, detail="User does not have permission to access dashboard data.")
+                # Check user_type for the requesting user (skip if already validated)
+                if not validated:
+                    cursor.execute("SELECT user_type FROM user_profile WHERE user_id = %s", (user_id,))
+                    user_row = cursor.fetchone()
+                    if not user_row or user_row.get("user_type", 0) < 10:
+                        # Record failed access (permission denied)
+                        business_metrics.record_utility_operation("case_dashboard_data", "permission_denied")
+                        response_status = 403
+                        error_message = "User does not have permission to access dashboard data"
+                        raise HTTPException(status_code=403, detail="User does not have permission to access dashboard data.")
 
-                # Build the base query for case statistics
+                # Build the optimized query with JOIN to get case statistics and descriptions in one query
                 base_query = """
                     SELECT 
                         c.case_status, 
                         COUNT(*) as cases, 
-                        SUM(c.pay_amount) as total_amount
+                        SUM(c.pay_amount) as total_amount,
+                        csl.case_status_desc
                     FROM cases c
+                    LEFT JOIN case_status_list csl ON c.case_status = csl.case_status
                     WHERE c.active = 1
                     AND c.user_id NOT IN ('04e884e8-4011-70e9-f3bd-d89fabd15c7b', '94883428-50c1-7049-9d3d-e095ca81f174', '94b80418-6091-701b-eac8-8b325f95a799', '74081438-80d1-7055-f5df-2221b7f96049')
                 """
@@ -207,17 +211,13 @@ def case_dashboard_data(
                     base_query += " AND c.case_date <= %s"
                     params.append(end_date)
                 
-                base_query += " GROUP BY c.case_status ORDER BY c.case_status"
+                base_query += " GROUP BY c.case_status, csl.case_status_desc ORDER BY c.case_status"
                 
-                # Execute the main query
+                # Execute the optimized single query
                 cursor.execute(base_query, params)
                 case_stats = cursor.fetchall()
                 
-                # Get status descriptions
-                cursor.execute("SELECT case_status, case_status_desc FROM case_status_list ORDER BY case_status")
-                status_descriptions = {row['case_status']: row['case_status_desc'] for row in cursor.fetchall()}
-                
-                # Combine the data
+                # Process the joined data (no need for separate status lookup)
                 dashboard_data = []
                 total_cases = 0
                 total_amount = 0.0
@@ -226,10 +226,11 @@ def case_dashboard_data(
                     case_status = stat['case_status']
                     cases_count = stat['cases']
                     amount = float(stat['total_amount']) if stat['total_amount'] else 0.0
+                    case_status_desc = stat['case_status_desc'] or f"Status {case_status}"
                     
                     dashboard_data.append({
                         'case_status': case_status,
-                        'case_status_desc': status_descriptions.get(case_status, f"Status {case_status}"),
+                        'case_status_desc': case_status_desc,
                         'cases': cases_count,
                         'total_amount': f"{amount:.2f}"
                     })

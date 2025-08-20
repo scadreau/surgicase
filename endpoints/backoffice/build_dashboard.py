@@ -1,5 +1,5 @@
 # Created: 2025-07-30 22:59:57
-# Last Modified: 2025-08-06 15:25:56
+# Last Modified: 2025-08-20 09:09:41
 # Author: Scott Cadreau
 
 # endpoints/backoffice/build_dashboard.py
@@ -10,6 +10,7 @@ from utils.monitoring import track_business_operation, business_metrics
 import time
 from typing import Optional, Dict, Any
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Import the individual dashboard functions
 from .case_dashboard_data import case_dashboard_data as get_case_dashboard_data
@@ -250,45 +251,47 @@ def build_dashboard(
         finally:
             close_db_connection(conn)
         
-        # Now collect data from all three functions
+        # Now collect data from all three functions in parallel
         dashboard_data = {}
         collection_errors = []
         
-        # 1. Get health data
-        try:
-            health_data = get_health_data()
-            dashboard_data["health"] = health_data
-        except Exception as e:
-            collection_errors.append(f"Health data collection failed: {str(e)}")
-            dashboard_data["health"] = {
-                "status": "error", 
-                "error": str(e),
-                "timestamp": datetime.utcnow().isoformat() + "Z"
+        # Execute all three functions concurrently using ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            # Submit all three functions simultaneously
+            # Pass validated=True to skip duplicate permission checks
+            futures = {
+                'health': executor.submit(get_health_data),
+                'cases': executor.submit(get_case_dashboard_data, request, user_id, start_date, end_date, True),
+                'users': executor.submit(get_user_dashboard_data, request, user_id, True)
             }
-        
-        # 2. Get case dashboard data
-        try:
-            case_data = get_case_dashboard_data(request, user_id, start_date, end_date)
-            dashboard_data["cases"] = case_data
-        except Exception as e:
-            collection_errors.append(f"Case dashboard data collection failed: {str(e)}")
-            dashboard_data["cases"] = {
-                "error": str(e),
-                "dashboard_data": [],
-                "summary": {"total_cases": 0, "total_amount": "0.00"}
-            }
-        
-        # 3. Get user dashboard data
-        try:
-            user_data = get_user_dashboard_data(request, user_id)
-            dashboard_data["users"] = user_data
-        except Exception as e:
-            collection_errors.append(f"User dashboard data collection failed: {str(e)}")
-            dashboard_data["users"] = {
-                "error": str(e),
-                "user_types": [],
-                "summary": {"total_users": 0}
-            }
+            
+            # Collect results with individual error handling
+            for component_name, future in futures.items():
+                try:
+                    result = future.result()
+                    dashboard_data[component_name] = result
+                except Exception as e:
+                    collection_errors.append(f"{component_name.title()} data collection failed: {str(e)}")
+                    
+                    # Provide fallback data structure based on component type
+                    if component_name == 'health':
+                        dashboard_data[component_name] = {
+                            "status": "error", 
+                            "error": str(e),
+                            "timestamp": datetime.utcnow().isoformat() + "Z"
+                        }
+                    elif component_name == 'cases':
+                        dashboard_data[component_name] = {
+                            "error": str(e),
+                            "dashboard_data": [],
+                            "summary": {"total_cases": 0, "total_amount": "0.00"}
+                        }
+                    elif component_name == 'users':
+                        dashboard_data[component_name] = {
+                            "error": str(e),
+                            "user_types": [],
+                            "summary": {"total_users": 0}
+                        }
         
         # Calculate execution time
         execution_time_ms = int((time.time() - start_time) * 1000)

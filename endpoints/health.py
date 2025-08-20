@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-07-30 17:18:45
+# Last Modified: 2025-08-20 09:23:50
 # Author: Scott Cadreau
 
 # endpoints/health.py
@@ -13,6 +13,7 @@ import json
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 
 router = APIRouter()
 
@@ -48,7 +49,7 @@ def load_health_config() -> Dict[str, Any]:
         return {
             "aws_resources": {"critical_services": [], "non_critical_services": []},
             "health_thresholds": {"database": {"healthy_ms": 500, "degraded_ms": 2000}, "aws_apis": {"healthy_ms": 1000, "degraded_ms": 3000}},
-            "cache_settings": {"cache_duration_seconds": 300, "enable_caching": True}
+            "cache_settings": {"cache_duration_seconds": 600, "enable_caching": True}
         }
 
 def is_cache_valid() -> bool:
@@ -463,29 +464,42 @@ def perform_comprehensive_health_check() -> Dict[str, Any]:
     """Perform comprehensive health check of all configured services"""
     start_time = time.time()
     
-    # Perform core health checks (always run these)
-    db_health = check_database_health()
-    aws_secrets_health = check_aws_secrets_manager_health() 
-    system_health = check_system_resources()
+    # Execute all health checks in parallel using ThreadPoolExecutor
+    # Note: Amplify and API Gateway checks removed - if they're down, requests wouldn't reach this endpoint
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        # Submit all health check functions simultaneously
+        futures = {
+            'database': executor.submit(check_database_health),
+            'aws_secrets_manager': executor.submit(check_aws_secrets_manager_health),
+            'system_resources': executor.submit(check_system_resources),
+            's3_storage': executor.submit(check_s3_health),
+            'ec2_instances': executor.submit(check_ec2_health)
+        }
+        
+        # Collect results from all futures
+        health_results = {}
+        for component_name, future in futures.items():
+            try:
+                health_results[component_name] = future.result()
+            except Exception as e:
+                logger.error(f"Health check failed for {component_name}: {str(e)}")
+                # Provide fallback error structure
+                health_results[component_name] = {
+                    "status": "unhealthy",
+                    "details": f"Health check failed: {str(e)}",
+                    "error": str(e)
+                }
     
-    # Perform configurable AWS service checks
-    amplify_health = check_amplify_health()
-    api_gateway_health = check_api_gateway_health()
-    s3_health = check_s3_health()
-    ec2_health = check_ec2_health()
-    
-    # Organize components by criticality
+    # Organize components by criticality using the threaded results
     critical_components = {
-        "database": db_health,
-        "aws_secrets_manager": aws_secrets_health,
-        "api_gateway": api_gateway_health,
-        "ec2_instances": ec2_health
+        "database": health_results['database'],
+        "aws_secrets_manager": health_results['aws_secrets_manager'],
+        "ec2_instances": health_results['ec2_instances']
     }
     
     non_critical_components = {
-        "s3_storage": s3_health,
-        "amplify_app": amplify_health,
-        "system_resources": system_health
+        "s3_storage": health_results['s3_storage'],
+        "system_resources": health_results['system_resources']
     }
     
     # Calculate overall health status
@@ -617,7 +631,6 @@ def readiness_check():
         critical_components = [
             health["components"]["database"]["status"],
             health["components"]["aws_secrets_manager"]["status"],
-            health["components"]["api_gateway"]["status"],
             health["components"]["ec2_instances"]["status"]
         ]
         
