@@ -1,5 +1,5 @@
 # Created: 2025-01-27
-# Last Modified: 2025-08-20 08:45:25
+# Last Modified: 2025-08-20 09:46:20
 # Version: 0.9.0
 
 # SurgiCase Management System
@@ -299,9 +299,12 @@ The `/bugs` endpoints provide comprehensive bug reporting functionality:
 - `LOG_LEVEL` - Logging level (DEBUG, INFO, WARNING, ERROR)
 
 #### Database Connection Pooling
-- `DB_POOL_SIZE` - Base connection pool size (default: 15)
-- `DB_POOL_MAX_OVERFLOW` - Additional connections when pool full (default: 10)
-- `DB_POOL_TIMEOUT` - Timeout waiting for connection in seconds (default: 10)
+**Hardcoded Configuration (Optimized for 16vCPU/64GB dedicated server):**
+- **Base Pool Size**: 50 connections
+- **Max Overflow**: 25 additional connections during traffic spikes  
+- **Total Max Connections**: 75 concurrent database connections
+- **Connection Timeout**: 10 seconds
+- **Pre-populated**: 10 connections at startup
 
 **Connection Pool Benefits:**
 - **5-minute credential caching** eliminates repeated AWS Secrets Manager calls (saves 200-500ms per request)

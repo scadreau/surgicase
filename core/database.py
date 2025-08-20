@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-20 08:38:53
+# Last Modified: 2025-08-20 09:50:32
 # Author: Scott Cadreau
 
 # core/database.py
@@ -63,18 +63,19 @@ def _initialize_pool():
         if _connection_pool is not None:
             return
             
-        # Pool configuration - optimized for rapid requests
-        pool_size = int(os.environ.get("DB_POOL_SIZE", "15"))
+        # Pool configuration - hardcoded for 16vCPU/64GB dedicated server
+        # Optimized based on: 16 vCPUs × 3 = 48 base connections + 25 overflow = 75 total max
         _pool_config = {
-            "pool_size": pool_size,
-            "max_overflow": int(os.environ.get("DB_POOL_MAX_OVERFLOW", "10")),
-            "pool_timeout": int(os.environ.get("DB_POOL_TIMEOUT", "10"))  # Faster timeout for rapid requests
+            "pool_size": 50,           # Base pool size
+            "max_overflow": 25,        # Additional connections during traffic spikes
+            "pool_timeout": 3         # Connection acquisition timeout (seconds)
         }
+        pool_size = _pool_config["pool_size"]
         
         _connection_pool = Queue(maxsize=pool_size + _pool_config["max_overflow"])
         
-        # Pre-populate with initial connections
-        for _ in range(min(pool_size, 3)):  # Start with 3 connections
+        # Pre-populate with initial connections - more aggressive for dedicated server
+        for _ in range(min(pool_size, 10)):  # Start with 10 connections
             try:
                 conn = _create_connection()
                 _connection_pool.put(conn, block=False)

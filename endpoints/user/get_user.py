@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-14 13:21:49
+# Last Modified: 2025-08-20 09:50:42
 # Author: Scott Cadreau
 
 # endpoints/user/get_user.py
@@ -223,12 +223,6 @@ def get_user(request: Request, user_id: str = Query(..., description="The user I
             raise HTTPException(status_code=400, detail="Missing user_id parameter")
 
         conn = get_db_connection()
-
-        # TODO: TEMPORARY - Remove this call when frontend integrates get_user_environment
-        # Update user's last login timestamp
-#        update_user_last_login(user_id, conn)
-        # Commit the login timestamp update
-#        conn.commit()
 
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
