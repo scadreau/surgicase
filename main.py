@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-20 08:38:53
+# Last Modified: 2025-08-20 08:43:19
 # Author: Scott Cadreau
 
 # main.py
@@ -153,6 +153,16 @@ app.include_router(provider_payment_summary_report_router, tags=["reports"])
 # Export endpoints
 app.include_router(quickbooks_export_router, tags=["exports"])
 app.include_router(case_export_router, tags=["exports"])
+
+# Warm secrets cache on startup for optimal performance
+# Pre-loads all application secrets to eliminate cold start latency
+try:
+    from utils.secrets_manager import warm_all_secrets
+    warming_results = warm_all_secrets()
+    logger.info(f"Secrets cache warming completed: {warming_results['successful']}/{warming_results['total_secrets']} secrets loaded")
+except Exception as e:
+    logger.error(f"Failed to warm secrets cache: {str(e)}")
+    logger.warning("Application will continue with on-demand secret loading")
 
 # Start the scheduler service in background
 # Handles: Case status updates (Mon/Thu), NPI data updates (Tue)

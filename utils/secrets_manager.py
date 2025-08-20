@@ -1,5 +1,5 @@
 # Created: 2025-08-08 15:34:05
-# Last Modified: 2025-08-20 08:38:53
+# Last Modified: 2025-08-20 08:42:55
 # Author: Scott Cadreau
 
 # utils/secrets_manager.py
@@ -129,6 +129,61 @@ class SecretsManager:
                 self._cache.clear()
                 logger.info("Cleared all cached secrets")
     
+    def warm_cache(self, secret_names: list, custom_ttls: Dict[str, int] = None) -> Dict[str, Any]:
+        """
+        Pre-load multiple secrets into cache for improved performance.
+        
+        Args:
+            secret_names: List of secret names/ARNs to pre-load
+            custom_ttls: Optional dictionary mapping secret names to custom TTL values
+            
+        Returns:
+            Dictionary with warming results including success/failure counts and details
+        """
+        if custom_ttls is None:
+            custom_ttls = {}
+            
+        results = {
+            "total_secrets": len(secret_names),
+            "successful": 0,
+            "failed": 0,
+            "details": [],
+            "start_time": time.time()
+        }
+        
+        logger.info(f"Starting cache warming for {len(secret_names)} secrets")
+        
+        for secret_name in secret_names:
+            try:
+                # Use custom TTL if provided, otherwise use default
+                ttl = custom_ttls.get(secret_name, 3600)  # Default 1 hour
+                
+                # This will cache the secret
+                secret_data = self.get_secret(secret_name, cache_ttl=ttl)
+                
+                results["successful"] += 1
+                results["details"].append({
+                    "secret_name": secret_name,
+                    "status": "success",
+                    "ttl": ttl,
+                    "keys_count": len(secret_data) if isinstance(secret_data, dict) else 0
+                })
+                logger.debug(f"Successfully warmed cache for secret: {secret_name}")
+                
+            except Exception as e:
+                results["failed"] += 1
+                results["details"].append({
+                    "secret_name": secret_name,
+                    "status": "failed",
+                    "error": str(e)
+                })
+                logger.warning(f"Failed to warm cache for secret {secret_name}: {str(e)}")
+        
+        results["duration_seconds"] = time.time() - results["start_time"]
+        
+        logger.info(f"Cache warming completed: {results['successful']}/{results['total_secrets']} successful in {results['duration_seconds']:.2f}s")
+        return results
+
     def get_cache_stats(self) -> Dict[str, Any]:
         """
         Get cache statistics for monitoring.
@@ -203,3 +258,88 @@ def get_secrets_cache_stats() -> Dict[str, Any]:
         Dictionary with cache statistics
     """
     return secrets_manager.get_cache_stats()
+
+def warm_secrets_cache(secret_names: list = None, custom_ttls: Dict[str, int] = None) -> Dict[str, Any]:
+    """
+    Pre-load secrets into cache using the global secrets manager instance.
+    
+    Args:
+        secret_names: List of secret names to warm. If None, warms all known secrets.
+        custom_ttls: Optional dictionary mapping secret names to custom TTL values
+        
+    Returns:
+        Dictionary with warming results
+    """
+    if secret_names is None:
+        secret_names = get_all_known_secrets()
+        
+    return secrets_manager.warm_cache(secret_names, custom_ttls)
+
+def get_all_known_secrets() -> list:
+    """
+    Get list of all known secrets used by the application.
+    
+    Returns:
+        List of secret names/ARNs used throughout the application
+    """
+    return [
+        # Database credentials (highest priority - 4 hour cache)
+        "arn:aws:secretsmanager:us-east-1:002118831669:secret:rds!cluster-9376049b-abee-46d9-9cdb-95b95d6cdda0-fjhTNH",
+        
+        # Core application secrets (1 hour cache)
+        "surgicase/main",
+        "surgicase/ses_keys", 
+        "surgicase/email_templates",
+        "surgicase/sms_templates",
+        "surgicase/twilio_keys",
+        
+        # S3 configuration secrets (1 hour cache)
+        "surgicase/s3-user-reports",
+        "surgicase/s3-case-documents", 
+        "surgicase/s3-user-documents"
+    ]
+
+def get_default_secret_ttls() -> Dict[str, int]:
+    """
+    Get default TTL values for different types of secrets.
+    
+    Returns:
+        Dictionary mapping secret names to their optimal TTL values
+    """
+    return {
+        # Database secret - 4 hours (rotates weekly)
+        "arn:aws:secretsmanager:us-east-1:002118831669:secret:rds!cluster-9376049b-abee-46d9-9cdb-95b95d6cdda0-fjhTNH": 14400,
+        
+        # All other secrets - 1 hour (default)
+        # These will use the default 3600 seconds if not specified
+    }
+
+def warm_all_secrets() -> Dict[str, Any]:
+    """
+    Warm cache for all known application secrets with optimal TTL values.
+    
+    This function is designed to be called during application startup to
+    pre-load all secrets and eliminate cold start latency.
+    
+    Returns:
+        Dictionary with detailed warming results
+    """
+    logger.info("Starting comprehensive cache warming for all application secrets")
+    
+    secret_names = get_all_known_secrets()
+    custom_ttls = get_default_secret_ttls()
+    
+    results = warm_secrets_cache(secret_names, custom_ttls)
+    
+    # Log summary
+    if results["failed"] == 0:
+        logger.info(f"✅ Cache warming successful: All {results['successful']} secrets loaded in {results['duration_seconds']:.2f}s")
+    else:
+        logger.warning(f"⚠️ Cache warming partial: {results['successful']}/{results['total_secrets']} secrets loaded in {results['duration_seconds']:.2f}s")
+        
+        # Log failed secrets for debugging
+        for detail in results["details"]:
+            if detail["status"] == "failed":
+                logger.error(f"Failed to warm {detail['secret_name']}: {detail['error']}")
+    
+    return results

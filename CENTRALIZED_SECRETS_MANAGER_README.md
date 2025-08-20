@@ -9,7 +9,9 @@ The centralized secrets manager reduces AWS API calls, improves performance, and
 ## Features
 
 - **Intelligent Caching**: Configurable TTL-based caching with thread-safe access
+- **Cache Warming**: Automatic pre-loading of all secrets during application startup
 - **Performance Optimization**: Reduces AWS Secrets Manager API calls by 60-80%
+- **Zero Cold Start**: Eliminates first-request latency through startup cache warming
 - **Unified Error Handling**: Consistent error handling and logging across all secret access
 - **Thread Safety**: Thread-safe cache operations for concurrent request handling
 - **Monitoring Integration**: Built-in cache statistics and performance monitoring
@@ -39,9 +41,10 @@ The centralized secrets manager reduces AWS API calls, improves performance, and
 
 - **Default TTL**: 1 hour (3600 seconds)
 - **Database Secret TTL**: 4 hours (14400 seconds) - optimized for weekly rotation schedule
+- **Cache Warming**: Automatic startup pre-loading of all application secrets
 - **Cache Key Format**: `{secret_name}_data` and `{secret_name}_time`
 - **Thread Safety**: Uses threading.Lock for cache access
-- **Memory Efficiency**: Only caches requested secrets
+- **Memory Efficiency**: Pre-loads all known secrets, maintains optimal performance
 
 ## Usage
 
@@ -254,13 +257,37 @@ from utils.secrets_manager import clear_secrets_cache
 clear_secrets_cache("problematic-secret-name")
 ```
 
+### Cache Warming
+
+The secrets manager automatically pre-loads all application secrets during startup:
+
+```python
+from utils.secrets_manager import warm_all_secrets, warm_secrets_cache
+
+# Automatic warming (called during app startup)
+results = warm_all_secrets()
+print(f"Warmed {results['successful']}/{results['total_secrets']} secrets")
+
+# Manual warming of specific secrets
+secrets_to_warm = ["surgicase/main", "surgicase/ses_keys"]
+custom_ttls = {"surgicase/main": 7200}  # 2 hours for main config
+results = warm_secrets_cache(secrets_to_warm, custom_ttls)
+```
+
+**Warmed Secrets:**
+- Database credentials (4-hour cache)
+- Main application configuration
+- Email service configuration
+- SMS service configuration  
+- S3 storage configurations
+- Email and SMS templates
+
 ## Future Enhancements
 
 ### Planned Features
 - Metrics export to Prometheus
 - Configurable cache sizes
-- Cache warming strategies
-- Secret prefetch capabilities
+- Dynamic cache warming based on usage patterns
 - Multi-region failover support
 
 ### Integration Opportunities
