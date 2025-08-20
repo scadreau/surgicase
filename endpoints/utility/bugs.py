@@ -1,5 +1,5 @@
 # Created: 2025-08-06 14:20:21
-# Last Modified: 2025-08-09 00:04:10
+# Last Modified: 2025-08-20 08:38:53
 # Author: Scott Cadreau
 
 # endpoints/utility/bugs.py
@@ -23,7 +23,7 @@ def get_clickup_config() -> Dict[str, Any]:
     """
     try:
         from utils.secrets_manager import get_secret
-        return get_secret("surgicase/main", cache_ttl=300)
+        return get_secret("surgicase/main")
     except Exception as e:
         print(f"Error fetching ClickUp configuration from Secrets Manager: {str(e)}")
         return {}

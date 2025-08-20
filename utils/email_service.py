@@ -1,5 +1,5 @@
 # Created: 2025-07-30 14:30:30
-# Last Modified: 2025-08-15 20:35:19
+# Last Modified: 2025-08-20 08:38:53
 # Author: Scott Cadreau
 
 import boto3
@@ -43,7 +43,7 @@ def _get_secret_value(secret_name: str, key: str, aws_region: str = "us-east-1")
     """
     try:
         from utils.secrets_manager import get_secret_value
-        return get_secret_value(secret_name, key, cache_ttl=300)
+        return get_secret_value(secret_name, key)
         
     except Exception as e:
         logger.error(f"Error retrieving secret {secret_name}, key {key}: {e}")
@@ -829,7 +829,7 @@ def get_email_templates(aws_region: str = "us-east-1") -> Dict[str, Any]:
     """
     try:
         from utils.secrets_manager import get_secret
-        templates = get_secret('surgicase/email_templates', cache_ttl=300)
+        templates = get_secret('surgicase/email_templates')
         logger.info("Successfully retrieved email templates from AWS Secrets Manager")
         return templates
     except Exception as e:

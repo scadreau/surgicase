@@ -1,5 +1,5 @@
 # Created: 2025-07-22 18:43:07
-# Last Modified: 2025-08-08 15:36:42
+# Last Modified: 2025-08-20 08:38:53
 # Author: Scott Cadreau
 
 # utils/s3_case_files.py
@@ -18,7 +18,7 @@ def get_s3_case_config(secret_name: str = "surgicase/s3-case-documents") -> Dict
     """
     try:
         from utils.secrets_manager import get_secret
-        return get_secret(secret_name, cache_ttl=300)
+        return get_secret(secret_name)
     except Exception as e:
         logger.error(f"Error fetching S3 case configuration from Secrets Manager: {str(e)}")
         raise

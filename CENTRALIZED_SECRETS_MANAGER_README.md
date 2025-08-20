@@ -37,7 +37,8 @@ The centralized secrets manager reduces AWS API calls, improves performance, and
 
 ### Cache Strategy
 
-- **Default TTL**: 5 minutes (300 seconds)
+- **Default TTL**: 1 hour (3600 seconds)
+- **Database Secret TTL**: 4 hours (14400 seconds) - optimized for weekly rotation schedule
 - **Cache Key Format**: `{secret_name}_data` and `{secret_name}_time`
 - **Thread Safety**: Uses threading.Lock for cache access
 - **Memory Efficiency**: Only caches requested secrets
@@ -63,7 +64,10 @@ email_address = get_secret_value("surgicase/ses_keys", "ses_default_from_email")
 from utils.secrets_manager import secrets_manager
 
 # Custom TTL
-db_config = secrets_manager.get_secret("rds-credentials", cache_ttl=600)  # 10 minutes
+db_config = secrets_manager.get_secret("rds-credentials", cache_ttl=14400)  # 4 hours for DB secrets
+
+# For other secrets, use default 1-hour cache
+config = secrets_manager.get_secret("surgicase/main")  # Uses 1-hour default
 
 # Cache management
 secrets_manager.clear_cache("surgicase/main")  # Clear specific secret

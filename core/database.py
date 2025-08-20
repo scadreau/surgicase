@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-08 15:44:44
+# Last Modified: 2025-08-20 08:38:53
 # Author: Scott Cadreau
 
 # core/database.py
@@ -30,7 +30,7 @@ def get_db_credentials(secret_name: str) -> Dict[str, Any]:
     Function to fetch database credentials from AWS Secrets Manager using centralized secrets manager
     """
     from utils.secrets_manager import get_secret
-    return get_secret(secret_name, cache_ttl=300)  # 5 minutes cache
+    return get_secret(secret_name, cache_ttl=14400)  # 4 hours cache (DB secret rotates weekly)
 
 def _create_connection() -> pymysql.Connection:
     """Create a new database connection"""

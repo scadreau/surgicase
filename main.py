@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-14 12:44:10
+# Last Modified: 2025-08-20 08:38:53
 # Author: Scott Cadreau
 
 # main.py
@@ -68,7 +68,7 @@ def get_main_config() -> dict:
     """
     try:
         from utils.secrets_manager import get_secret
-        return get_secret("surgicase/main", cache_ttl=300)
+        return get_secret("surgicase/main")
     except Exception as e:
         logging.error(f"Error fetching main configuration from Secrets Manager: {str(e)}")
         # Return default configuration if secrets are unavailable

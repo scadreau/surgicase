@@ -1,5 +1,5 @@
 # Created: 2025-08-18 23:03:35
-# Last Modified: 2025-08-18 23:34:36
+# Last Modified: 2025-08-20 08:38:53
 # Author: Scott Cadreau
 
 import boto3
@@ -37,7 +37,7 @@ def _get_secret_value(secret_name: str, key: str, aws_region: str = "us-east-1")
     """
     try:
         from utils.secrets_manager import get_secret_value
-        return get_secret_value(secret_name, key, cache_ttl=300)
+        return get_secret_value(secret_name, key)
         
     except Exception as e:
         logger.error(f"Error retrieving secret {secret_name}, key {key}: {e}")
@@ -193,7 +193,7 @@ def _get_twilio_credentials(aws_region: str = "us-east-1") -> Dict[str, str]:
     """
     try:
         from utils.secrets_manager import get_secret
-        twilio_secrets = get_secret('surgicase/twilio_keys', cache_ttl=300)
+        twilio_secrets = get_secret('surgicase/twilio_keys')
         
         # Check for required keys - handle both 'phone_number' and 'from_phone'
         required_keys = ['account_sid', 'auth_token']
@@ -493,7 +493,7 @@ def get_sms_templates(aws_region: str = "us-east-1") -> Dict[str, Any]:
     """
     try:
         from utils.secrets_manager import get_secret
-        templates = get_secret('surgicase/sms_templates', cache_ttl=300)
+        templates = get_secret('surgicase/sms_templates')
         logger.info("Successfully retrieved SMS templates from AWS Secrets Manager")
         return templates
     except Exception as e:

@@ -1,5 +1,5 @@
 # Created: 2025-07-17 10:30:00
-# Last Modified: 2025-08-08 15:36:40
+# Last Modified: 2025-08-20 08:38:53
 # Author: Scott Cadreau
 
 # utils/s3_storage.py
@@ -19,7 +19,7 @@ def get_s3_config(secret_name: str = "surgicase/s3-user-reports") -> Dict[str, A
     """
     try:
         from utils.secrets_manager import get_secret
-        return get_secret(secret_name, cache_ttl=300)
+        return get_secret(secret_name)
     except Exception as e:
         logger.error(f"Error fetching S3 configuration from Secrets Manager: {str(e)}")
         raise

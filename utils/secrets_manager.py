@@ -1,5 +1,5 @@
 # Created: 2025-08-08 15:34:05
-# Last Modified: 2025-08-08 15:39:54
+# Last Modified: 2025-08-20 08:38:53
 # Author: Scott Cadreau
 
 # utils/secrets_manager.py
@@ -35,13 +35,13 @@ class SecretsManager:
         self._lock = threading.Lock()
         self._region = region
         
-    def get_secret(self, secret_name: str, cache_ttl: int = 300) -> Dict[str, Any]:
+    def get_secret(self, secret_name: str, cache_ttl: int = 3600) -> Dict[str, Any]:
         """
         Get complete secret data with intelligent caching.
         
         Args:
             secret_name: Name or ARN of the secret in AWS Secrets Manager
-            cache_ttl: Cache time-to-live in seconds (default: 5 minutes)
+            cache_ttl: Cache time-to-live in seconds (default: 1 hour)
             
         Returns:
             Dictionary containing the secret data
@@ -92,14 +92,14 @@ class SecretsManager:
                 logger.error(f"Unexpected error retrieving secret {secret_name}: {e}")
                 raise
     
-    def get_secret_value(self, secret_name: str, key: str, cache_ttl: int = 300) -> Optional[str]:
+    def get_secret_value(self, secret_name: str, key: str, cache_ttl: int = 3600) -> Optional[str]:
         """
         Get a specific key from a secret.
         
         Args:
             secret_name: Name or ARN of the secret in AWS Secrets Manager
             key: Key within the secret to retrieve
-            cache_ttl: Cache time-to-live in seconds (default: 5 minutes)
+            cache_ttl: Cache time-to-live in seconds (default: 1 hour)
             
         Returns:
             The secret value for the specified key, or None if not found
@@ -159,27 +159,27 @@ class SecretsManager:
 secrets_manager = SecretsManager()
 
 # Convenience functions for backward compatibility and ease of use
-def get_secret(secret_name: str, cache_ttl: int = 300) -> Dict[str, Any]:
+def get_secret(secret_name: str, cache_ttl: int = 3600) -> Dict[str, Any]:
     """
     Get complete secret data using the global secrets manager instance.
     
     Args:
         secret_name: Name or ARN of the secret in AWS Secrets Manager
-        cache_ttl: Cache time-to-live in seconds (default: 5 minutes)
+        cache_ttl: Cache time-to-live in seconds (default: 1 hour)
         
     Returns:
         Dictionary containing the secret data
     """
     return secrets_manager.get_secret(secret_name, cache_ttl)
 
-def get_secret_value(secret_name: str, key: str, cache_ttl: int = 300) -> Optional[str]:
+def get_secret_value(secret_name: str, key: str, cache_ttl: int = 3600) -> Optional[str]:
     """
     Get a specific key from a secret using the global secrets manager instance.
     
     Args:
         secret_name: Name or ARN of the secret in AWS Secrets Manager
         key: Key within the secret to retrieve
-        cache_ttl: Cache time-to-live in seconds (default: 5 minutes)
+        cache_ttl: Cache time-to-live in seconds (default: 1 hour)
         
     Returns:
         The secret value for the specified key, or None if not found

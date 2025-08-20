@@ -1,5 +1,5 @@
 # Created: 2025-01-27
-# Last Modified: 2025-08-08 15:39:54
+# Last Modified: 2025-08-20 08:38:53
 # Version: 0.9.0
 
 # SurgiCase Management System
@@ -565,7 +565,7 @@ WantedBy=multi-user.target
 ## 📈 Performance
 
 ### Optimization Features
-- **Database connection pooling** with credential caching (5-minute AWS Secrets Manager cache)
+- **Database connection pooling** with credential caching (4-hour AWS Secrets Manager cache for DB secrets, 1-hour for others)
 - **Centralized secrets management** with 60-80% reduction in AWS API calls
 - **Connection reuse** eliminates ~200-500ms overhead per request
 - **Intelligent secrets caching** improves multi-secret request performance by 200-500ms

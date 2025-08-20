@@ -1,5 +1,5 @@
 # Created: 2025-07-29 04:32:09
-# Last Modified: 2025-08-08 15:39:54
+# Last Modified: 2025-08-20 08:38:53
 # Author: Scott Cadreau
 
 # utils/compress_pic.py
@@ -20,7 +20,7 @@ def get_compression_mode() -> str:
     """
     try:
         from utils.secrets_manager import get_secret_value
-        compression_mode = get_secret_value("surgicase/main", "COMPRESSION_MODE", cache_ttl=300)
+        compression_mode = get_secret_value("surgicase/main", "COMPRESSION_MODE")
         return compression_mode.lower() if compression_mode else "normal"
     except Exception as e:
         logger.warning(f"Could not fetch compression mode from secrets, using 'normal': {str(e)}")
