@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-20 21:52:28
+# Last Modified: 2025-08-20 22:00:42
 # Author: Scott Cadreau
 
 # endpoints/case/filter_cases.py
@@ -209,21 +209,19 @@ def _get_user_cases_optimized(cursor, user_id, status_list, max_case_status):
     cursor.execute(sql, params)
     cases = cursor.fetchall()
 
+    # Pre-fetch all case status descriptions to avoid N+1 queries
+    # This eliminates the need for individual queries in the loop below
+    cursor.execute("SELECT case_status, case_status_desc FROM case_status_list")
+    status_descriptions = {row["case_status"]: row["case_status_desc"] for row in cursor.fetchall()}
+
     result = []
     for case_data in cases:
         # Apply case status visibility restriction
         original_case_status = case_data["case_status"]
         if original_case_status > max_case_status:
             case_data["case_status"] = max_case_status
-            # Update case_status_desc to match the modified case_status
-            cursor.execute("""
-                SELECT case_status_desc 
-                FROM case_status_list 
-                WHERE case_status = %s
-            """, (max_case_status,))
-            status_desc_result = cursor.fetchone()
-            if status_desc_result:
-                case_data["case_status_desc"] = status_desc_result["case_status_desc"]
+            # Update case_status_desc using pre-fetched lookup (no additional query needed)
+            case_data["case_status_desc"] = status_descriptions.get(max_case_status, case_data["case_status_desc"])
         
         # Convert datetime to ISO format
         if case_data["case_date"]:

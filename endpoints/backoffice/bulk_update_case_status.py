@@ -1,5 +1,5 @@
 # Created: 2025-07-27 02:00:40
-# Last Modified: 2025-08-06 15:57:17
+# Last Modified: 2025-08-20 22:28:52
 # Author: Scott Cadreau
 
 # endpoints/backoffice/bulk_update_case_status.py
@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Body, Request
 import pymysql.cursors
 import logging
 import time
+import threading
 from typing import List, Dict, Any, Tuple
 from core.database import get_db_connection, close_db_connection
 from core.models import BulkCaseStatusUpdate
@@ -71,11 +72,12 @@ def build_update_query_with_timestamps(timestamp_field: str = None) -> str:
 @track_business_operation("bulk_update", "case_status")
 def bulk_update_case_status(request: Request, update_request: BulkCaseStatusUpdate = Body(...)) -> Dict[str, Any]:
     """
-    Bulk update case status for multiple cases.
+    Bulk update case status for multiple cases with intelligent cache management.
     
     This function updates the case_status for a list of case IDs to a new status value.
     It performs validation to prevent backward status progression unless explicitly forced.
-    Additionally updates specific timestamps based on configured status transitions.
+    Additionally updates specific timestamps based on configured status transitions and
+    automatically invalidates and re-warms relevant caches to ensure data consistency.
     
     Current timestamp mappings:
     - Status 10 → 15: Updates pending_payment_ts
@@ -110,6 +112,14 @@ def bulk_update_case_status(request: Request, update_request: BulkCaseStatusUpda
     Timestamp Updates:
         - Automatically updates appropriate timestamp fields based on STATUS_TIMESTAMP_MAPPING
         - New mappings can be added to STATUS_TIMESTAMP_MAPPING without code changes
+    
+    Cache Management:
+        - Automatically clears global cases cache (get_cases_by_status) after successful updates
+        - Spawns background thread to re-warm global cache with common filter combinations
+        - Identifies affected users and invalidates their individual case caches (filter_cases)
+        - Spawns background threads to re-warm user-specific caches for optimal performance
+        - Cache operations are non-blocking and won't fail the main operation if they encounter errors
+        - Comprehensive logging of all cache operations for monitoring and debugging
     """
     conn = None
     start_time = time.time()
@@ -248,6 +258,50 @@ def bulk_update_case_status(request: Request, update_request: BulkCaseStatusUpda
                 
                 # Commit transaction
                 conn.commit()
+                
+                # Invalidate and re-warm caches after successful bulk update
+                if result["total_updated"] > 0:
+                    try:
+                        # 1. Clear and re-warm global cases cache (affects admin dashboard)
+                        from endpoints.backoffice.get_cases_by_status import clear_cases_cache, warm_cases_cache
+                        clear_cases_cache()  # Clear all cached data
+                        logger.info(f"Cleared global cases cache after bulk status update of {result['total_updated']} cases")
+                        
+                        # Spawn background thread to re-warm global cache
+                        threading.Thread(
+                            target=warm_cases_cache,
+                            daemon=True,
+                            name="bulk_update_cache_rewarm_global"
+                        ).start()
+                        logger.info("Started background re-warming of global cases cache")
+                        
+                        # 2. Get unique user_ids from updated cases and invalidate their caches
+                        from endpoints.case.filter_cases import invalidate_and_rewarm_user_cache
+                        
+                        # Extract unique user_ids from successfully updated cases
+                        updated_case_ids = [case["case_id"] for case in result["updated_cases"]]
+                        if updated_case_ids:
+                            # Query to get user_ids for the updated cases
+                            placeholders = ','.join(['%s'] * len(updated_case_ids))
+                            cursor.execute(f"""
+                                SELECT DISTINCT user_id 
+                                FROM cases 
+                                WHERE case_id IN ({placeholders}) AND active = 1
+                            """, updated_case_ids)
+                            
+                            affected_users = cursor.fetchall()
+                            
+                            # Invalidate and re-warm cache for each affected user
+                            for user_row in affected_users:
+                                user_id = user_row['user_id']
+                                invalidate_and_rewarm_user_cache(user_id)
+                                logger.debug(f"Invalidated and re-warmed cache for user: {user_id}")
+                            
+                            logger.info(f"Invalidated user caches for {len(affected_users)} affected users")
+                            
+                    except Exception as cache_error:
+                        # Don't fail the main operation if cache operations fail
+                        logger.warning(f"Cache invalidation failed after bulk status update: {str(cache_error)}")
                 
                 response_data = result
                 

@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-20 13:21:58
+# Last Modified: 2025-08-20 22:39:26
 # Author: Scott Cadreau
 
 # endpoints/case/create_case.py
@@ -13,6 +13,7 @@ from utils.pay_amount_calculator import update_case_pay_amount
 from utils.monitoring import track_business_operation, business_metrics
 import logging
 import time
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +80,7 @@ def create_case_with_procedures(case: CaseCreate, conn) -> dict:
 @track_business_operation("create", "case")
 def add_case(case: CaseCreate, request: Request):
     """
-    Create a new surgical case with associated procedure codes and automatic processing.
+    Create a new surgical case with associated procedure codes, automatic processing, and intelligent cache management.
     
     This endpoint provides comprehensive case creation functionality including:
     - Case validation and duplicate prevention
@@ -87,6 +88,7 @@ def add_case(case: CaseCreate, request: Request):
     - Automatic procedure code association
     - Pay amount calculation based on procedure codes
     - Case status updates when applicable
+    - Intelligent cache invalidation and rewarming
     - Full monitoring and logging integration
     - Prometheus metrics tracking
     
@@ -138,6 +140,14 @@ def add_case(case: CaseCreate, request: Request):
         - Explicit transaction begin/commit for data consistency
         - Automatic rollback on any operation failure
         - Connection validation and proper cleanup in finally block
+    
+    Cache Management:
+        - Automatically clears global cases cache (get_cases_by_status) after successful creation
+        - Spawns background thread to re-warm global cache with common filter combinations
+        - Invalidates and re-warms user-specific case cache (filter_cases) for the case owner
+        - Cache operations are non-blocking and won't fail the main operation if they encounter errors
+        - Ensures both admin dashboard and user dashboard show the new case immediately
+        - Comprehensive logging of all cache operations for monitoring and debugging
     
     Example:
         POST /case
@@ -195,13 +205,29 @@ def add_case(case: CaseCreate, request: Request):
         # Commit all changes at once
         conn.commit()
         
-        # Invalidate and re-warm user cases cache after successful creation
+        # Invalidate and re-warm caches after successful case creation
         try:
+            # 1. Clear and re-warm global cases cache (affects admin dashboard)
+            from endpoints.backoffice.get_cases_by_status import clear_cases_cache, warm_cases_cache
+            clear_cases_cache()  # Clear all cached data
+            logger.info(f"Cleared global cases cache after case creation: {case.case_id}")
+            
+            # Spawn background thread to re-warm global cache
+            threading.Thread(
+                target=warm_cases_cache,
+                daemon=True,
+                name="create_case_cache_rewarm_global"
+            ).start()
+            logger.info("Started background re-warming of global cases cache")
+            
+            # 2. Invalidate and re-warm user cases cache
             from endpoints.case.filter_cases import invalidate_and_rewarm_user_cache
             invalidate_and_rewarm_user_cache(case.user_id)
+            logger.debug(f"Invalidated and re-warmed cache for user: {case.user_id}")
+            
         except Exception as e:
             # Don't fail the main operation if cache invalidation fails
-            logging.error(f"Failed to invalidate cache for user {case.user_id} after case creation: {str(e)}")
+            logging.error(f"Failed to invalidate caches after case creation {case.case_id}: {str(e)}")
         
         response_status = 201
         response_data = {
