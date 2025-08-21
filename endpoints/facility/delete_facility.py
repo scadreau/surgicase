@@ -1,10 +1,11 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-06 15:32:44
+# Last Modified: 2025-08-21 17:54:09
 # Author: Scott Cadreau
 
 # endpoints/facility/delete_facility.py
 from fastapi import APIRouter, HTTPException, Query, Request
 import pymysql.cursors
+import logging
 from core.database import get_db_connection, close_db_connection, is_connection_valid
 from utils.monitoring import track_business_operation, business_metrics
 import time
@@ -101,6 +102,10 @@ def delete_facility(request: Request, facility_id: int = Query(..., description=
         conn = get_db_connection()
         
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            # Get user_id before deleting for cache invalidation
+            cursor.execute("SELECT user_id FROM facility_list WHERE facility_id = %s", (facility_id,))
+            facility_data = cursor.fetchone()
+            
             cursor.execute("DELETE FROM facility_list WHERE facility_id = %s", (facility_id,))
             if cursor.rowcount == 0:
                 # Record failed facility deletion (not found)
@@ -112,6 +117,16 @@ def delete_facility(request: Request, facility_id: int = Query(..., description=
 
             # Record successful facility deletion
             business_metrics.record_facility_operation("delete", "success", facility_id)
+            
+            # Clear user environment cache after successful facility deletion
+            if facility_data and facility_data.get('user_id'):
+                try:
+                    from endpoints.utility.get_user_environment import invalidate_and_rewarm_user_environment_cache
+                    invalidate_and_rewarm_user_environment_cache(facility_data['user_id'])
+                    logging.info(f"Invalidated user environment cache for user: {facility_data['user_id']} after facility deletion")
+                except Exception as cache_error:
+                    # Don't fail the operation if cache invalidation fails
+                    logging.error(f"Failed to invalidate user environment cache for user {facility_data['user_id']}: {str(cache_error)}")
             
         response_data = {
             "statusCode": 200,

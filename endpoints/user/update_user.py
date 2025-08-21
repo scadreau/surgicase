@@ -1,10 +1,11 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-12 17:32:31
+# Last Modified: 2025-08-21 17:52:17
 # Author: Scott Cadreau
 
 # endpoints/user/update_user.py
 from fastapi import APIRouter, HTTPException, Body, Request
 import pymysql.cursors
+import logging
 from core.database import get_db_connection, close_db_connection, is_connection_valid
 from core.models import UserUpdate
 from utils.monitoring import track_business_operation, business_metrics
@@ -290,6 +291,15 @@ def update_user(request: Request, user: UserUpdate = Body(...)):
                 raise HTTPException(status_code=400, detail="No changes made to user")
             
             conn.commit()
+            
+            # Clear user environment cache after successful update
+            try:
+                from endpoints.utility.get_user_environment import invalidate_and_rewarm_user_environment_cache
+                invalidate_and_rewarm_user_environment_cache(user.user_id)
+                logging.info(f"Invalidated user environment cache for user: {user.user_id}")
+            except Exception as cache_error:
+                # Don't fail the operation if cache invalidation fails
+                logging.error(f"Failed to invalidate user environment cache for user {user.user_id}: {str(cache_error)}")
             
             # Record successful user update
             business_metrics.record_user_operation("update", "success", user.user_id)

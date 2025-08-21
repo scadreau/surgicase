@@ -1,5 +1,5 @@
 # Created: 2025-07-24 17:54:30
-# Last Modified: 2025-08-14 20:10:49
+# Last Modified: 2025-08-21 17:52:02
 # Author: Scott Cadreau
 
 # endpoints/utility/get_user_environment.py
@@ -8,9 +8,99 @@ import pymysql.cursors
 from core.database import get_db_connection, close_db_connection
 from utils.monitoring import track_business_operation, business_metrics
 import time
+import json
+import logging
+import threading
+import hashlib
 from datetime import datetime
 
 router = APIRouter()
+
+# Global cache for user environment data following established patterns
+_user_environment_cache = {}
+_user_environment_cache_lock = threading.Lock()
+# Track which cache keys belong to which users for efficient invalidation
+_user_environment_cache_keys = {}  # user_id -> set of cache_keys
+
+def _generate_user_environment_cache_key(user_id: str) -> str:
+    """Generate a consistent cache key for user environment data"""
+    cache_input = f"user_environment:{user_id}"
+    return hashlib.md5(cache_input.encode()).hexdigest()
+
+def _is_user_environment_cache_valid(cache_key: str, cache_ttl: int = 43200) -> bool:
+    """Check if cached user environment data is still valid (12 hours = 43200 seconds)"""
+    time_key = f"{cache_key}_time"
+    
+    if cache_key not in _user_environment_cache or time_key not in _user_environment_cache:
+        return False
+    
+    return time.time() - _user_environment_cache[time_key] < cache_ttl
+
+def _get_cached_user_environment(cache_key: str):
+    """Get cached user environment data if valid"""
+    with _user_environment_cache_lock:
+        if _is_user_environment_cache_valid(cache_key):
+            logging.debug(f"Returning cached user environment data: {cache_key}")
+            return _user_environment_cache[cache_key]
+    return None
+
+def _cache_user_environment_data(cache_key: str, data, user_id: str = None):
+    """Cache the user environment data with timestamp and track user association"""
+    with _user_environment_cache_lock:
+        time_key = f"{cache_key}_time"
+        _user_environment_cache[cache_key] = data
+        _user_environment_cache[time_key] = time.time()
+        
+        # Track which user this cache key belongs to for efficient invalidation
+        if user_id:
+            if user_id not in _user_environment_cache_keys:
+                _user_environment_cache_keys[user_id] = set()
+            _user_environment_cache_keys[user_id].add(cache_key)
+        
+        logging.debug(f"Successfully cached user environment data: {cache_key}")
+
+def clear_user_environment_cache(user_id: str = None) -> None:
+    """Clear cached user environment data - for future invalidation use"""
+    with _user_environment_cache_lock:
+        if user_id:
+            # Use the user cache key tracking for efficient invalidation
+            if user_id in _user_environment_cache_keys:
+                keys_to_remove = list(_user_environment_cache_keys[user_id])
+                removed_count = 0
+                
+                # Remove all cache keys and their corresponding time keys
+                for cache_key in keys_to_remove:
+                    time_key = f"{cache_key}_time"
+                    
+                    # Remove data key
+                    if _user_environment_cache.pop(cache_key, None) is not None:
+                        removed_count += 1
+                    
+                    # Remove time key
+                    if _user_environment_cache.pop(time_key, None) is not None:
+                        removed_count += 1
+                
+                # Clear the user's key tracking
+                del _user_environment_cache_keys[user_id]
+                
+                logging.info(f"Cleared {removed_count} cache entries for user environment: {user_id}")
+            else:
+                logging.info(f"No cache entries found for user environment: {user_id}")
+        else:
+            cache_count = len(_user_environment_cache)
+            _user_environment_cache.clear()
+            _user_environment_cache_keys.clear()
+            logging.info(f"Cleared all cached user environment data ({cache_count} entries)")
+
+def invalidate_and_rewarm_user_environment_cache(user_id: str):
+    """
+    Invalidate user environment cache and optionally re-warm it.
+    Called after user profile/permission changes to ensure fresh data.
+    """
+    # Clear the user's cache immediately
+    clear_user_environment_cache(user_id)
+    
+    logging.info(f"Initiated cache invalidation for user environment: {user_id}")
 
 def get_user_profile_info(user_id: str, conn) -> dict:
     """
@@ -215,6 +305,9 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
     It delivers personalized data based on the user's type, access level, and permissions
     to enable complete frontend application state setup with optimal performance.
     
+    Features intelligent caching with 12-hour TTL to optimize performance for this
+    frequently called endpoint, with cache invalidation support for data consistency.
+    
     Args:
         request (Request): FastAPI request object for logging and monitoring
         user_id (str): User ID to retrieve environment data for.
@@ -313,6 +406,8 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
         - Optimized for frontend application initialization
         - Minimal database connections through connection reuse
         - Efficient data aggregation for complete user context
+        - Intelligent caching with 12-hour TTL reduces database load
+        - Thread-safe cache implementation with user-specific invalidation
     
     Security Features:
         - Permission-based data filtering throughout all queries
@@ -338,6 +433,18 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
             response_status = 400
             error_message = "Missing user_id parameter"
             raise HTTPException(status_code=400, detail="Missing user_id parameter")
+
+        # Generate cache key for this user environment request
+        cache_key = _generate_user_environment_cache_key(user_id)
+        
+        # Check cache first
+        cached_result = _get_cached_user_environment(cache_key)
+        if cached_result is not None:
+            logging.debug(f"Returning cached user environment data for user: {user_id}")
+            return cached_result
+
+        # Cache miss - proceed with database queries
+        logging.info(f"Cache miss for user environment query: {cache_key}")
 
         conn = get_db_connection()
         
@@ -406,6 +513,10 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
                 "last_login_updated": login_updated
             }
         }
+        
+        # Cache the result before returning
+        _cache_user_environment_data(cache_key, response_data, user_id)
+        
         return response_data
         
     except HTTPException as http_error:

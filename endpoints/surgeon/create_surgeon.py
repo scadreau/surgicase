@@ -1,10 +1,11 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-06 15:36:45
+# Last Modified: 2025-08-21 17:54:09
 # Author: Scott Cadreau
 
 # endpoints/surgeon/create_surgeon.py
 from fastapi import APIRouter, HTTPException, Request
 import pymysql.cursors
+import logging
 from core.database import get_db_connection, close_db_connection, is_connection_valid
 from core.models import SurgeonCreate
 from utils.monitoring import track_business_operation, business_metrics
@@ -115,6 +116,15 @@ def add_surgeon(request: Request, surgeon: SurgeonCreate):
 
             # Record successful surgeon creation
             business_metrics.record_surgeon_operation("create", "success", surgeon_id)
+            
+            # Clear user environment cache after successful surgeon creation
+            try:
+                from endpoints.utility.get_user_environment import invalidate_and_rewarm_user_environment_cache
+                invalidate_and_rewarm_user_environment_cache(surgeon.user_id)
+                logging.info(f"Invalidated user environment cache for user: {surgeon.user_id} after surgeon creation")
+            except Exception as cache_error:
+                # Don't fail the operation if cache invalidation fails
+                logging.error(f"Failed to invalidate user environment cache for user {surgeon.user_id}: {str(cache_error)}")
             
         response_data = {
             "statusCode": 201,

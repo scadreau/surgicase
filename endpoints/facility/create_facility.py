@@ -1,10 +1,11 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-06 15:32:02
+# Last Modified: 2025-08-21 17:54:09
 # Author: Scott Cadreau
 
 # endpoints/facility/create_facility.py
 from fastapi import APIRouter, HTTPException, Request
 import pymysql.cursors
+import logging
 from core.database import get_db_connection, close_db_connection, is_connection_valid
 from core.models import FacilityCreate
 from utils.monitoring import track_business_operation, business_metrics
@@ -111,6 +112,15 @@ def add_facility(request: Request, facility: FacilityCreate):
 
             # Record successful facility creation
             business_metrics.record_facility_operation("create", "success", facility_id)
+            
+            # Clear user environment cache after successful facility creation
+            try:
+                from endpoints.utility.get_user_environment import invalidate_and_rewarm_user_environment_cache
+                invalidate_and_rewarm_user_environment_cache(facility.user_id)
+                logging.info(f"Invalidated user environment cache for user: {facility.user_id} after facility creation")
+            except Exception as cache_error:
+                # Don't fail the operation if cache invalidation fails
+                logging.error(f"Failed to invalidate user environment cache for user {facility.user_id}: {str(cache_error)}")
             
         response_data = {
             "statusCode": 201,
