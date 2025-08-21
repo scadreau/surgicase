@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-20 13:21:58
+# Last Modified: 2025-08-21 02:30:34
 # Author: Scott Cadreau
 
 # endpoints/case/update_case.py
@@ -262,15 +262,18 @@ def update_case(request: Request, case: CaseUpdate = Body(...)):
             # Update case status if conditions are met (within the same transaction)
             status_update_result = update_case_status(case.case_id, conn)
             
-            # Commit all changes at once
-            conn.commit()
-
-            # Record successful case update
-            business_metrics.record_case_operation("update", "success", case.case_id)
-            
-            # Invalidate and re-warm user cases cache after successful update
+            # Clear caches BEFORE commit to prevent race conditions
+            # This ensures no stale data gets cached between clear and commit
+            logger.info(f"🔄 STARTING cache invalidation for case update: {case.case_id}")
             try:
-                from endpoints.case.filter_cases import invalidate_and_rewarm_user_cache
+                # 1. Clear global cases cache (affects admin dashboard) - but don't re-warm yet
+                from endpoints.backoffice.get_cases_by_status import clear_cases_cache
+                clear_cases_cache()  # Clear all cached data
+                logger.info(f"✅ CLEARED global cases cache before commit for case update: {case.case_id}")
+                
+                # 2. Clear user cases cache - but don't re-warm yet
+                from endpoints.case.filter_cases import clear_user_cases_cache
+                
                 # Get user_id from the case data (either provided or from database)
                 target_user_id = case.user_id
                 if not target_user_id:
@@ -281,10 +284,48 @@ def update_case(request: Request, case: CaseUpdate = Body(...)):
                         target_user_id = case_user['user_id']
                 
                 if target_user_id:
-                    invalidate_and_rewarm_user_cache(target_user_id)
+                    clear_user_cases_cache(target_user_id)  # Clear all cache entries for this user
+                    logger.info(f"✅ CLEARED user cases cache for user: {target_user_id}")
+                else:
+                    logger.warning(f"⚠️ Could not determine user_id for cache invalidation, case: {case.case_id}")
+                    
             except Exception as e:
                 # Don't fail the main operation if cache invalidation fails
-                logging.error(f"Failed to invalidate cache after case update {case.case_id}: {str(e)}")
+                logger.error(f"❌ Failed to invalidate caches before commit for case update {case.case_id}: {str(e)}", exc_info=True)
+            
+            # Commit all changes at once
+            conn.commit()
+            logger.info(f"✅ COMMITTED database changes for case update: {case.case_id}")
+
+            # Record successful case update
+            business_metrics.record_case_operation("update", "success", case.case_id)
+            
+            # Re-warm caches after successful commit
+            try:
+                # Re-warm global cases cache in background
+                from endpoints.backoffice.get_cases_by_status import warm_cases_cache
+                import threading
+                threading.Thread(
+                    target=warm_cases_cache,
+                    daemon=True,
+                    name="update_case_cache_rewarm_global"
+                ).start()
+                logger.info(f"🔄 Started background re-warming of global cases cache after case update: {case.case_id}")
+                
+                # Re-warm user cache if we have a user_id
+                if target_user_id:
+                    from endpoints.case.filter_cases import _rewarm_user_cases_cache_background
+                    threading.Thread(
+                        target=_rewarm_user_cases_cache_background,
+                        args=(target_user_id,),
+                        daemon=True,
+                        name=f"update_case_cache_rewarm_user_{target_user_id}"
+                    ).start()
+                    logger.info(f"🔄 Started background re-warming of user cases cache for user: {target_user_id}")
+                
+            except Exception as e:
+                # Don't fail the main operation if cache re-warming fails
+                logger.error(f"❌ Failed to re-warm caches after case update {case.case_id}: {str(e)}", exc_info=True)
 
         response_data = {
             "statusCode": 200,

@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-20 22:00:42
+# Last Modified: 2025-08-21 02:30:33
 # Author: Scott Cadreau
 
 # endpoints/case/filter_cases.py
@@ -19,6 +19,8 @@ router = APIRouter()
 # Global cache for user cases data following established patterns
 _user_cases_cache = {}
 _user_cases_cache_lock = threading.Lock()
+# Track which cache keys belong to which users for efficient invalidation
+_user_cache_keys = {}  # user_id -> set of cache_keys
 
 def _generate_user_cases_cache_key(user_id, status_list) -> str:
     """Generate a consistent cache key for user cases"""
@@ -43,27 +45,53 @@ def _get_cached_user_cases(cache_key: str):
             return _user_cases_cache[cache_key]
     return None
 
-def _cache_user_cases_data(cache_key: str, data):
-    """Cache the user cases data with timestamp"""
+def _cache_user_cases_data(cache_key: str, data, user_id: str = None):
+    """Cache the user cases data with timestamp and track user association"""
     with _user_cases_cache_lock:
         time_key = f"{cache_key}_time"
         _user_cases_cache[cache_key] = data
         _user_cases_cache[time_key] = time.time()
+        
+        # Track which user this cache key belongs to for efficient invalidation
+        if user_id:
+            if user_id not in _user_cache_keys:
+                _user_cache_keys[user_id] = set()
+            _user_cache_keys[user_id].add(cache_key)
+        
         logging.debug(f"Successfully cached user cases data: {cache_key}")
 
 def clear_user_cases_cache(user_id: str = None) -> None:
     """Clear cached user cases data - for future invalidation use"""
     with _user_cases_cache_lock:
         if user_id:
-            # Clear all cache entries for a specific user
-            keys_to_remove = [key for key in _user_cases_cache.keys() if f"user_cases:{user_id}:" in key]
-            for key in keys_to_remove:
-                _user_cases_cache.pop(key, None)
-                _user_cases_cache.pop(f"{key}_time", None)
-            logging.info(f"Cleared cache for user: {user_id}")
+            # Use the user cache key tracking for efficient invalidation
+            if user_id in _user_cache_keys:
+                keys_to_remove = list(_user_cache_keys[user_id])
+                removed_count = 0
+                
+                # Remove all cache keys and their corresponding time keys
+                for cache_key in keys_to_remove:
+                    time_key = f"{cache_key}_time"
+                    
+                    # Remove data key
+                    if _user_cases_cache.pop(cache_key, None) is not None:
+                        removed_count += 1
+                    
+                    # Remove time key
+                    if _user_cases_cache.pop(time_key, None) is not None:
+                        removed_count += 1
+                
+                # Clear the user's key tracking
+                del _user_cache_keys[user_id]
+                
+                logging.info(f"Cleared {removed_count} cache entries for user: {user_id}")
+            else:
+                logging.info(f"No cache entries found for user: {user_id}")
         else:
+            cache_count = len(_user_cases_cache)
             _user_cases_cache.clear()
-            logging.info("Cleared all cached user cases data")
+            _user_cache_keys.clear()
+            logging.info(f"Cleared all cached user cases data ({cache_count} entries)")
 
 def _rewarm_user_cases_cache_background(user_id: str):
     """
@@ -250,7 +278,7 @@ def _get_user_cases_optimized(cursor, user_id, status_list, max_case_status):
         result.append(case_data)
     
     # Cache the result before returning
-    _cache_user_cases_data(cache_key, result)
+    _cache_user_cases_data(cache_key, result, user_id)
     
     return result
 

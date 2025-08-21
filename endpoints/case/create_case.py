@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-20 22:39:26
+# Last Modified: 2025-08-21 02:30:35
 # Author: Scott Cadreau
 
 # endpoints/case/create_case.py
@@ -202,32 +202,51 @@ def add_case(case: CaseCreate, request: Request):
         # Record successful case creation before commit
         business_metrics.record_case_operation("create", "success", case.case_id)
         
+        # Clear caches BEFORE commit to prevent race conditions
+        logger.info(f"🔄 STARTING cache invalidation for case creation: {case.case_id}")
+        try:
+            # 1. Clear global cases cache (affects admin dashboard) - but don't re-warm yet
+            from endpoints.backoffice.get_cases_by_status import clear_cases_cache
+            clear_cases_cache()  # Clear all cached data
+            logger.info(f"✅ CLEARED global cases cache before commit for case creation: {case.case_id}")
+            
+            # 2. Clear user cases cache - but don't re-warm yet
+            from endpoints.case.filter_cases import clear_user_cases_cache
+            clear_user_cases_cache(case.user_id)  # Clear all cache entries for this user
+            logger.info(f"✅ CLEARED user cases cache for user: {case.user_id}")
+            
+        except Exception as e:
+            # Don't fail the main operation if cache invalidation fails
+            logger.error(f"❌ Failed to invalidate caches before commit for case creation {case.case_id}: {str(e)}", exc_info=True)
+        
         # Commit all changes at once
         conn.commit()
+        logger.info(f"✅ COMMITTED database changes for case creation: {case.case_id}")
         
-        # Invalidate and re-warm caches after successful case creation
+        # Re-warm caches after successful commit
         try:
-            # 1. Clear and re-warm global cases cache (affects admin dashboard)
-            from endpoints.backoffice.get_cases_by_status import clear_cases_cache, warm_cases_cache
-            clear_cases_cache()  # Clear all cached data
-            logger.info(f"Cleared global cases cache after case creation: {case.case_id}")
-            
-            # Spawn background thread to re-warm global cache
+            # Re-warm global cases cache in background
+            from endpoints.backoffice.get_cases_by_status import warm_cases_cache
             threading.Thread(
                 target=warm_cases_cache,
                 daemon=True,
                 name="create_case_cache_rewarm_global"
             ).start()
-            logger.info("Started background re-warming of global cases cache")
+            logger.info(f"🔄 Started background re-warming of global cases cache after case creation: {case.case_id}")
             
-            # 2. Invalidate and re-warm user cases cache
-            from endpoints.case.filter_cases import invalidate_and_rewarm_user_cache
-            invalidate_and_rewarm_user_cache(case.user_id)
-            logger.debug(f"Invalidated and re-warmed cache for user: {case.user_id}")
+            # Re-warm user cache
+            from endpoints.case.filter_cases import _rewarm_user_cases_cache_background
+            threading.Thread(
+                target=_rewarm_user_cases_cache_background,
+                args=(case.user_id,),
+                daemon=True,
+                name=f"create_case_cache_rewarm_user_{case.user_id}"
+            ).start()
+            logger.info(f"🔄 Started background re-warming of user cases cache for user: {case.user_id}")
             
         except Exception as e:
-            # Don't fail the main operation if cache invalidation fails
-            logging.error(f"Failed to invalidate caches after case creation {case.case_id}: {str(e)}")
+            # Don't fail the main operation if cache re-warming fails
+            logger.error(f"❌ Failed to re-warm caches after case creation {case.case_id}: {str(e)}", exc_info=True)
         
         response_status = 201
         response_data = {
