@@ -1,5 +1,5 @@
 # Created: 2025-07-24 17:54:30
-# Last Modified: 2025-08-21 17:52:02
+# Last Modified: 2025-08-21 18:04:37
 # Author: Scott Cadreau
 
 # endpoints/utility/get_user_environment.py
@@ -441,6 +441,21 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
         cached_result = _get_cached_user_environment(cache_key)
         if cached_result is not None:
             logging.debug(f"Returning cached user environment data for user: {user_id}")
+            
+            # Calculate execution time for cache hit
+            execution_time_ms = int((time.time() - start_time) * 1000)
+            
+            # Log request details for cached response
+            from endpoints.utility.log_request import log_request_from_endpoint
+            log_request_from_endpoint(
+                request=request,
+                execution_time_ms=execution_time_ms,
+                response_status=200,
+                user_id=user_id,
+                response_data=cached_result,
+                error_message=None
+            )
+            
             return cached_result
 
         # Cache miss - proceed with database queries
