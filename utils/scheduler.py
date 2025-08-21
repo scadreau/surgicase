@@ -1,5 +1,5 @@
 # Created: 2025-01-15
-# Last Modified: 2025-08-20 10:24:32
+# Last Modified: 2025-08-21 18:22:49
 # Author: Scott Cadreau
 
 import schedule
@@ -530,6 +530,34 @@ def secrets_warming_job():
     except Exception as e:
         logger.error(f"❌ Error in secrets warming job: {str(e)}")
 
+def user_environment_cache_warming_job():
+    """
+    Scheduled function to refresh the user environment cache.
+    
+    This function:
+    1. Pre-loads all active users' environment data to prevent cache misses
+    2. Refreshes user caches before they expire (proactive warming)
+    3. Eliminates database query latency during normal operations
+    4. Logs warming statistics and any failures
+    """
+    logger.info("🔥 Starting scheduled user environment cache warming...")
+    
+    try:
+        from endpoints.utility.get_user_environment import warm_all_user_environment_caches
+        
+        results = warm_all_user_environment_caches()
+        
+        if results.get("error"):
+            logger.error(f"❌ User environment cache warming failed: {results['error']}")
+        elif results["failed_warms"] == 0:
+            logger.info(f"✅ User environment cache warming completed: {results['successful_warms']} users refreshed in {results['execution_time_seconds']}s")
+        else:
+            logger.warning(f"⚠️ User environment cache warming partial: {results['successful_warms']}/{results['total_users']} users refreshed")
+            logger.warning(f"   Duration: {results['execution_time_seconds']}s, Failed: {results['failed_warms']}")
+                    
+    except Exception as e:
+        logger.error(f"❌ Error in user environment cache warming job: {str(e)}")
+
 def setup_weekly_scheduler(scheduler_role: str = "leader"):
     """
     Set up the scheduler based on server role.
@@ -566,6 +594,7 @@ def setup_weekly_scheduler(scheduler_role: str = "leader"):
     schedule.every().day.at("10:30").do(pool_prewarm_job)  # Pre-warm pool before business hours
     schedule.every().day.at("17:00").do(pool_stats_job)  # Log pool stats
     schedule.every(30).minutes.do(secrets_warming_job)  # Refresh secrets cache every 30 minutes
+    schedule.every(6).hours.do(user_environment_cache_warming_job)  # Refresh user environment cache every 6 hours
     
     # Schedule business operations only on leader server
     if scheduler_role.lower() == "leader":
@@ -586,6 +615,7 @@ def setup_weekly_scheduler(scheduler_role: str = "leader"):
     logger.info("    - Pool pre-warming: Daily at 10:30 UTC")
     logger.info("    - Pool statistics: Daily at 17:00 UTC")
     logger.info("    - Secrets cache warming: Every 30 minutes")
+    logger.info("    - User environment cache warming: Every 6 hours")
     
     # Log business operations only for leader
     if scheduler_role.lower() == "leader":

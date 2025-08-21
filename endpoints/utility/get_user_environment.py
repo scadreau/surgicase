@@ -1,5 +1,5 @@
 # Created: 2025-07-24 17:54:30
-# Last Modified: 2025-08-21 18:04:37
+# Last Modified: 2025-08-21 18:31:52
 # Author: Scott Cadreau
 
 # endpoints/utility/get_user_environment.py
@@ -101,6 +101,215 @@ def invalidate_and_rewarm_user_environment_cache(user_id: str):
     clear_user_environment_cache(user_id)
     
     logging.info(f"Initiated cache invalidation for user environment: {user_id}")
+
+def _warm_single_user_environment_cache(user_id: str) -> bool:
+    """
+    Warm cache for a single user by fetching their environment data.
+    
+    Args:
+        user_id: The user ID to warm cache for
+        
+    Returns:
+        bool: True if successful, False if failed
+    """
+    try:
+        conn = get_db_connection()
+        
+        try:
+            # Get user profile information
+            user_profile = get_user_profile_info(user_id, conn)
+            
+            if not user_profile:
+                logging.debug(f"Skipping cache warming for inactive user: {user_id}")
+                return False
+
+            user_type = user_profile.get("user_type", 0)
+            max_case_status = user_profile.get("max_case_status", 20)
+            
+            # Get case statuses based on user permissions
+            case_status_info = get_case_statuses_for_user(user_id, user_type, max_case_status, conn)
+            
+            # Get surgeon and facility lists for the user
+            surgeons = get_user_surgeons(user_id, conn)
+            facilities = get_user_facilities(user_id, conn)
+            
+            # Get available user types for the user
+            available_user_types = get_available_user_types(user_type, conn)
+            
+            # Find max_case_status_desc from the case_statuses array
+            max_case_status_desc = None
+            for case_status in case_status_info["case_statuses"]:
+                if case_status["case_status"] == max_case_status:
+                    max_case_status_desc = case_status["case_status_desc"]
+                    break
+            
+            # Build response data (same structure as main endpoint)
+            response_data = {
+                "user_profile": user_profile,
+                "case_statuses": case_status_info["case_statuses"],
+                "surgeons": surgeons,
+                "facilities": facilities,
+                "user_types": available_user_types,
+                "permissions": {
+                    "user_type": user_type,
+                    "user_type_desc": user_profile.get("user_type_desc"),
+                    "case_status_access_level": case_status_info["access_level"],
+                    "max_case_status": user_profile.get("max_case_status", 20),
+                    "max_case_status_desc": max_case_status_desc,
+                    "can_access_all_cases": user_type >= 10,
+                    "can_access_backoffice": user_type >= 10
+                },
+                "environment_info": {
+                    "user_id": user_id,
+                    "case_statuses_count": case_status_info["total_count"],
+                    "has_documents": len(user_profile.get("documents", [])) > 0,
+                    "document_count": len(user_profile.get("documents", [])),
+                    "surgeon_count": len(surgeons),
+                    "facility_count": len(facilities),
+                    "user_types_count": len(available_user_types),
+                    "last_login_updated": False  # Don't update login time during warming
+                }
+            }
+            
+            # Cache the result
+            cache_key = _generate_user_environment_cache_key(user_id)
+            _cache_user_environment_data(cache_key, response_data, user_id)
+            
+            logging.debug(f"Successfully warmed cache for user: {user_id}")
+            return True
+            
+        finally:
+            close_db_connection(conn)
+            
+    except Exception as e:
+        logging.error(f"Failed to warm cache for user {user_id}: {str(e)}")
+        return False
+
+def warm_all_user_environment_caches() -> dict:
+    """
+    Warm user environment cache for all active users.
+    
+    This function is called on server startup and by scheduled jobs to pre-populate
+    the cache with all active users' environment data, ensuring fast response times
+    for all users without the "first request penalty".
+    
+    Returns:
+        dict: Summary of warming operation including success/failure counts
+    """
+    start_time = time.time()
+    logging.info("🔥 Starting user environment cache warming for all active users")
+    
+    try:
+        conn = get_db_connection()
+        
+        try:
+            # Get all active users sorted by last login (most recent first for priority warming)
+            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                cursor.execute("""
+                    SELECT user_id FROM user_profile 
+                    WHERE active = 1 
+                    ORDER BY last_login_dt DESC, user_id
+                """)
+                active_users = cursor.fetchall()
+            
+            total_users = len(active_users)
+            successful_warms = 0
+            failed_warms = 0
+            
+            logging.info(f"Found {total_users} active users to warm (sorted by last login, most recent first)")
+            
+            # Warm cache for each user with rate limiting (15 users/second)
+            for i, user_data in enumerate(active_users):
+                user_id = user_data['user_id']
+                
+                # Rate limiting: 15 users per second = 1/15 = 0.0667 seconds between users
+                if i > 0:  # Don't sleep before the first user
+                    time.sleep(1.0 / 15.0)  # 15 users per second
+                
+                if _warm_single_user_environment_cache(user_id):
+                    successful_warms += 1
+                else:
+                    failed_warms += 1
+                
+                # Log progress every 50 users
+                if (i + 1) % 50 == 0:
+                    elapsed = time.time() - start_time
+                    logging.info(f"🔥 Progress: {i + 1}/{total_users} users warmed in {elapsed:.1f}s (rate: {(i + 1)/elapsed:.1f} users/sec)")
+            
+            execution_time = time.time() - start_time
+            
+            result = {
+                "total_users": total_users,
+                "successful_warms": successful_warms,
+                "failed_warms": failed_warms,
+                "execution_time_seconds": round(execution_time, 2),
+                "cache_entries": len(_user_environment_cache) // 2  # Divide by 2 because we store data + time keys
+            }
+            
+            logging.info(
+                f"🔥 Cache warming completed: {successful_warms}/{total_users} users warmed "
+                f"in {result['execution_time_seconds']}s, {failed_warms} failures, "
+                f"{result['cache_entries']} cache entries"
+            )
+            
+            return result
+            
+        finally:
+            close_db_connection(conn)
+            
+    except Exception as e:
+        execution_time = time.time() - start_time
+        error_msg = f"Cache warming failed after {execution_time:.2f}s: {str(e)}"
+        logging.error(error_msg)
+        return {
+            "total_users": 0,
+            "successful_warms": 0,
+            "failed_warms": 0,
+            "execution_time_seconds": round(execution_time, 2),
+            "error": str(e)
+        }
+
+def warm_user_environment_cache_background():
+    """
+    Background thread function to warm user environment cache without blocking server startup.
+    
+    This function runs in a separate thread to ensure server startup is not delayed by cache warming.
+    It warms users in priority order (most recent login first) with rate limiting to prevent
+    database overload.
+    """
+    try:
+        logging.info("🔥 Starting background user environment cache warming thread...")
+        results = warm_all_user_environment_caches()
+        
+        if results.get("error"):
+            logging.error(f"❌ Background cache warming failed: {results['error']}")
+        else:
+            logging.info(
+                f"✅ Background cache warming completed: {results['successful_warms']}/{results['total_users']} users warmed "
+                f"in {results['execution_time_seconds']}s ({results['cache_entries']} cache entries)"
+            )
+    except Exception as e:
+        logging.error(f"❌ Background cache warming thread failed: {str(e)}")
+
+def start_background_cache_warming():
+    """
+    Start user environment cache warming in a background thread.
+    
+    This function is called during server startup to begin cache warming without
+    blocking the server initialization. The warming happens asynchronously while
+    the server becomes available to handle requests.
+    
+    Returns:
+        threading.Thread: The background warming thread (for monitoring if needed)
+    """
+    warming_thread = threading.Thread(
+        target=warm_user_environment_cache_background,
+        daemon=True,
+        name="user_env_cache_warming"
+    )
+    warming_thread.start()
+    logging.info("🔥 Started background user environment cache warming thread")
+    return warming_thread
 
 def get_user_profile_info(user_id: str, conn) -> dict:
     """

@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-20 12:20:41
+# Last Modified: 2025-08-21 18:31:52
 # Author: Scott Cadreau
 
 # main.py
@@ -163,6 +163,17 @@ try:
 except Exception as e:
     logger.error(f"Failed to warm secrets cache: {str(e)}")
     logger.warning("Application will continue with on-demand secret loading")
+
+# Warm user environment cache on startup for optimal performance (non-blocking)
+# Starts background thread to pre-load all active users' environment data
+# Server becomes available immediately while cache warming happens in background
+try:
+    from endpoints.utility.get_user_environment import start_background_cache_warming
+    warming_thread = start_background_cache_warming()
+    logger.info("🔥 User environment cache warming started in background thread (non-blocking)")
+except Exception as e:
+    logger.error(f"Failed to start user environment cache warming: {str(e)}")
+    logger.warning("Application will continue with on-demand user environment loading")
 
 # Warm database connection pool on startup for optimal performance
 # Pre-creates database connections to eliminate first-request latency
