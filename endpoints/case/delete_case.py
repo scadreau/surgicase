@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-06 15:15:22
+# Last Modified: 2025-08-21 17:39:01
 # Author: Scott Cadreau
 
 # endpoints/case/delete_case.py
@@ -133,6 +133,7 @@ def delete_case(request: Request, case_id: str = Query(..., description="The cas
     response_status = 200
     response_data = None
     error_message = None
+    user_id = None  # Initialize user_id for logging
     
     try:
         if not case_id:
@@ -145,8 +146,8 @@ def delete_case(request: Request, case_id: str = Query(..., description="The cas
         print("INFO: Database connection established successfully")
 
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-            # First check if case exists and get current status
-            cursor.execute("""SELECT case_id, active FROM cases WHERE case_id = %s""", (case_id,))
+            # First check if case exists and get current status and user_id for cache invalidation
+            cursor.execute("""SELECT case_id, active, user_id FROM cases WHERE case_id = %s""", (case_id,))
             case_data = cursor.fetchone()
 
             if not case_data:
@@ -197,11 +198,60 @@ def delete_case(request: Request, case_id: str = Query(..., description="The cas
 
             print(f"SUCCESS: Case soft deleted (deactivated) - case_id: {case_id}, rows affected: {cursor.rowcount}")
 
+            # Clear caches BEFORE commit to prevent race conditions
+            user_id = case_data.get('user_id') if case_data else None
+            print(f"🔄 STARTING cache invalidation for case deletion: {case_id}")
+            try:
+                # 1. Clear global cases cache (affects admin dashboard) - but don't re-warm yet
+                from endpoints.backoffice.get_cases_by_status import clear_cases_cache
+                clear_cases_cache()  # Clear all cached data
+                print(f"✅ CLEARED global cases cache before commit for case deletion: {case_id}")
+                
+                # 2. Clear user cases cache - but don't re-warm yet
+                if user_id:
+                    from endpoints.case.filter_cases import clear_user_cases_cache
+                    clear_user_cases_cache(user_id)  # Clear all cache entries for this user
+                    print(f"✅ CLEARED user cases cache for user: {user_id}")
+                else:
+                    print(f"⚠️ Could not determine user_id for cache invalidation, case: {case_id}")
+                    
+            except Exception as e:
+                # Don't fail the main operation if cache invalidation fails
+                print(f"❌ Failed to invalidate caches before commit for case deletion {case_id}: {str(e)}")
+
             # Commit the transaction
             conn.commit()
+            print(f"✅ COMMITTED database changes for case deletion: {case_id}")
             
             # Record successful case deletion
             business_metrics.record_case_operation("delete", "success", case_id)
+
+            # Re-warm caches after successful deletion
+            try:
+                # Re-warm global cases cache in background
+                from endpoints.backoffice.get_cases_by_status import warm_cases_cache
+                import threading
+                threading.Thread(
+                    target=warm_cases_cache,
+                    daemon=True,
+                    name="delete_case_cache_rewarm_global"
+                ).start()
+                print(f"🔄 Started background re-warming of global cases cache after case deletion: {case_id}")
+                
+                # Re-warm user cache if we have a user_id
+                if user_id:
+                    from endpoints.case.filter_cases import _rewarm_user_cases_cache_background
+                    threading.Thread(
+                        target=_rewarm_user_cases_cache_background,
+                        args=(user_id,),
+                        daemon=True,
+                        name=f"delete_case_cache_rewarm_user_{user_id}"
+                    ).start()
+                    print(f"🔄 Started background re-warming of user cases cache for user: {user_id}")
+                
+            except Exception as e:
+                # Don't fail the main operation if cache re-warming fails
+                print(f"❌ Failed to re-warm caches after case deletion {case_id}: {str(e)}")
 
             # Archive the deleted case
             # Note: This includes S3 file movement and will raise exceptions on failure
@@ -214,8 +264,31 @@ def delete_case(request: Request, case_id: str = Query(..., description="The cas
                 # Rollback the soft delete by setting active = 1
                 try:
                     cursor.execute("""UPDATE cases SET active = 1 WHERE case_id = %s""", (case_id,))
+                    
+                    # Clear caches again since we're restoring the case
+                    print(f"🔄 STARTING cache invalidation for case restoration: {case_id}")
+                    try:
+                        clear_cases_cache()  # Clear global cache again
+                        print(f"✅ CLEARED global cases cache for case restoration: {case_id}")
+                        
+                        if user_id:
+                            clear_user_cases_cache(user_id)  # Clear user cache again
+                            print(f"✅ CLEARED user cases cache for case restoration, user: {user_id}")
+                    except Exception as cache_error:
+                        print(f"❌ Failed to clear caches during case restoration {case_id}: {str(cache_error)}")
+                    
                     conn.commit()
                     print(f"INFO: Rolled back case soft delete due to archive failure - case_id: {case_id}")
+                    
+                    # Re-warm caches after restoration
+                    try:
+                        threading.Thread(target=warm_cases_cache, daemon=True, name="restore_case_cache_rewarm_global").start()
+                        if user_id:
+                            threading.Thread(target=_rewarm_user_cases_cache_background, args=(user_id,), daemon=True, name=f"restore_case_cache_rewarm_user_{user_id}").start()
+                        print(f"🔄 Started cache re-warming after case restoration: {case_id}")
+                    except Exception as rewarm_error:
+                        print(f"❌ Failed to re-warm caches after case restoration {case_id}: {str(rewarm_error)}")
+                        
                 except Exception as rollback_error:
                     print(f"CRITICAL: Failed to rollback case soft delete - case_id: {case_id}, error: {str(rollback_error)}")
                 
@@ -275,7 +348,7 @@ def delete_case(request: Request, case_id: str = Query(..., description="The cas
             request=request,
             execution_time_ms=execution_time_ms,
             response_status=response_status,
-            user_id=None,  # No user_id available in delete case endpoint
+            user_id=user_id,  # User ID from the deleted case
             response_data=response_data,
             error_message=error_message
         )
