@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-18 23:50:10
+# Last Modified: 2025-08-21 21:23:34
 # Author: Scott Cadreau
 
 # endpoints/user/create_user.py
@@ -8,6 +8,7 @@ import pymysql.cursors
 from core.database import get_db_connection, close_db_connection, is_connection_valid
 from core.models import UserCreate
 from utils.monitoring import track_business_operation, business_metrics
+from utils.text_formatting import capitalize_name_field
 import time
 
 router = APIRouter()
@@ -188,13 +189,23 @@ def add_user(request: Request, user: UserCreate):
                 error_message = "User already exists"
                 raise HTTPException(status_code=400, detail={"error": "User already exists", "user_id": user.user_id})
 
+            # Format names if they are all caps or all lowercase (preserve mixed case)
+            formatted_first_name = user.first_name
+            formatted_last_name = user.last_name
+            
+            if user.first_name and (user.first_name.isupper() or user.first_name.islower()):
+                formatted_first_name = capitalize_name_field(user.first_name)
+                
+            if user.last_name and (user.last_name.isupper() or user.last_name.islower()):
+                formatted_last_name = capitalize_name_field(user.last_name)
+
             # Insert new user
             cursor.execute("""
                 INSERT INTO user_profile (
                     user_id, user_email, first_name, last_name, addr1, addr2, city, state, zipcode, telephone, user_npi, referred_by_user, message_pref, states_licensed, timezone
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
-                user.user_id, user.user_email, user.first_name, user.last_name, user.addr1, user.addr2,
+                user.user_id, user.user_email, formatted_first_name, formatted_last_name, user.addr1, user.addr2,
                 user.city, user.state, user.zipcode, user.telephone, user.user_npi, user.referred_by_user, user.message_pref, user.states_licensed, user.timezone
             ))
             # Insert user documents if provided
@@ -217,8 +228,8 @@ def add_user(request: Request, user: UserCreate):
                 from utils.email_service import send_welcome_email
                 welcome_result = send_welcome_email(
                     user_email=user.user_email,
-                    first_name=user.first_name,
-                    last_name=user.last_name
+                    first_name=formatted_first_name,
+                    last_name=formatted_last_name
                 )
                 if welcome_result.get('success'):
                     print(f"Welcome email sent successfully to {user.user_email}")
@@ -237,13 +248,13 @@ def add_user(request: Request, user: UserCreate):
                 signup_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 
                 # Create email content
-                subject = f"New SurgiCase User Signup - {user.first_name} {user.last_name}"
+                subject = f"New SurgiCase User Signup - {formatted_first_name} {formatted_last_name}"
                 
                 body = f"""New SurgiCase user created:
 
 User Details:
 - Email: {user.user_email}
-- Name: {user.first_name} {user.last_name}
+- Name: {formatted_first_name} {formatted_last_name}
 - User ID: {user.user_id}
 - Signup Time: {signup_timestamp}
 
