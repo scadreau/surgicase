@@ -1,5 +1,5 @@
 # Created: 2025-08-14 17:39:43
-# Last Modified: 2025-08-22 06:01:41
+# Last Modified: 2025-08-22 06:04:58
 # Author: Scott Cadreau
 
 """
@@ -68,7 +68,7 @@ st.set_page_config(
 )
 
 # Constants
-EC2_INSTANCE_ID = "i-099fb57644b0c33ba"
+EC2_INSTANCE_ID = "i-089794865fce8cb91"
 INSTANCE_TYPE = "m8g.8xlarge"
 INSTANCE_SPECS = "32 vCPUs, 128GB RAM"
 
@@ -151,11 +151,11 @@ def display_current_metrics():
     with col2:
         memory_value = float(current_data['memory_utilization_percent']) if current_data['memory_utilization_percent'] else 0
         memory_emoji = get_status_emoji(memory_value)
-        memory_gb = (memory_value / 100) * 32  # 32GB total
+        memory_gb = (memory_value / 100) * 128  # 32GB total
         st.metric(
             "Memory Usage", 
             f"{memory_value:.1f}%", 
-            f"{memory_gb:.1f}GB / 32GB",
+            f"{memory_gb:.1f}GB / 128GB",
             help=f"Current memory utilization {memory_emoji}"
         )
     
