@@ -1,5 +1,5 @@
 # Created: 2025-08-14 17:39:43
-# Last Modified: 2025-08-14 17:51:12
+# Last Modified: 2025-08-22 05:58:15
 # Author: Scott Cadreau
 
 """
@@ -69,7 +69,7 @@ st.set_page_config(
 
 # Constants
 EC2_INSTANCE_ID = "i-099fb57644b0c33ba"
-INSTANCE_TYPE = "m8g.2xlarge"
+INSTANCE_TYPE = "m8g.8xlarge"
 INSTANCE_SPECS = "8 vCPUs, 32GB RAM"
 
 def format_bytes(bytes_value):
