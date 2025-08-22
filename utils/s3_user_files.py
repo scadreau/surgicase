@@ -1,5 +1,5 @@
 # Created: 2025-07-22 18:53:59
-# Last Modified: 2025-08-20 08:38:53
+# Last Modified: 2025-08-22 01:40:18
 # Author: Scott Cadreau
 
 # utils/s3_user_files.py
@@ -189,6 +189,24 @@ def move_user_documents_to_deleted(
         successful_moves = 0
         
         for document_type, document_name in user_documents:
+            # Skip documents with empty or null filenames
+            if not document_name or document_name.strip() == '':
+                logger.warning(f"Skipping document with empty filename - document_type: {document_type}, user_id: {user_id}")
+                results.append({
+                    "document_type": document_type,
+                    "document_name": document_name,
+                    "source_key": "N/A - empty filename",
+                    "dest_key": "N/A - empty filename",
+                    "result": {
+                        "success": True,
+                        "message": "Skipped document with empty filename",
+                        "source_key": "N/A",
+                        "dest_key": "N/A"
+                    }
+                })
+                successful_moves += 1  # Count as successful since we're intentionally skipping
+                continue
+            
             # Since document_name contains the full path, we need to handle it properly
             # If it starts with a prefix, use it as is, otherwise construct the path
             if document_name.startswith('private/') or document_name.startswith('/'):
@@ -196,6 +214,23 @@ def move_user_documents_to_deleted(
                 source_key = document_name.lstrip('/')  # Remove leading slash if present
                 # Extract just the filename for destination
                 filename = document_name.split('/')[-1]
+                # Additional check for empty filename after path extraction
+                if not filename or filename.strip() == '':
+                    logger.warning(f"Skipping document with empty filename after path extraction - document_type: {document_type}, user_id: {user_id}, path: {document_name}")
+                    results.append({
+                        "document_type": document_type,
+                        "document_name": document_name,
+                        "source_key": source_key,
+                        "dest_key": "N/A - empty filename",
+                        "result": {
+                            "success": True,
+                            "message": "Skipped document with empty filename after path extraction",
+                            "source_key": source_key,
+                            "dest_key": "N/A"
+                        }
+                    })
+                    successful_moves += 1  # Count as successful since we're intentionally skipping
+                    continue
                 dest_key = f"{dest_prefix}{user_id}/{filename}"
             else:
                 # Document name is just a filename, construct full paths
