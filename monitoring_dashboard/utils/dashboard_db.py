@@ -1,5 +1,5 @@
 # Created: 2025-08-14 17:37:31
-# Last Modified: 2025-08-22 06:26:51
+# Last Modified: 2025-08-22 09:10:00
 # Author: Scott Cadreau
 
 """
@@ -15,8 +15,10 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Tuple
 import logging
 
-# Add parent directory to path to import core modules
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+# Ensure project root is first on sys.path to resolve top-level packages like `core` and `utils`
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 from core.database import get_db_connection, close_db_connection
 

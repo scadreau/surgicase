@@ -1,5 +1,5 @@
 # Created: 2025-08-14 17:39:43
-# Last Modified: 2025-08-22 06:28:52
+# Last Modified: 2025-08-22 09:08:46
 # Author: Scott Cadreau
 
 """
@@ -33,11 +33,6 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PARENT_DIR = os.path.dirname(BASE_DIR)
 if PARENT_DIR not in sys.path:
     sys.path.insert(0, PARENT_DIR)
-if BASE_DIR not in sys.path:
-    sys.path.insert(0, BASE_DIR)
-UTILS_DIR = os.path.join(BASE_DIR, 'utils')
-if UTILS_DIR not in sys.path:
-    sys.path.insert(0, UTILS_DIR)
 
 # Import dashboard utilities with fallbacks
 try:
@@ -60,8 +55,8 @@ try:
     )
 except ImportError:
     try:
-        # Fallback: package-local import when running inside the directory
-        from utils.dashboard_db import (
+        # Last resort: direct import from the current directory
+        from dashboard_db import (  # type: ignore[reportMissingImports]
             get_latest_monitoring_data,
             get_monitoring_data_by_hours,
             get_monitoring_summary_stats,
@@ -69,7 +64,7 @@ except ImportError:
             get_hourly_aggregated_data,
             get_system_health_score
         )
-        from utils.dashboard_charts import (
+        from dashboard_charts import (  # type: ignore[reportMissingImports]
             create_cpu_timeline_chart,
             create_memory_timeline_chart,
             create_network_io_chart,
@@ -77,29 +72,10 @@ except ImportError:
             create_system_overview_chart,
             create_combined_metrics_chart
         )
-    except ImportError as e2:
-        try:
-            # Last resort: direct import from utils directory on sys.path
-            from dashboard_db import (  # type: ignore[reportMissingImports]
-                get_latest_monitoring_data,
-                get_monitoring_data_by_hours,
-                get_monitoring_summary_stats,
-                get_recent_alerts,
-                get_hourly_aggregated_data,
-                get_system_health_score
-            )
-            from dashboard_charts import (  # type: ignore[reportMissingImports]
-                create_cpu_timeline_chart,
-                create_memory_timeline_chart,
-                create_network_io_chart,
-                create_disk_io_chart,
-                create_system_overview_chart,
-                create_combined_metrics_chart
-            )
-        except ImportError as e3:
-            st.error(f"Failed to import dashboard utilities: {e3}")
-            st.error("Please ensure you're running the dashboard from the correct directory.")
-            st.stop()
+    except ImportError as e3:
+        st.error(f"Failed to import dashboard utilities: {e3}")
+        st.error("Please ensure you're running the dashboard from the correct directory.")
+        st.stop()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
