@@ -1,5 +1,5 @@
 # Created: 2025-08-14 15:55:28
-# Last Modified: 2025-08-14 16:35:37
+# Last Modified: 2025-08-22 06:34:31
 # Author: Scott Cadreau
 
 """
@@ -18,9 +18,7 @@ The script will:
 4. Handle errors gracefully and log them for troubleshooting
 
 EC2 Instance Details:
-- Instance ID: i-099fb57644b0c33ba
-- Instance Type: m8g.2xlarge (8 vCPUs, 32 GB RAM)
-- Expected to handle ~100 new users next week
+- Multiple instances supported. Configure INSTANCE_IDS below.
 """
 
 import boto3
@@ -50,7 +48,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Configuration
-EC2_INSTANCE_ID = "i-099fb57644b0c33ba"
+# Support monitoring multiple instances in one run
+INSTANCE_IDS = [
+    "i-089794865fce8cb91",  # m8g.8xlarge (32 vCPUs, 128GB RAM)
+#    "i-099fb57644b0c33ba",  # legacy instance
+]
 AWS_REGION = "us-east-1"  # Update if your instance is in a different region
 METRICS_PERIOD = 300  # 5 minutes (CloudWatch minimum for detailed monitoring)
 DB_NAME = "allstars"
@@ -476,7 +478,7 @@ def print_instance_info(monitor: EC2Monitor):
     else:
         print(f"Could not retrieve information for instance {monitor.instance_id}")
 
-def print_latest_metrics():
+def print_latest_metrics(instance_id: str):
     """
     Print the latest metrics from the database.
     """
@@ -491,13 +493,13 @@ def print_latest_metrics():
                 WHERE instance_id = %s
                 ORDER BY timestamp DESC 
                 LIMIT 5
-            """, (EC2_INSTANCE_ID,))
+            """, (instance_id,))
             
             results = cursor.fetchall()
             
             if results:
                 print("\n" + "="*100)
-                print("LATEST MONITORING RESULTS")
+                print(f"LATEST MONITORING RESULTS FOR {instance_id}")
                 print("="*100)
                 print(f"{'Timestamp':<20} {'CPU %':<8} {'Mem %':<8} {'Net In':<10} {'Net Out':<10} {'Disk Read':<12} {'Disk Write':<12} {'Notes':<15}")
                 print("-"*100)
@@ -538,34 +540,36 @@ def main():
     """
     Main function to run the EC2 monitoring script.
     """
-    print(f"Starting EC2 monitoring for instance {EC2_INSTANCE_ID}")
+    print(f"Starting EC2 monitoring for instances: {', '.join(INSTANCE_IDS)}")
     print(f"Monitoring will run every minute and log to database '{DB_NAME}'")
     
     try:
-        # Initialize monitor
-        monitor = EC2Monitor(EC2_INSTANCE_ID, AWS_REGION)
-        
-        # Print instance information
-        print_instance_info(monitor)
-        
-        # Run monitoring cycle
-        success = monitor.run_monitoring_cycle()
-        
-        if success:
-            print("\n✅ Monitoring cycle completed successfully!")
-            print("📊 Checking latest metrics...")
-            print_latest_metrics()
+        overall_success = True
+        for instance_id in INSTANCE_IDS:
+            # Initialize monitor per instance
+            monitor = EC2Monitor(instance_id, AWS_REGION)
             
-            print("\n📝 To run this script every minute, add this to your crontab:")
-            print(f"* * * * * cd /home/scadreau/surgicase && python tests/ec2_monitoring_script.py >> tests/ec2_monitoring_cron.log 2>&1")
+            # Print instance information
+            print_instance_info(monitor)
             
-            print("\n📈 Monitor your server at:")
-            print("- CPU and Memory usage will be tracked in the 'ec2_monitoring' table")
-            print("- Check logs at: /home/scadreau/surgicase/tests/ec2_monitoring.log")
-            print("- For m8g.2xlarge: 8 vCPUs, 32GB RAM - should handle 100+ users easily")
+            # Run monitoring cycle
+            success = monitor.run_monitoring_cycle()
+            overall_success = overall_success and success
             
-        else:
-            print("\n❌ Monitoring cycle failed. Check logs for details.")
+            if success:
+                print("\n✅ Monitoring cycle completed successfully!")
+                print("📊 Checking latest metrics...")
+                print_latest_metrics(instance_id)
+            else:
+                print(f"\n❌ Monitoring cycle failed for {instance_id}. Check logs for details.")
+
+        print("\n📝 To run this script every minute, add this to your crontab:")
+        print(f"* * * * * cd /home/scadreau/surgicase && python tests/ec2_monitoring_script.py >> tests/ec2_monitoring_cron.log 2>&1")
+        
+        print("\n📈 Monitor your server at:")
+        print("- CPU and Memory usage will be tracked in the 'ec2_monitoring' table")
+        print("- Check logs at: /home/scadreau/surgicase/tests/ec2_monitoring.log")
+        print("- m8g.8xlarge: 32 vCPUs, 128GB RAM; legacy instance remains available")
             
     except Exception as e:
         logger.error(f"Failed to run monitoring script: {str(e)}")

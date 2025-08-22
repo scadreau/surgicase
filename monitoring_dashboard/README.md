@@ -1,6 +1,6 @@
 # EC2 Monitoring Dashboard
 
-A Streamlit-based real-time monitoring dashboard for the SurgiCase primary API server (EC2 instance `i-099fb57644b0c33ba`).
+A Streamlit-based real-time monitoring dashboard for the SurgiCase primary API server (EC2 instance `i-089794865fce8cb91`).
 
 ## Overview
 
@@ -112,7 +112,7 @@ monitoring_dashboard/
 - **Current baseline**: ~1% CPU, ~8% memory
 - **Expected with 100 users**: ~15-30% CPU, ~40-60% memory
 - **Safety margins**: CPU <70%, Memory <80%
-- **m8g.2xlarge capacity**: 8 vCPUs, 32GB RAM
+- **m8g.8xlarge capacity**: 32 vCPUs, 128GB RAM
 
 ## Troubleshooting
 

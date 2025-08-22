@@ -1,5 +1,5 @@
 # Created: 2025-08-14 17:39:43
-# Last Modified: 2025-08-22 06:04:58
+# Last Modified: 2025-08-22 06:28:52
 # Author: Scott Cadreau
 
 """
@@ -28,13 +28,21 @@ from datetime import datetime, timedelta
 import time
 import logging
 
-# Add utils directory to path
-utils_path = os.path.join(os.path.dirname(__file__), 'utils')
-sys.path.insert(0, utils_path)
+# Ensure imports resolve in various run contexts (Streamlit, direct, module)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PARENT_DIR = os.path.dirname(BASE_DIR)
+if PARENT_DIR not in sys.path:
+    sys.path.insert(0, PARENT_DIR)
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+UTILS_DIR = os.path.join(BASE_DIR, 'utils')
+if UTILS_DIR not in sys.path:
+    sys.path.insert(0, UTILS_DIR)
 
-# Import dashboard utilities
+# Import dashboard utilities with fallbacks
 try:
-    from dashboard_db import (
+    # Preferred: absolute import when project root is on sys.path
+    from monitoring_dashboard.utils.dashboard_db import (
         get_latest_monitoring_data,
         get_monitoring_data_by_hours,
         get_monitoring_summary_stats,
@@ -42,7 +50,7 @@ try:
         get_hourly_aggregated_data,
         get_system_health_score
     )
-    from dashboard_charts import (
+    from monitoring_dashboard.utils.dashboard_charts import (
         create_cpu_timeline_chart,
         create_memory_timeline_chart,
         create_network_io_chart,
@@ -50,10 +58,48 @@ try:
         create_system_overview_chart,
         create_combined_metrics_chart
     )
-except ImportError as e:
-    st.error(f"Failed to import dashboard utilities: {e}")
-    st.error("Please ensure you're running the dashboard from the correct directory.")
-    st.stop()
+except ImportError:
+    try:
+        # Fallback: package-local import when running inside the directory
+        from utils.dashboard_db import (
+            get_latest_monitoring_data,
+            get_monitoring_data_by_hours,
+            get_monitoring_summary_stats,
+            get_recent_alerts,
+            get_hourly_aggregated_data,
+            get_system_health_score
+        )
+        from utils.dashboard_charts import (
+            create_cpu_timeline_chart,
+            create_memory_timeline_chart,
+            create_network_io_chart,
+            create_disk_io_chart,
+            create_system_overview_chart,
+            create_combined_metrics_chart
+        )
+    except ImportError as e2:
+        try:
+            # Last resort: direct import from utils directory on sys.path
+            from dashboard_db import (  # type: ignore[reportMissingImports]
+                get_latest_monitoring_data,
+                get_monitoring_data_by_hours,
+                get_monitoring_summary_stats,
+                get_recent_alerts,
+                get_hourly_aggregated_data,
+                get_system_health_score
+            )
+            from dashboard_charts import (  # type: ignore[reportMissingImports]
+                create_cpu_timeline_chart,
+                create_memory_timeline_chart,
+                create_network_io_chart,
+                create_disk_io_chart,
+                create_system_overview_chart,
+                create_combined_metrics_chart
+            )
+        except ImportError as e3:
+            st.error(f"Failed to import dashboard utilities: {e3}")
+            st.error("Please ensure you're running the dashboard from the correct directory.")
+            st.stop()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -71,6 +117,7 @@ st.set_page_config(
 EC2_INSTANCE_ID = "i-089794865fce8cb91"
 INSTANCE_TYPE = "m8g.8xlarge"
 INSTANCE_SPECS = "32 vCPUs, 128GB RAM"
+TOTAL_RAM_GB = 128
 
 def format_bytes(bytes_value):
     """Format bytes into human readable format."""
@@ -151,11 +198,11 @@ def display_current_metrics():
     with col2:
         memory_value = float(current_data['memory_utilization_percent']) if current_data['memory_utilization_percent'] else 0
         memory_emoji = get_status_emoji(memory_value)
-        memory_gb = (memory_value / 100) * 128  # 32GB total
+        memory_gb = (memory_value / 100) * TOTAL_RAM_GB  # 128GB total
         st.metric(
             "Memory Usage", 
             f"{memory_value:.1f}%", 
-            f"{memory_gb:.1f}GB / 128GB",
+            f"{memory_gb:.1f}GB / {TOTAL_RAM_GB}GB",
             help=f"Current memory utilization {memory_emoji}"
         )
     

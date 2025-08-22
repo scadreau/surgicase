@@ -1,5 +1,5 @@
 # Created: 2025-08-14 17:37:31
-# Last Modified: 2025-08-14 17:48:41
+# Last Modified: 2025-08-22 06:26:51
 # Author: Scott Cadreau
 
 """
@@ -24,7 +24,7 @@ from core.database import get_db_connection, close_db_connection
 logger = logging.getLogger(__name__)
 
 # Constants
-EC2_INSTANCE_ID = "i-099fb57644b0c33ba"
+EC2_INSTANCE_ID = "i-089794865fce8cb91"
 
 def get_latest_monitoring_data() -> Optional[Dict]:
     """
@@ -145,7 +145,7 @@ def get_monitoring_summary_stats(hours: int = 24) -> Dict:
                     MAX(memory_utilization_percent) as max_memory,
                     MIN(memory_utilization_percent) as min_memory,
                     COUNT(*) as total_records,
-                    SUM(CASE WHEN notes IS NOT NULL AND notes != '' THEN 1 ELSE 0 END) as alert_count
+                    COALESCE(SUM(CASE WHEN notes IS NOT NULL AND notes != '' THEN 1 ELSE 0 END), 0) as alert_count
                 FROM ec2_monitoring 
                 WHERE instance_id = %s
                   AND timestamp >= DATE_SUB(NOW(), INTERVAL %s HOUR)
@@ -155,14 +155,14 @@ def get_monitoring_summary_stats(hours: int = 24) -> Dict:
             
             if result:
                 return {
-                    'avg_cpu': round(float(result['avg_cpu']), 2) if result['avg_cpu'] else 0,
-                    'max_cpu': round(float(result['max_cpu']), 2) if result['max_cpu'] else 0,
-                    'min_cpu': round(float(result['min_cpu']), 2) if result['min_cpu'] else 0,
-                    'avg_memory': round(float(result['avg_memory']), 2) if result['avg_memory'] else 0,
-                    'max_memory': round(float(result['max_memory']), 2) if result['max_memory'] else 0,
-                    'min_memory': round(float(result['min_memory']), 2) if result['min_memory'] else 0,
-                    'total_records': int(result['total_records']),
-                    'alert_count': int(result['alert_count'])
+                    'avg_cpu': round(float(result['avg_cpu']), 2) if result['avg_cpu'] is not None else 0,
+                    'max_cpu': round(float(result['max_cpu']), 2) if result['max_cpu'] is not None else 0,
+                    'min_cpu': round(float(result['min_cpu']), 2) if result['min_cpu'] is not None else 0,
+                    'avg_memory': round(float(result['avg_memory']), 2) if result['avg_memory'] is not None else 0,
+                    'max_memory': round(float(result['max_memory']), 2) if result['max_memory'] is not None else 0,
+                    'min_memory': round(float(result['min_memory']), 2) if result['min_memory'] is not None else 0,
+                    'total_records': int(result['total_records'] or 0),
+                    'alert_count': int(result['alert_count'] or 0)
                 }
             else:
                 return {}
