@@ -1,5 +1,5 @@
 # Created: 2025-07-22 12:20:56
-# Last Modified: 2025-08-06 15:23:15
+# Last Modified: 2025-08-22 06:48:43
 # Author: Scott Cadreau
 
 # endpoints/backoffice/get_users.py
@@ -196,7 +196,7 @@ def get_users(request: Request, user_id: str = Query(..., description="The user 
                            telephone, user_npi, referred_by_user, user_type, message_pref, states_licensed, user_tier, create_ts, last_updated_ts
                     FROM user_profile 
                     WHERE active = 1 AND user_type <= %s
-                    ORDER BY last_name, first_name
+                    ORDER BY user_type, first_name, last_name
                 """, (requesting_user_type,))
                 users = cursor.fetchall()
 
