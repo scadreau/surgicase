@@ -1,5 +1,5 @@
 # Created: 2025-07-24 17:54:30
-# Last Modified: 2025-08-21 18:31:52
+# Last Modified: 2025-08-22 09:23:33
 # Author: Scott Cadreau
 
 # endpoints/utility/get_user_environment.py
@@ -40,12 +40,35 @@ def _get_cached_user_environment(cache_key: str):
     """Get cached user environment data if valid"""
     with _user_environment_cache_lock:
         if _is_user_environment_cache_valid(cache_key):
-            logging.debug(f"Returning cached user environment data: {cache_key}")
-            return _user_environment_cache[cache_key]
+            cached_data = _user_environment_cache[cache_key]
+            
+            # Validate that cached data is actually usable
+            if (cached_data is not None and 
+                isinstance(cached_data, dict) and 
+                cached_data.get("user_profile") is not None and
+                cached_data.get("case_statuses") is not None):
+                
+                logging.debug(f"Returning valid cached user environment data: {cache_key}")
+                return cached_data
+            else:
+                # Cache contains invalid data - remove it
+                logging.warning(f"Removing invalid cached data for key: {cache_key}, data type: {type(cached_data)}")
+                _user_environment_cache.pop(cache_key, None)
+                _user_environment_cache.pop(f"{cache_key}_time", None)
+                
     return None
 
 def _cache_user_environment_data(cache_key: str, data, user_id: str = None):
     """Cache the user environment data with timestamp and track user association"""
+    # Validate data before caching to prevent storing invalid/null data
+    if (data is None or 
+        not isinstance(data, dict) or 
+        data.get("user_profile") is None or
+        data.get("case_statuses") is None):
+        
+        logging.error(f"Refusing to cache invalid data for key: {cache_key}, data type: {type(data)}")
+        return False
+    
     with _user_environment_cache_lock:
         time_key = f"{cache_key}_time"
         _user_environment_cache[cache_key] = data
@@ -58,6 +81,7 @@ def _cache_user_environment_data(cache_key: str, data, user_id: str = None):
             _user_environment_cache_keys[user_id].add(cache_key)
         
         logging.debug(f"Successfully cached user environment data: {cache_key}")
+        return True
 
 def clear_user_environment_cache(user_id: str = None) -> None:
     """Clear cached user environment data - for future invalidation use"""
@@ -173,7 +197,9 @@ def _warm_single_user_environment_cache(user_id: str) -> bool:
             
             # Cache the result
             cache_key = _generate_user_environment_cache_key(user_id)
-            _cache_user_environment_data(cache_key, response_data, user_id)
+            cache_success = _cache_user_environment_data(cache_key, response_data, user_id)
+            if not cache_success:
+                logging.error(f"Failed to cache data during warming for user: {user_id}")
             
             logging.debug(f"Successfully warmed cache for user: {user_id}")
             return True
@@ -672,8 +698,15 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
 
         conn = get_db_connection()
         
-        # Get user profile information
+        # Get user profile information with additional error handling
         user_profile = get_user_profile_info(user_id, conn)
+        
+        # Additional validation: ensure we got valid user profile data
+        if user_profile is None:
+            logging.warning(f"get_user_profile_info returned None for user_id: {user_id}")
+        elif not isinstance(user_profile, dict):
+            logging.error(f"get_user_profile_info returned invalid data type for user_id: {user_id}, type: {type(user_profile)}")
+            user_profile = None
         
         if not user_profile:
             # Record failed access (user not found)
@@ -739,7 +772,9 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
         }
         
         # Cache the result before returning
-        _cache_user_environment_data(cache_key, response_data, user_id)
+        cache_success = _cache_user_environment_data(cache_key, response_data, user_id)
+        if not cache_success:
+            logging.error(f"Failed to cache response data for user: {user_id}")
         
         return response_data
         
