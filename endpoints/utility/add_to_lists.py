@@ -1,5 +1,5 @@
 # Created: 2025-08-12 17:16:24
-# Last Modified: 2025-08-14 20:08:55
+# Last Modified: 2025-08-23 00:25:08
 # Author: Scott Cadreau
 
 # endpoints/utility/add_to_lists.py
@@ -351,7 +351,7 @@ def add_case_status(request: Request, case_status_data: CaseStatusCreate):
                     "INSERT INTO case_status_list (case_status, case_status_desc) VALUES (%s, %s)",
                     (case_status_data.case_status, case_status_data.case_status_desc)
                 )
-                cursor.commit()
+                conn.commit()
                 
                 # Record successful case status creation
                 business_metrics.record_utility_operation("add_case_status", "success")
@@ -530,7 +530,7 @@ def add_user_doc_type(request: Request, user_doc_type_data: UserDocTypeCreate):
                     "INSERT INTO user_doc_type_list (doc_type, doc_prefix) VALUES (%s, %s)",
                     (user_doc_type_data.doc_type, user_doc_type_data.doc_prefix)
                 )
-                cursor.commit()
+                conn.commit()
 
                 # Record successful user doc type creation
                 business_metrics.record_utility_operation("add_user_doc_type", "success")
@@ -693,7 +693,7 @@ def add_faq(request: Request, faq_data: FaqCreate):
                     "INSERT INTO faq_list (user_type, faq_header, faq_text, display_order) VALUES (%s, %s, %s, %s)",
                     (faq_data.user_type, faq_data.faq_header, faq_data.faq_text, faq_data.display_order)
                 )
-                cursor.commit()
+                conn.commit()
 
                 # Record successful FAQ creation
                 business_metrics.record_utility_operation("add_faq", "success")
@@ -889,7 +889,7 @@ def add_pay_tier(request: Request, pay_tier_data: PayTierCreate):
                     "INSERT INTO procedure_code_buckets (code_category, code_bucket, tier, pay_amount) VALUES (%s, %s, %s, %s)",
                     (pay_tier_data.code_category, pay_tier_data.code_bucket, pay_tier_data.tier, pay_tier_data.pay_amount)
                 )
-                cursor.commit()
+                conn.commit()
 
                 # Record successful payment tier creation
                 business_metrics.record_utility_operation("add_pay_tier", "success")
