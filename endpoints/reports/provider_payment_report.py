@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-08-18 13:42:06
+# Last Modified: 2025-08-23 19:19:32
 # Author: Scott Cadreau
 
 # endpoints/reports/provider_payment_report.py
@@ -48,6 +48,49 @@ class ProviderPaymentReportPDF(FPDF):
     def __init__(self, user_id: Optional[str] = None):
         super().__init__()
         self.user_id = user_id
+    
+    def truncate_text(self, text: str, max_width: float) -> str:
+        """
+        Truncate text to fit within the specified width, adding ellipsis if needed
+        
+        Args:
+            text: The text to truncate
+            max_width: Maximum width in points
+            
+        Returns:
+            Truncated text with ellipsis if needed
+        """
+        if not text:
+            return ""
+        
+        # Check if text fits as-is
+        if self.get_string_width(text) <= max_width:
+            return text
+        
+        # If text is too long, truncate and add ellipsis
+        ellipsis = "..."
+        ellipsis_width = self.get_string_width(ellipsis)
+        
+        # Binary search approach for efficiency with very long text
+        left, right = 0, len(text)
+        best_length = 0
+        
+        while left <= right:
+            mid = (left + right) // 2
+            test_text = text[:mid]
+            test_width = self.get_string_width(test_text) + ellipsis_width
+            
+            if test_width <= max_width:
+                best_length = mid
+                left = mid + 1
+            else:
+                right = mid - 1
+        
+        # Handle edge case where even ellipsis doesn't fit
+        if best_length == 0:
+            return ""
+        
+        return text[:best_length] + ellipsis
 
     def header(self):
         self.set_font("Arial", 'B', 13)
@@ -146,12 +189,15 @@ class ProviderPaymentReportPDF(FPDF):
             elif procedures is None:
                 procedures = ''
             
+            # Truncate procedures to fit in the cell (55 points width, leave some padding)
+            procedures_truncated = self.truncate_text(procedures, 52)
+            
             # Format amount
             amount = case.get('pay_amount', 0) or 0
             
             self.cell(25, data_height, formatted_date, border=1)
             self.cell(50, data_height, patient_name, border=1)
-            self.cell(55, data_height, procedures, border=1)
+            self.cell(55, data_height, procedures_truncated, border=1)
             self.cell(30, data_height, case.get('pay_category', '') or '', border=1)
             self.cell(20, data_height, f"${amount:.2f}", border=1, ln=True, align="R")
             provider_total += amount
