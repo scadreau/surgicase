@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-21 21:23:34
+# Last Modified: 2025-08-25 17:31:48
 # Author: Scott Cadreau
 
 # endpoints/user/create_user.py
@@ -199,14 +199,22 @@ def add_user(request: Request, user: UserCreate):
             if user.last_name and (user.last_name.isupper() or user.last_name.islower()):
                 formatted_last_name = capitalize_name_field(user.last_name)
 
+            # Check if user email exists in users_and_tiers table to determine tier
+            user_tier = 1  # Default tier
+            cursor.execute("SELECT tier FROM users_and_tiers WHERE user_email = %s", (user.user_email,))
+            tier_result = cursor.fetchone()
+            if tier_result:
+                user_tier = tier_result['tier']
+                print(f"Found tier {user_tier} for email {user.user_email} in users_and_tiers table")
+
             # Insert new user
             cursor.execute("""
                 INSERT INTO user_profile (
-                    user_id, user_email, first_name, last_name, addr1, addr2, city, state, zipcode, telephone, user_npi, referred_by_user, message_pref, states_licensed, timezone
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    user_id, user_email, first_name, last_name, addr1, addr2, city, state, zipcode, telephone, user_npi, referred_by_user, message_pref, states_licensed, timezone, user_tier
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 user.user_id, user.user_email, formatted_first_name, formatted_last_name, user.addr1, user.addr2,
-                user.city, user.state, user.zipcode, user.telephone, user.user_npi, user.referred_by_user, user.message_pref, user.states_licensed, user.timezone
+                user.city, user.state, user.zipcode, user.telephone, user.user_npi, user.referred_by_user, user.message_pref, user.states_licensed, user.timezone, user_tier
             ))
             # Insert user documents if provided
             if user.documents:
