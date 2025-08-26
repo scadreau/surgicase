@@ -1,5 +1,5 @@
 # Created: 2025-07-30 14:30:30
-# Last Modified: 2025-08-20 08:38:53
+# Last Modified: 2025-08-26 20:16:49
 # Author: Scott Cadreau
 
 import boto3
@@ -1383,4 +1383,143 @@ def send_welcome_email(
             "success": False,
             "message": error_msg,
             "recipient": user_email
+        }
+
+def send_referral_report_emails(
+    report_path: str,
+    report_filename: str,
+    report_data: Dict[str, Any],
+    email_type: str = "weekly",
+    aws_region: str = "us-east-1"
+) -> Dict[str, Any]:
+    """
+    Send referral report to all configured recipients
+    
+    Args:
+        report_path: Local path to the PDF report
+        report_filename: Name of the PDF file
+        report_data: Dictionary containing report metadata for email variables
+        email_type: Type of email template to use ("weekly" or "on_demand")
+        aws_region: AWS region for services
+        
+    Returns:
+        Dictionary with overall results and individual email statuses
+    """
+    try:
+        # Get email templates
+        templates = get_email_templates(aws_region)
+        
+        # Check if referral report templates exist
+        if 'referral_report' not in templates['email_templates']:
+            logger.error(
+                "Referral report email templates not found in AWS Secrets Manager. "
+                "Please add templates manually to 'surgicase/email_templates' secret under the key "
+                "'referral_report' with 'weekly' and 'on_demand' sub-keys."
+            )
+            raise ValueError("Referral report email templates not configured in AWS Secrets")
+        
+        template_config = templates['email_templates']['referral_report'][email_type]
+        
+        # Get recipients for referral report
+        recipients = get_report_email_recipients('referral_report', email_type)
+        
+        if not recipients:
+            logger.warning(f"No recipients found for referral_report_{email_type}")
+            return {
+                "success": True,
+                "message": f"No recipients configured for referral_report_{email_type}",
+                "emails_sent": 0,
+                "total_recipients": 0,
+                "individual_results": []
+            }
+        
+        logger.info(f"Sending referral report to {len(recipients)} recipients")
+        
+        # Read the PDF file for attachment
+        with open(report_path, 'rb') as f:
+            pdf_content = f.read()
+        
+        attachment = EmailAttachment(
+            filename=report_filename,
+            content=pdf_content,
+            content_type='application/pdf'
+        )
+        
+        # Send emails to all recipients
+        results = []
+        successful_sends = 0
+        
+        for recipient in recipients:
+            try:
+                # Prepare template variables for this recipient
+                template_vars = {
+                    **report_data,
+                    "recipient_name": f"{recipient.get('first_name', '')} {recipient.get('last_name', '')}".strip(),
+                    "recipient_first_name": recipient.get('first_name', ''),
+                    "recipient_last_name": recipient.get('last_name', '')
+                }
+                
+                # Handle timezone conversion for creation_date if UTC datetime is provided
+                if 'creation_date_utc' in template_vars and isinstance(template_vars['creation_date_utc'], datetime):
+                    # Use recipient-specific timezone formatting if available
+                    template_vars['creation_date'] = format_datetime_for_user(
+                        template_vars['creation_date_utc'],
+                        user_id=None,  # No specific user context for admin reports
+                        format_string='%B %d, %Y'
+                    )
+                
+                # Format email content
+                subject = format_email_template(template_config['subject'], template_vars)
+                body = format_email_template(template_config['body'], template_vars)
+                
+                result = send_email(
+                    to_addresses=[recipient['email_address']],
+                    subject=subject,
+                    body=body,
+                    attachments=[attachment],
+                    email_type=f"referral_report_{email_type}",
+                    report_type="referral_report",
+                    aws_region=aws_region
+                )
+                
+                if result.get('success', False):
+                    successful_sends += 1
+                    logger.info(f"Successfully sent referral report to {recipient['email_address']}")
+                else:
+                    logger.error(f"Failed to send referral report to {recipient['email_address']}: {result.get('message', 'Unknown error')}")
+                
+                results.append({
+                    "recipient": recipient['email_address'],
+                    "success": result.get('success', False),
+                    "message": result.get('message', 'Unknown result')
+                })
+                
+            except Exception as e:
+                error_msg = f"Error sending referral report to {recipient['email_address']}: {str(e)}"
+                logger.error(error_msg)
+                results.append({
+                    "recipient": recipient['email_address'],
+                    "success": False,
+                    "message": error_msg
+                })
+        
+        # Return overall results
+        overall_success = successful_sends > 0
+        return {
+            "success": overall_success,
+            "message": f"Sent referral report to {successful_sends} of {len(recipients)} recipients",
+            "emails_sent": successful_sends,
+            "total_recipients": len(recipients),
+            "individual_results": results
+        }
+        
+    except Exception as e:
+        error_msg = f"Error in send_referral_report_emails: {str(e)}"
+        logger.error(error_msg)
+        return {
+            "success": False,
+            "message": error_msg,
+            "emails_sent": 0,
+            "total_recipients": 0,
+            "individual_results": []
         }
