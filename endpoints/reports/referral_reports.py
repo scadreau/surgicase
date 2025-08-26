@@ -1,5 +1,5 @@
 # Created: 2025-08-26 20:11:19
-# Last Modified: 2025-08-26 20:13:06
+# Last Modified: 2025-08-26 20:23:36
 # Author: Scott Cadreau
 
 # endpoints/reports/referral_reports.py
@@ -115,7 +115,7 @@ class ReferralReportPDF(FPDF):
         self.cell(60, header_height, "Referred User", border=1)
         self.cell(30, header_height, "Pay Category", border=1)
         self.cell(25, header_height, "Case Count", border=1, align="C")
-        self.cell(35, header_height, "Summed Pay Amount", border=1, ln=True, align="R")
+        self.cell(50, header_height, "Pay Amount", border=1, ln=True, align="R")
 
         # Table data
         self.set_font("Arial", '', 10)
@@ -142,7 +142,7 @@ class ReferralReportPDF(FPDF):
             self.cell(60, data_height, referred_user_name, border=1)
             self.cell(30, data_height, pay_category, border=1)
             self.cell(25, data_height, str(case_count), border=1, align="C")
-            self.cell(35, data_height, f"${pay_amount:.2f}", border=1, ln=True, align="R")
+            self.cell(50, data_height, f"${pay_amount:.2f}", border=1, ln=True, align="R")
             
             section_total += pay_amount
             total_cases += case_count
@@ -151,7 +151,7 @@ class ReferralReportPDF(FPDF):
         self.set_font("Arial", 'B', 10)
         total_height = self.font_size + 3
         self.cell(115, total_height, f"Referral User Total:", align="R")
-        self.cell(35, total_height, f"${section_total:.2f}", border=1, ln=True, align="R")
+        self.cell(50, total_height, f"${section_total:.2f}", border=1, ln=True, align="R")
         self.ln(8)
         
         return section_total, total_cases
