@@ -1,5 +1,5 @@
 # Created: 2025-08-26 20:11:19
-# Last Modified: 2025-08-26 20:23:36
+# Last Modified: 2025-08-26 20:51:11
 # Author: Scott Cadreau
 
 # endpoints/reports/referral_reports.py
@@ -24,6 +24,32 @@ from pypdf import PdfReader, PdfWriter
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+def calculate_referral_fee(case_count: int, total_pay_amount: float, payment_type: str, payment_amount: float) -> tuple:
+    """
+    Calculate referral fee based on payment type and amount
+    
+    Args:
+        case_count: Number of cases
+        total_pay_amount: Total payment amount for the cases
+        payment_type: "Flat" or "Percentage" or None
+        payment_amount: Dollar amount for flat fee or decimal percentage (e.g., 0.10 for 10%)
+        
+    Returns:
+        Tuple of (referral_fee_amount, display_text)
+    """
+    if not payment_type or not payment_amount:
+        return 0.0, "$0.00"
+    
+    if payment_type.lower() == "flat":
+        referral_fee = float(payment_amount) * case_count
+        return referral_fee, f"${referral_fee:.2f} (Flat)"
+    elif payment_type.lower() == "percentage":
+        referral_fee = total_pay_amount * float(payment_amount)
+        percentage_display = f"{float(payment_amount) * 100:.1f}%"
+        return referral_fee, f"${referral_fee:.2f} ({percentage_display})"
+    else:
+        return 0.0, "$0.00"
 
 def password_protect_pdf(input_path: str, output_path: str, password: str) -> bool:
     """
@@ -112,15 +138,17 @@ class ReferralReportPDF(FPDF):
         # Table header
         self.set_font("Arial", 'B', 10)
         header_height = self.font_size + 2
-        self.cell(60, header_height, "Referred User", border=1)
-        self.cell(30, header_height, "Pay Category", border=1)
+        self.cell(45, header_height, "Referred User", border=1)
+        self.cell(25, header_height, "Pay Category", border=1)
         self.cell(25, header_height, "Case Count", border=1, align="C")
-        self.cell(50, header_height, "Pay Amount", border=1, ln=True, align="R")
+        self.cell(30, header_height, "Pay Amount", border=1, align="R")
+        self.cell(40, header_height, "Referral Fee", border=1, ln=True, align="R")
 
         # Table data
         self.set_font("Arial", '', 10)
         data_height = self.font_size + 2
         section_total = 0
+        section_referral_total = 0
         total_cases = 0
         
         for user_data in referred_users_data:
@@ -139,24 +167,34 @@ class ReferralReportPDF(FPDF):
             case_count = user_data.get('case_count', 0) or 0
             pay_amount = user_data.get('total_pay_amount', 0) or 0
             
-            self.cell(60, data_height, referred_user_name, border=1)
-            self.cell(30, data_height, pay_category, border=1)
+            # Calculate referral fee
+            payment_type = user_data.get('payment_type')
+            referral_payment_amount = user_data.get('referral_payment_amount')
+            referral_fee_amount, referral_fee_display = calculate_referral_fee(
+                case_count, pay_amount, payment_type, referral_payment_amount
+            )
+            
+            self.cell(45, data_height, referred_user_name, border=1)
+            self.cell(25, data_height, pay_category, border=1)
             self.cell(25, data_height, str(case_count), border=1, align="C")
-            self.cell(50, data_height, f"${pay_amount:.2f}", border=1, ln=True, align="R")
+            self.cell(30, data_height, f"${pay_amount:.2f}", border=1, align="R")
+            self.cell(40, data_height, referral_fee_display, border=1, ln=True, align="R")
             
             section_total += pay_amount
+            section_referral_total += referral_fee_amount
             total_cases += case_count
 
         # Section subtotal
         self.set_font("Arial", 'B', 10)
         total_height = self.font_size + 3
-        self.cell(115, total_height, f"Referral User Total:", align="R")
-        self.cell(50, total_height, f"${section_total:.2f}", border=1, ln=True, align="R")
+        self.cell(95, total_height, f"Referral User Total:", align="R")
+        self.cell(30, total_height, f"${section_total:.2f}", border=1, align="R")
+        self.cell(40, total_height, f"${section_referral_total:.2f}", border=1, ln=True, align="R")
         self.ln(8)
         
-        return section_total, total_cases
+        return section_total, section_referral_total, total_cases
 
-    def add_summary(self, total_amount, referral_user_count, total_referred_users, total_cases):
+    def add_summary(self, total_amount, total_referral_fees, referral_user_count, total_referred_users, total_cases):
         """Add summary section at the end"""
         self.add_page()
         
@@ -169,6 +207,7 @@ class ReferralReportPDF(FPDF):
         self.cell(0, 8, f"Total Referred Users: {total_referred_users}", ln=True)
         self.cell(0, 8, f"Total Cases: {total_cases}", ln=True)
         self.cell(0, 8, f"Total Amount: ${total_amount:.2f}", ln=True)
+        self.cell(0, 8, f"Total Referral Fees: ${total_referral_fees:.2f}", ln=True)
 
 @router.get("/referral_report")
 @track_business_operation("generate", "referral_report")
@@ -343,19 +382,23 @@ def generate_referral_report(request: Request):
         
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-                # Build the main query to get referral data
+                # Build the main query to get referral data with referral payment amounts
                 sql = """
                     SELECT 
                         referring_user.first_name as referring_first_name,
                         referring_user.last_name as referring_last_name,
+                        referring_user.user_id as referring_user_id,
                         up.first_name,
                         up.last_name,
                         c.pay_category,
                         COUNT(c.case_id) as case_count,
-                        SUM(c.pay_amount) as total_pay_amount
+                        SUM(c.pay_amount) as total_pay_amount,
+                        rpa.payment_type,
+                        rpa.payment_amount as referral_payment_amount
                     FROM cases c
                     INNER JOIN user_profile up ON c.user_id = up.user_id
                     INNER JOIN user_profile referring_user ON up.referred_by_user = referring_user.user_id
+                    LEFT JOIN referral_payment_amounts rpa ON referring_user.user_id = rpa.user_id AND c.pay_category = rpa.pay_category
                     WHERE c.case_status = 15
                     AND c.active = 1 
                     AND up.active = 1
@@ -363,7 +406,7 @@ def generate_referral_report(request: Request):
                     AND up.referred_by_user IS NOT NULL
                     AND up.referred_by_user != ''
                     AND c.user_id NOT IN ('04e884e8-4011-70e9-f3bd-d89fabd15c7b', '94883428-50c1-7049-9d3d-e095ca81f174', '94b80418-6091-701b-eac8-8b325f95a799')
-                    GROUP BY up.referred_by_user, c.user_id, c.pay_category
+                    GROUP BY up.referred_by_user, c.user_id, c.pay_category, rpa.payment_type, rpa.payment_amount
                     ORDER BY referring_user.last_name, referring_user.first_name, up.last_name, up.first_name, c.pay_category
                 """
                 
@@ -401,6 +444,7 @@ def generate_referral_report(request: Request):
                 pdf.add_page()
                 
                 total_amount = 0
+                total_referral_fees = 0
                 total_cases = 0
                 total_referred_users = 0
                 
@@ -408,18 +452,19 @@ def generate_referral_report(request: Request):
                 first_section = True
                 for referral_user_name in sorted(referral_users.keys()):
                     referred_users_data = referral_users[referral_user_name]
-                    section_total, section_cases = pdf.add_referral_user_section(
+                    section_total, section_referral_total, section_cases = pdf.add_referral_user_section(
                         referral_user_name, 
                         referred_users_data,
                         is_first_section=first_section
                     )
                     total_amount += section_total
+                    total_referral_fees += section_referral_total
                     total_cases += section_cases
                     total_referred_users += len(referred_users_data)
                     first_section = False
                 
                 # Add summary
-                pdf.add_summary(total_amount, len(referral_users), total_referred_users, total_cases)
+                pdf.add_summary(total_amount, total_referral_fees, len(referral_users), total_referred_users, total_cases)
                 
                 # Create reports directory if it doesn't exist
                 reports_dir = os.path.join(os.getcwd(), "reports")
@@ -461,7 +506,8 @@ def generate_referral_report(request: Request):
                     'total_referral_users': str(len(referral_users)),
                     'total_referred_users': str(total_referred_users),
                     'total_cases': str(total_cases),
-                    'total_amount': f"{total_amount:.2f}"
+                    'total_amount': f"{total_amount:.2f}",
+                    'total_referral_fees': f"{total_referral_fees:.2f}"
                 }
                 
                 # Upload to S3
@@ -488,6 +534,7 @@ def generate_referral_report(request: Request):
                         "total_referred_users": total_referred_users,
                         "total_cases": total_cases,
                         "total_amount": f"{total_amount:.2f}",
+                        "total_referral_fees": f"{total_referral_fees:.2f}",
                         "password": report_password,
                         "report_type": "Referral Report"
                     }

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Created: 2025-08-26 20:15:00
-# Last Modified: 2025-08-26 20:16:22
+# Last Modified: 2025-08-26 20:46:23
 # Author: Scott Cadreau
 
 """
@@ -40,6 +40,7 @@ Report Summary:
 • Total Referred Users: {total_referred_users}
 • Total Cases: {total_cases}
 • Total Amount: ${total_amount}
+• Total Referral Fees: ${total_referral_fees}
 
 IMPORTANT SECURITY INFORMATION:
 The attached PDF report is password-protected for security. To open the report, use the following password:
@@ -77,6 +78,7 @@ Report Summary:
 • Total Referred Users: {total_referred_users}
 • Total Cases: {total_cases}
 • Total Amount: ${total_amount}
+• Total Referral Fees: ${total_referral_fees}
 
 IMPORTANT SECURITY INFORMATION:
 The attached PDF report is password-protected for security. To open the report, use the following password:
