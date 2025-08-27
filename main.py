@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-27 00:36:35
+# Last Modified: 2025-08-27 02:46:55
 # Author: Scott Cadreau
 
 # main.py
@@ -62,6 +62,31 @@ from endpoints.exports.case_export import router as case_export_router
 
 # Import monitoring utilities
 from utils.monitoring import monitor_request, system_monitor, db_monitor, logger
+import requests
+
+def get_ec2_instance_id() -> str:
+    """
+    Get the current EC2 instance ID from metadata service.
+    
+    Returns:
+        EC2 instance ID or None if not running on EC2 or unable to retrieve
+    """
+    try:
+        # EC2 instance metadata service endpoint
+        response = requests.get(
+            'http://169.254.169.254/latest/meta-data/instance-id',
+            timeout=2  # Quick timeout since this should be local
+        )
+        if response.status_code == 200:
+            instance_id = response.text.strip()
+            logger.info(f"Retrieved EC2 instance ID: {instance_id}")
+            return instance_id
+        else:
+            logger.warning(f"Failed to retrieve instance ID, status code: {response.status_code}")
+            return None
+    except Exception as e:
+        logger.warning(f"Unable to retrieve EC2 instance ID: {str(e)}")
+        return None
 
 def get_main_config() -> dict:
     """
@@ -213,7 +238,18 @@ except Exception as e:
 try:
     main_config = get_main_config()
     enable_scheduler = main_config.get("ENABLE_SCHEDULER", "true").lower() == "true"
-    scheduler_role = main_config.get("SCHEDULER_ROLE", "leader").lower()  # "leader" or "worker"
+    
+    # Get instance-specific scheduler role
+    instance_id = get_ec2_instance_id()
+    if instance_id:
+        # Look for instance-specific configuration: SCHEDULER_ROLE_<instanceid>
+        instance_key = f"SCHEDULER_ROLE_{instance_id}"
+        scheduler_role = main_config.get(instance_key, "worker").lower()  # Default to "worker"
+        logger.info(f"Using instance-specific scheduler role from key: {instance_key}")
+    else:
+        # Fallback to general SCHEDULER_ROLE if instance ID unavailable, default to "worker"
+        scheduler_role = main_config.get("SCHEDULER_ROLE", "worker").lower()
+        logger.info("Using general SCHEDULER_ROLE (instance ID unavailable)")
     
     if enable_scheduler:
         from utils.scheduler import run_scheduler_in_background
@@ -223,10 +259,10 @@ try:
         logger.info("Scheduler disabled via AWS Secrets Manager configuration")
 except Exception as e:
     logger.error(f"Failed to initialize scheduler: {str(e)}")
-    # Fallback: enable scheduler in leader mode if configuration cannot be retrieved
+    # Fallback: enable scheduler in worker mode if configuration cannot be retrieved
     from utils.scheduler import run_scheduler_in_background
-    run_scheduler_in_background(scheduler_role="leader")
-    logger.warning("Scheduler enabled in LEADER mode as fallback due to configuration error")
+    run_scheduler_in_background(scheduler_role="worker")
+    logger.warning("Scheduler enabled in WORKER mode as fallback due to configuration error")
 
 if __name__ == "__main__":
     import uvicorn
