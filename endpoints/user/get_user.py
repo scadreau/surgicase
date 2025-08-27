@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-20 09:50:42
+# Last Modified: 2025-08-27 05:38:36
 # Author: Scott Cadreau
 
 # endpoints/user/get_user.py
@@ -8,41 +8,8 @@ import pymysql.cursors
 from core.database import get_db_connection, close_db_connection
 from utils.monitoring import track_business_operation, business_metrics
 import time
-from datetime import datetime  # TODO: TEMPORARY - Remove when frontend integrates get_user_environment
 
 router = APIRouter()
-
-# TODO: TEMPORARY - Remove this function when frontend integrates get_user_environment
-def update_user_last_login(user_id: str, conn) -> bool:
-    """
-    Update the last_login_dt field for a user with current timestamp.
-    
-    Args:
-        user_id: The user ID to update
-        conn: Database connection
-        
-    Returns:
-        bool: True if update was successful, False otherwise
-    """
-    try:
-        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-            # Use CURRENT_TIMESTAMP for timestamp fields (now that last_login_dt is timestamp type)
-            cursor.execute("""
-                UPDATE user_profile 
-                SET last_login_dt = CURRENT_TIMESTAMP 
-                WHERE user_id = %s
-            """, (user_id,))
-            
-            # Return True if a row was updated
-            return cursor.rowcount > 0
-    except Exception as e:
-        # Log the error but don't fail the main operation
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Failed to update last_login_dt for user {user_id}: {str(e)}")
-        return False
-
-
 
 @router.get("/user")
 @track_business_operation("read", "user")
