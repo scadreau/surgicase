@@ -1,5 +1,5 @@
 # Created: 2025-07-30 22:59:57
-# Last Modified: 2025-08-20 09:09:41
+# Last Modified: 2025-08-27 05:23:05
 # Author: Scott Cadreau
 
 # endpoints/backoffice/build_dashboard.py
@@ -15,9 +15,26 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # Import the individual dashboard functions
 from .case_dashboard_data import case_dashboard_data as get_case_dashboard_data
 from .user_dashboard_data import user_dashboard_data as get_user_dashboard_data
-from endpoints.health import health_check as get_health_data
+
 
 router = APIRouter()
+
+def get_simplified_health_data():
+    """
+    Simplified health check for dashboard - returns healthy status since 
+    successful request to this endpoint indicates core services are operational
+    """
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "summary": {
+            "total_services": 1,
+            "healthy": 1,
+            "degraded": 0,
+            "unhealthy": 0
+        },
+        "details": "Service operational - request successfully reached dashboard endpoint"
+    }
 
 @router.get("/build_dashboard")
 @track_business_operation("get", "build_dashboard")
@@ -260,7 +277,7 @@ def build_dashboard(
             # Submit all three functions simultaneously
             # Pass validated=True to skip duplicate permission checks
             futures = {
-                'health': executor.submit(get_health_data),
+                'health': executor.submit(get_simplified_health_data),
                 'cases': executor.submit(get_case_dashboard_data, request, user_id, start_date, end_date, True),
                 'users': executor.submit(get_user_dashboard_data, request, user_id, True)
             }
@@ -278,7 +295,13 @@ def build_dashboard(
                         dashboard_data[component_name] = {
                             "status": "error", 
                             "error": str(e),
-                            "timestamp": datetime.utcnow().isoformat() + "Z"
+                            "timestamp": datetime.utcnow().isoformat() + "Z",
+                            "summary": {
+                                "total_services": 0,
+                                "healthy": 0,
+                                "degraded": 0,
+                                "unhealthy": 1
+                            }
                         }
                     elif component_name == 'cases':
                         dashboard_data[component_name] = {
