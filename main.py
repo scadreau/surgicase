@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-27 02:46:55
+# Last Modified: 2025-08-27 02:50:25
 # Author: Scott Cadreau
 
 # main.py
@@ -67,23 +67,57 @@ import requests
 def get_ec2_instance_id() -> str:
     """
     Get the current EC2 instance ID from metadata service.
+    Supports both IMDSv1 and IMDSv2 (Instance Metadata Service versions).
     
     Returns:
         EC2 instance ID or None if not running on EC2 or unable to retrieve
     """
     try:
-        # EC2 instance metadata service endpoint
+        # First try IMDSv2 (recommended approach)
+        try:
+            # Step 1: Get session token for IMDSv2
+            token_response = requests.put(
+                'http://169.254.169.254/latest/api/token',
+                headers={'X-aws-ec2-metadata-token-ttl-seconds': '21600'},  # 6 hours
+                timeout=2
+            )
+            
+            if token_response.status_code == 200:
+                token = token_response.text.strip()
+                
+                # Step 2: Use token to get instance ID
+                response = requests.get(
+                    'http://169.254.169.254/latest/meta-data/instance-id',
+                    headers={'X-aws-ec2-metadata-token': token},
+                    timeout=2
+                )
+                
+                if response.status_code == 200:
+                    instance_id = response.text.strip()
+                    logger.info(f"Retrieved EC2 instance ID via IMDSv2: {instance_id}")
+                    return instance_id
+                else:
+                    logger.warning(f"IMDSv2 instance ID request failed, status code: {response.status_code}")
+            else:
+                logger.warning(f"IMDSv2 token request failed, status code: {token_response.status_code}")
+        
+        except Exception as imdsv2_error:
+            logger.debug(f"IMDSv2 failed: {str(imdsv2_error)}, trying IMDSv1...")
+        
+        # Fallback to IMDSv1 (legacy approach)
         response = requests.get(
             'http://169.254.169.254/latest/meta-data/instance-id',
-            timeout=2  # Quick timeout since this should be local
+            timeout=2
         )
+        
         if response.status_code == 200:
             instance_id = response.text.strip()
-            logger.info(f"Retrieved EC2 instance ID: {instance_id}")
+            logger.info(f"Retrieved EC2 instance ID via IMDSv1: {instance_id}")
             return instance_id
         else:
-            logger.warning(f"Failed to retrieve instance ID, status code: {response.status_code}")
+            logger.warning(f"IMDSv1 failed to retrieve instance ID, status code: {response.status_code}")
             return None
+            
     except Exception as e:
         logger.warning(f"Unable to retrieve EC2 instance ID: {str(e)}")
         return None
