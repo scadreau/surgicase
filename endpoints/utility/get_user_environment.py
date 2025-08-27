@@ -1,5 +1,5 @@
 # Created: 2025-07-24 17:54:30
-# Last Modified: 2025-08-22 09:23:33
+# Last Modified: 2025-08-27 00:52:49
 # Author: Scott Cadreau
 
 # endpoints/utility/get_user_environment.py
@@ -26,6 +26,31 @@ def _generate_user_environment_cache_key(user_id: str) -> str:
     """Generate a consistent cache key for user environment data"""
     cache_input = f"user_environment:{user_id}"
     return hashlib.md5(cache_input.encode()).hexdigest()
+
+def _check_user_group_admin(user_id: str, conn) -> bool:
+    """
+    Check if user is a group admin by querying the user_groups table.
+    
+    Args:
+        user_id (str): The user ID to check
+        conn: Database connection
+        
+    Returns:
+        bool: True if user is a group admin (group_admin = 1), False otherwise
+    """
+    try:
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT group_admin 
+                FROM user_groups 
+                WHERE user_id = %s AND group_admin = 1
+                LIMIT 1
+            """, (user_id,))
+            result = cursor.fetchone()
+            return result is not None
+    except Exception as e:
+        logging.error(f"Error checking group admin status for user {user_id}: {str(e)}")
+        return False
 
 def _is_user_environment_cache_valid(cache_key: str, cache_ttl: int = 43200) -> bool:
     """Check if cached user environment data is still valid (12 hours = 43200 seconds)"""
@@ -160,6 +185,9 @@ def _warm_single_user_environment_cache(user_id: str) -> bool:
             # Get available user types for the user
             available_user_types = get_available_user_types(user_type, conn)
             
+            # Check if user is a group admin
+            is_group_admin = _check_user_group_admin(user_id, conn)
+            
             # Find max_case_status_desc from the case_statuses array
             max_case_status_desc = None
             for case_status in case_status_info["case_statuses"]:
@@ -181,7 +209,8 @@ def _warm_single_user_environment_cache(user_id: str) -> bool:
                     "max_case_status": user_profile.get("max_case_status", 20),
                     "max_case_status_desc": max_case_status_desc,
                     "can_access_all_cases": user_type >= 10,
-                    "can_access_backoffice": user_type >= 10
+                    "can_access_backoffice": user_type >= 10,
+                    "group_admin": is_group_admin
                 },
                 "environment_info": {
                     "user_id": user_id,
@@ -734,6 +763,9 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
         # Get available user types for the user
         available_user_types = get_available_user_types(user_type, conn)
         
+        # Check if user is a group admin
+        is_group_admin = _check_user_group_admin(user_id, conn)
+        
         # Find max_case_status_desc from the case_statuses array
         max_case_status_desc = None
         for case_status in case_status_info["case_statuses"]:
@@ -757,7 +789,8 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
                 "max_case_status": user_profile.get("max_case_status", 20),
                 "max_case_status_desc": max_case_status_desc,
                 "can_access_all_cases": user_type >= 10,
-                "can_access_backoffice": user_type >= 10
+                "can_access_backoffice": user_type >= 10,
+                "group_admin": is_group_admin
             },
             "environment_info": {
                 "user_id": user_id,

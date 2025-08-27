@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-26 20:13:06
+# Last Modified: 2025-08-27 00:36:35
 # Author: Scott Cadreau
 
 # main.py
@@ -12,6 +12,7 @@ from endpoints.case.create_case import router as create_case_router
 from endpoints.case.update_case import router as update_case_router
 from endpoints.case.delete_case import router as delete_case_router
 from endpoints.case.filter_cases import router as filter_cases_router
+from endpoints.case.group_cases import router as group_cases_router
 
 from endpoints.user.get_user import router as get_user_router
 from endpoints.user.create_user import router as create_user_router
@@ -96,6 +97,7 @@ app.include_router(create_case_router, tags=["cases"])
 app.include_router(update_case_router, tags=["cases"])
 app.include_router(delete_case_router, tags=["cases"])
 app.include_router(filter_cases_router, tags=["cases"])
+app.include_router(group_cases_router, tags=["cases"])
 
 # User endpoints
 app.include_router(get_user_router, tags=["users"])
