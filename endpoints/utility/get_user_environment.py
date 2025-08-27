@@ -1,5 +1,5 @@
 # Created: 2025-07-24 17:54:30
-# Last Modified: 2025-08-27 00:52:49
+# Last Modified: 2025-08-27 05:08:37
 # Author: Scott Cadreau
 
 # endpoints/utility/get_user_environment.py
@@ -691,6 +691,7 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
     response_status = 200
     response_data = None
     error_message = None
+    logged_already = False  # Track if we've already logged this request
     
     try:
         if not user_id:
@@ -706,8 +707,10 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
         if cached_result is not None:
             logging.debug(f"Returning cached user environment data for user: {user_id}")
             
-            # Calculate execution time for cache hit
-            execution_time_ms = int((time.time() - start_time) * 1000)
+            # Calculate execution time for cache hit with better precision
+            execution_time_seconds = time.time() - start_time
+            # Use round() instead of int() to get more accurate timing, and ensure minimum 1ms
+            execution_time_ms = max(1, round(execution_time_seconds * 1000))
             
             # Log request details for cached response
             from endpoints.utility.log_request import log_request_from_endpoint
@@ -719,6 +722,9 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
                 response_data=cached_result,
                 error_message=None
             )
+            
+            # Mark as already logged to prevent duplicate logging in finally block
+            logged_already = True
             
             return cached_result
 
@@ -830,17 +836,21 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
             except Exception:
                 pass  # Connection might already be closed
         
-        # Calculate execution time in milliseconds for logging
-        execution_time_ms = int((time.time() - start_time) * 1000)
-        
-        # Log request details for monitoring using the utility function
-        from endpoints.utility.log_request import log_request_from_endpoint
-        log_request_from_endpoint(
-            request=request,
-            execution_time_ms=execution_time_ms,
-            response_status=response_status,
-            user_id=user_id,
-            response_data=response_data,
-            error_message=error_message
-        )
+        # Only log if we haven't already logged (prevents duplicate logging for cache hits)
+        if not logged_already:
+            # Calculate execution time in milliseconds for logging with better precision
+            execution_time_seconds = time.time() - start_time
+            # Use round() instead of int() to get more accurate timing, and ensure minimum 1ms
+            execution_time_ms = max(1, round(execution_time_seconds * 1000))
+            
+            # Log request details for monitoring using the utility function
+            from endpoints.utility.log_request import log_request_from_endpoint
+            log_request_from_endpoint(
+                request=request,
+                execution_time_ms=execution_time_ms,
+                response_status=response_status,
+                user_id=user_id,
+                response_data=response_data,
+                error_message=error_message
+            )
  
