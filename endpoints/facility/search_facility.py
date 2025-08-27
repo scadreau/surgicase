@@ -1,5 +1,5 @@
 # Created: 2025-07-21 16:40:47
-# Last Modified: 2025-08-08 16:10:46
+# Last Modified: 2025-08-27 03:29:53
 # Author: Scott Cadreau
 
 # endpoints/facility/search_facility.py
@@ -160,7 +160,7 @@ def search_facility(
                 cursor.execute(f"""
                     SELECT npi, facility_name, address, city, state, zip
                     FROM search_surgeon_facility.{table_name}
-                    WHERE facility_name LIKE %s
+                    WHERE facility_name LIKE %s order by state, city, facility_name
                 """, (f"%{facility_name}%",))
                 
                 facilities = cursor.fetchall()

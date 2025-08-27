@@ -1,5 +1,5 @@
 # Created: 2025-07-21 15:08:09
-# Last Modified: 2025-08-08 16:10:46
+# Last Modified: 2025-08-27 03:28:14
 # Author: Scott Cadreau
 
 # endpoints/surgeon/search_surgeon.py
@@ -169,7 +169,7 @@ def search_surgeon(
                 cursor.execute(f"""
                     SELECT npi, first_name, last_name, address, city, state, zip
                     FROM search_surgeon_facility.{table_name}
-                    WHERE last_name like %s AND first_name like %s
+                    WHERE last_name like %s AND first_name like %s order by state, city, last_name, first_name
                 """, (f"%{last_name_upper}%", f"%{first_name_upper}%"))
                 
                 surgeons = cursor.fetchall()
