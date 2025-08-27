@@ -1,5 +1,5 @@
 # Created: 2025-07-27 02:29:13
-# Last Modified: 2025-08-21 01:50:32
+# Last Modified: 2025-08-27 06:09:51
 # Author: Scott Cadreau
 
 # endpoints/backoffice/case_dashboard_data.py
@@ -19,7 +19,8 @@ def case_dashboard_data(
     user_id: str = Query(..., description="The user ID making the request (must be user_type >= 10)"),
     start_date: Optional[str] = Query(None, description="Start date for filtering (YYYY-MM-DD format)"),
     end_date: Optional[str] = Query(None, description="End date for filtering (YYYY-MM-DD format)"),
-    validated: bool = False
+    validated: bool = False,
+    skip_logging: bool = False
 ):
     """
     Generate comprehensive case analytics dashboard with status-based aggregation and financial summaries.
@@ -282,13 +283,14 @@ def case_dashboard_data(
         # Calculate execution time
         execution_time_ms = int((time.time() - start_time) * 1000)
         
-        # Log request details for monitoring using the utility function
-        from endpoints.utility.log_request import log_request_from_endpoint
-        log_request_from_endpoint(
-            request=request,
-            execution_time_ms=execution_time_ms,
-            response_status=response_status,
-            user_id=user_id,
-            response_data=response_data,
-            error_message=error_message
-        ) 
+        # Log request details for monitoring using the utility function (skip if called internally)
+        if not skip_logging:
+            from endpoints.utility.log_request import log_request_from_endpoint
+            log_request_from_endpoint(
+                request=request,
+                execution_time_ms=execution_time_ms,
+                response_status=response_status,
+                user_id=user_id,
+                response_data=response_data,
+                error_message=error_message
+            ) 

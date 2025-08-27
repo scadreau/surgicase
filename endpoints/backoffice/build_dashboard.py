@@ -1,5 +1,5 @@
 # Created: 2025-07-30 22:59:57
-# Last Modified: 2025-08-27 05:23:05
+# Last Modified: 2025-08-27 06:09:53
 # Author: Scott Cadreau
 
 # endpoints/backoffice/build_dashboard.py
@@ -275,11 +275,11 @@ def build_dashboard(
         # Execute all three functions concurrently using ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=3) as executor:
             # Submit all three functions simultaneously
-            # Pass validated=True to skip duplicate permission checks
+            # Pass validated=True to skip duplicate permission checks and skip_logging=True to prevent duplicate logs
             futures = {
                 'health': executor.submit(get_simplified_health_data),
-                'cases': executor.submit(get_case_dashboard_data, request, user_id, start_date, end_date, True),
-                'users': executor.submit(get_user_dashboard_data, request, user_id, True)
+                'cases': executor.submit(get_case_dashboard_data, request, user_id, start_date, end_date, True, True),
+                'users': executor.submit(get_user_dashboard_data, request, user_id, True, True)
             }
             
             # Collect results with individual error handling
