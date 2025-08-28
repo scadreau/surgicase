@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-25 17:31:48
+# Last Modified: 2025-08-28 20:16:23
 # Author: Scott Cadreau
 
 # endpoints/user/create_user.py
@@ -8,7 +8,7 @@ import pymysql.cursors
 from core.database import get_db_connection, close_db_connection, is_connection_valid
 from core.models import UserCreate
 from utils.monitoring import track_business_operation, business_metrics
-from utils.text_formatting import capitalize_name_field
+from utils.text_formatting import capitalize_name_field, normalize_email_for_tier_lookup
 import time
 
 router = APIRouter()
@@ -201,11 +201,34 @@ def add_user(request: Request, user: UserCreate):
 
             # Check if user email exists in users_and_tiers table to determine tier
             user_tier = 1  # Default tier
+            tier_result = None
+            tier_lookup_method = "default"
+            
+            # First, try exact email match
             cursor.execute("SELECT tier FROM users_and_tiers WHERE user_email = %s", (user.user_email,))
             tier_result = cursor.fetchone()
+            
             if tier_result:
                 user_tier = tier_result['tier']
-                print(f"Found tier {user_tier} for email {user.user_email} in users_and_tiers table")
+                tier_lookup_method = "exact_match"
+                print(f"Found tier {user_tier} for email {user.user_email} in users_and_tiers table (exact match)")
+            elif '+' in user.user_email:
+                # If no exact match and email contains '+', try base email lookup
+                base_email = normalize_email_for_tier_lookup(user.user_email)
+                if base_email != user.user_email:  # Only search if normalization changed the email
+                    cursor.execute("SELECT tier FROM users_and_tiers WHERE user_email = %s", (base_email,))
+                    tier_result = cursor.fetchone()
+                    
+                    if tier_result:
+                        user_tier = tier_result['tier']
+                        tier_lookup_method = "base_email_match"
+                        print(f"Found tier {user_tier} for base email {base_email} (from tagged email {user.user_email}) in users_and_tiers table")
+                    else:
+                        print(f"No tier found for tagged email {user.user_email} or base email {base_email}, using default tier {user_tier}")
+                else:
+                    print(f"No tier found for email {user.user_email}, using default tier {user_tier}")
+            else:
+                print(f"No tier found for email {user.user_email}, using default tier {user_tier}")
 
             # Insert new user
             cursor.execute("""

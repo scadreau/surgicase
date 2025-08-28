@@ -1,5 +1,5 @@
 # Created: 2025-07-23
-# Last Modified: 2025-07-29 02:12:36
+# Last Modified: 2025-08-28 20:16:23
 # Author: Scott Cadreau
 
 # utils/text_formatting.py
@@ -232,4 +232,49 @@ def capitalize_address_field(address_str: str) -> str:
             # Use name field logic for other words
             capitalized_words.append(capitalize_name_field(clean_word) + punctuation)
     
-    return ' '.join(capitalized_words) 
+    return ' '.join(capitalized_words)
+
+
+def normalize_email_for_tier_lookup(email: str) -> str:
+    """
+    Extract the base email address by removing any "+tag" portion for tier lookup purposes.
+    This allows users with tagged emails (e.g., user+tag@domain.com) to inherit the tier
+    from their base email address (user@domain.com).
+    
+    Args:
+        email: The email address to normalize
+        
+    Returns:
+        The base email address with any "+tag" portion removed
+        
+    Examples:
+        normalize_email_for_tier_lookup("pamela.burford+scott@palmsurgicalbilling.com") 
+        -> "pamela.burford@palmsurgicalbilling.com"
+        
+        normalize_email_for_tier_lookup("john.doe+provider1@clinic.com") 
+        -> "john.doe@clinic.com"
+        
+        normalize_email_for_tier_lookup("admin+test+dev@hospital.org") 
+        -> "admin@hospital.org"
+        
+        normalize_email_for_tier_lookup("regular@email.com") 
+        -> "regular@email.com" (unchanged)
+    """
+    if not email or '@' not in email:
+        return email
+    
+    # Split email into local part (before @) and domain part (after @)
+    try:
+        local_part, domain_part = email.rsplit('@', 1)
+        
+        # If there's a + in the local part, remove everything from + onwards
+        if '+' in local_part:
+            base_local_part = local_part.split('+')[0]
+            return f"{base_local_part}@{domain_part}"
+        
+        # If no + found, return original email
+        return email
+        
+    except ValueError:
+        # If email format is invalid, return as-is
+        return email 
