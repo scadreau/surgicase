@@ -1,5 +1,5 @@
 # Created: 2025-08-01 20:06:31
-# Last Modified: 2025-08-05 22:53:23
+# Last Modified: 2025-08-28 20:02:20
 # Author: Scott Cadreau
 
 """
@@ -378,7 +378,12 @@ def cleanup_old_backups(days_to_keep: int = 7) -> Dict[str, Any]:
         deleted_files = []
         
         for filename in os.listdir(backup_dir):
-            if filename.startswith("db_backup_") and (filename.endswith(".gz.encrypted") or filename.endswith(".encryption_info")):
+            # Handle both encrypted files (.gz.encrypted, .encryption_info) and old unencrypted files (.gz)
+            if filename.startswith("db_backup_") and (
+                filename.endswith(".gz.encrypted") or 
+                filename.endswith(".encryption_info") or 
+                (filename.endswith(".gz") and not filename.endswith(".gz.encrypted"))
+            ):
                 file_path = os.path.join(backup_dir, filename)
                 file_mtime = datetime.fromtimestamp(os.path.getmtime(file_path), tz=timezone.utc)
                 

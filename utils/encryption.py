@@ -1,5 +1,5 @@
 # Created: 2025-08-05 22:48:22
-# Last Modified: 2025-08-05 22:53:23
+# Last Modified: 2025-08-27 21:36:27
 # Author: Scott Cadreau
 
 """
@@ -91,7 +91,7 @@ class HIPAAEncryption:
             # Create the key
             create_response = self.kms_client.create_key(
                 Description='SurgiCase database backup encryption key for HIPAA compliance',
-                Usage='ENCRYPT_DECRYPT',
+                KeyUsage='ENCRYPT_DECRYPT',
                 KeySpec='SYMMETRIC_DEFAULT',
                 Policy=json.dumps(key_policy),
                 Tags=[
