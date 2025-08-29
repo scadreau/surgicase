@@ -1,5 +1,5 @@
 # Created: 2025-07-21 15:08:09
-# Last Modified: 2025-08-27 03:28:14
+# Last Modified: 2025-08-29 20:09:23
 # Author: Scott Cadreau
 
 # endpoints/surgeon/search_surgeon.py
@@ -17,7 +17,8 @@ router = APIRouter()
 def search_surgeon(
     request: Request,
     first_name: str = Query(..., description="First name to search for"),
-    last_name: str = Query(..., description="Last name to search for")
+    last_name: str = Query(..., description="Last name to search for"),
+    user_id: str = Query(None, description="Optional user ID for enhanced logging and monitoring")
 ):
     """
     Search for surgeons by name using optimized A-Z partitioned search tables.
@@ -64,6 +65,7 @@ def search_surgeon(
         request (Request): FastAPI request object for logging and monitoring
         first_name (str): Surgeon's first name to search for (partial matching supported)
         last_name (str): Surgeon's last name to search for (partial matching supported)
+        user_id (str, optional): User ID for enhanced logging and monitoring
     
     Returns:
         dict: Response containing:
@@ -106,7 +108,7 @@ def search_surgeon(
         - Returns appropriate 400 error for invalid input
     
     Example:
-        GET /search-surgeon?first_name=John&last_name=Smith
+        GET /search-surgeon?first_name=John&last_name=Smith&user_id=user123
         
         Response:
         {
@@ -115,7 +117,8 @@ def search_surgeon(
                 "message": "Found 12 matching surgeon(s)",
                 "search_criteria": {
                     "first_name": "John",
-                    "last_name": "Smith"
+                    "last_name": "Smith",
+                    "user_id": "user123"
                 },
                 "surgeons": [
                     {
@@ -198,14 +201,19 @@ def search_surgeon(
         finally:
             close_db_connection(conn)
             
+        # Build search criteria response
+        search_criteria = {
+            "first_name": first_name,
+            "last_name": last_name
+        }
+        if user_id:
+            search_criteria["user_id"] = user_id
+            
         response_data = {
             "statusCode": 200,
             "body": {
                 "message": f"Found {len(surgeons)} matching surgeon(s)",
-                "search_criteria": {
-                    "first_name": first_name,
-                    "last_name": last_name
-                },
+                "search_criteria": search_criteria,
                 "surgeons": surgeons
             }
         }
@@ -236,7 +244,7 @@ def search_surgeon(
             request=request,
             execution_time_ms=execution_time_ms,
             response_status=response_status,
-            user_id=None,  # No user_id available in search endpoints
+            user_id=user_id,  # Use provided user_id for enhanced logging
             response_data=response_data,
             error_message=error_message
         ) 

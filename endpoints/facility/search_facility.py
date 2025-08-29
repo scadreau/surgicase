@@ -1,5 +1,5 @@
 # Created: 2025-07-21 16:40:47
-# Last Modified: 2025-08-27 03:29:53
+# Last Modified: 2025-08-29 20:09:20
 # Author: Scott Cadreau
 
 # endpoints/facility/search_facility.py
@@ -16,7 +16,8 @@ router = APIRouter()
 @track_business_operation("search", "facility")
 def search_facility(
     request: Request,
-    facility_name: str = Query(..., description="Facility name to search for")
+    facility_name: str = Query(..., description="Facility name to search for"),
+    user_id: str = Query(None, description="Optional user ID for enhanced logging and monitoring")
 ):
     """
     Search for healthcare facilities by name using optimized A-Z partitioned search tables.
@@ -62,6 +63,7 @@ def search_facility(
     Args:
         request (Request): FastAPI request object for logging and monitoring
         facility_name (str): Healthcare facility name to search for (partial matching supported)
+        user_id (str, optional): User ID for enhanced logging and monitoring
     
     Returns:
         dict: Response containing:
@@ -102,7 +104,7 @@ def search_facility(
         - Returns appropriate 400 error for invalid input
     
     Example:
-        GET /search-facility?facility_name=General Hospital
+        GET /search-facility?facility_name=General Hospital&user_id=user123
         
         Response:
         {
@@ -110,7 +112,8 @@ def search_facility(
             "body": {
                 "message": "Found 15 matching facility(ies)",
                 "search_criteria": {
-                    "facility_name": "General Hospital"
+                    "facility_name": "General Hospital",
+                    "user_id": "user123"
                 },
                 "facilities": [
                     {
@@ -186,13 +189,16 @@ def search_facility(
         finally:
             close_db_connection(conn)
             
+        # Build search criteria response
+        search_criteria = {"facility_name": facility_name}
+        if user_id:
+            search_criteria["user_id"] = user_id
+            
         response_data = {
             "statusCode": 200,
             "body": {
                 "message": f"Found {len(facilities)} matching facility(ies)",
-                "search_criteria": {
-                    "facility_name": facility_name
-                },
+                "search_criteria": search_criteria,
                 "facilities": facilities
             }
         }
@@ -223,7 +229,7 @@ def search_facility(
             request=request,
             execution_time_ms=execution_time_ms,
             response_status=response_status,
-            user_id=None,  # No user_id available in search endpoints
+            user_id=user_id,  # Use provided user_id for enhanced logging
             response_data=response_data,
             error_message=error_message
         ) 
