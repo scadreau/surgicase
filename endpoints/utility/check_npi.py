@@ -1,5 +1,5 @@
 # Created: 2025-07-16 11:24:30
-# Last Modified: 2025-08-06 15:42:37
+# Last Modified: 2025-08-29 19:29:54
 # Author: Scott Cadreau
 
 # endpoints/utility/check_npi.py
@@ -13,12 +13,13 @@ router = APIRouter()
 
 @router.get("/check_npi")
 @track_business_operation("validate", "npi")
-def check_npi(request: Request, npi: str = Query(..., regex="^\\d{10}$")):
+def check_npi(request: Request, npi: str = Query(..., regex="^\\d{10}$"), facility: bool = Query(False)):
     """
-    Validate and retrieve provider information from a National Provider Identifier (NPI).
+    Validate and retrieve provider or facility information from a National Provider Identifier (NPI).
     
     This endpoint validates a 10-digit NPI number by querying the official CMS National
-    Provider Identifier (NPI) Registry API. It performs comprehensive validation including
+    Provider Identifier (NPI) Registry API. It supports both individual providers (Type 1)
+    and organizational facilities (Type 2). It performs comprehensive validation including
     format checking, external API verification, and data extraction with automatic name
     formatting standardization.
     
@@ -26,18 +27,24 @@ def check_npi(request: Request, npi: str = Query(..., regex="^\\d{10}$")):
         request (Request): FastAPI request object for logging and monitoring
         npi (str): 10-digit National Provider Identifier number to validate.
                   Must be exactly 10 digits, validated by regex pattern "^\\d{10}$"
+        facility (bool): Optional query parameter to specify lookup type.
+                        False (default): Look up individual provider (Type 1)
+                        True: Look up organizational facility (Type 2)
     
     Returns:
-        dict: Response containing validated provider information:
+        dict: Response containing validated provider/facility information:
             - npi (str): The validated 10-digit NPI number
-            - first_name (str): Provider's first name with proper capitalization
-            - last_name (str): Provider's last name with proper capitalization
+            - first_name (str): For individuals: Provider's first name with proper capitalization
+                               For facilities: Organization name with proper capitalization
+            - last_name (str): For individuals: Provider's last name with proper capitalization
+                              For facilities: Empty string
     
     Raises:
         HTTPException:
             - 400 Bad Request: Invalid NPI format (not 10 digits)
             - 404 Not Found: NPI not found in the CMS registry
-            - 422 Unprocessable Entity: NPI record missing required name fields
+            - 422 Unprocessable Entity: NPI record missing required fields
+                                       (name fields for individuals, organization name for facilities)
             - 502 Bad Gateway: Failed to contact external NPI registry API
             - 500 Internal Server Error: Unexpected processing errors
     
@@ -48,15 +55,17 @@ def check_npi(request: Request, npi: str = Query(..., regex="^\\d{10}$")):
     
     Data Processing:
         - Automatic name capitalization using capitalize_name_field utility
-        - Validation of required fields (first_name, last_name) from API response
+        - Validation of required fields based on lookup type:
+          - Individual providers: first_name, last_name
+          - Facilities: organization_name
         - JSON response parsing with error handling for malformed data
     
     Monitoring & Logging:
         - Business metrics tracking with detailed operation categorization:
-          - "success": Valid NPI with complete provider information
+          - "success": Valid NPI with complete provider/facility information
           - "invalid_format": Improper NPI format provided
           - "not_found": NPI not found in registry
-          - "missing_fields": NPI found but missing required data
+          - "missing_fields": NPI found but missing required data (names or organization name)
           - "external_api_error": CMS API communication failure
           - "error": Unexpected system errors
         - Prometheus monitoring via @track_business_operation decorator
@@ -64,13 +73,22 @@ def check_npi(request: Request, npi: str = Query(..., regex="^\\d{10}$")):
         - Error logging with full exception details and status codes
     
     Example Usage:
-        GET /check_npi?npi=1234567890
+        Individual Provider: GET /check_npi?npi=1234567890
+        Facility: GET /check_npi?npi=1234567890&facility=true
     
-    Example Response:
+    Example Responses:
+        Individual Provider:
         {
             "npi": "1234567890",
             "first_name": "John",
             "last_name": "Smith"
+        }
+        
+        Facility:
+        {
+            "npi": "1234567890",
+            "first_name": "General Hospital",
+            "last_name": ""
         }
     
     Security Considerations:
@@ -82,8 +100,9 @@ def check_npi(request: Request, npi: str = Query(..., regex="^\\d{10}$")):
     Notes:
         - No authentication required for this utility endpoint
         - Names are automatically formatted for consistent presentation
-        - Only individual providers (Type 1 NPIs) with name fields are supported
-        - Organizational providers (Type 2 NPIs) may fail validation if missing name fields
+        - Supports both individual providers (Type 1) and organizational facilities (Type 2)
+        - Use facility=true parameter to lookup organizational facilities
+        - For facilities, organization name is returned in the first_name field
     """
     start_time = time.time()
     response_status = 200
@@ -120,26 +139,49 @@ def check_npi(request: Request, npi: str = Query(..., regex="^\\d{10}$")):
 
         result = data["results"][0]
         basic = result.get("basic", {})
-        first_name = basic.get("first_name")
-        last_name = basic.get("last_name")
-        if not first_name or not last_name:
-            # Record failed NPI validation (missing name fields)
-            business_metrics.record_utility_operation("npi_validation", "missing_fields")
-            response_status = 422
-            error_message = "NPI record missing name fields"
-            raise HTTPException(status_code=422, detail="NPI record missing name fields.")
+        
+        if facility:
+            # For facilities (Type 2), look for organization name
+            organization_name = basic.get("organization_name")
+            if not organization_name:
+                # Record failed NPI validation (missing organization name)
+                business_metrics.record_utility_operation("npi_validation", "missing_fields")
+                response_status = 422
+                error_message = "NPI record missing organization name"
+                raise HTTPException(status_code=422, detail="NPI record missing organization name.")
+            
+            corrected_org_name = capitalize_name_field(organization_name)
+            
+            # Record successful NPI validation
+            business_metrics.record_utility_operation("npi_validation", "success")
+            
+            response_data = {
+                "npi": npi,
+                "first_name": corrected_org_name,  # Using first_name field for organization name
+                "last_name": ""  # Empty last_name for facilities
+            }
+        else:
+            # For individual providers (Type 1), look for first and last name
+            first_name = basic.get("first_name")
+            last_name = basic.get("last_name")
+            if not first_name or not last_name:
+                # Record failed NPI validation (missing name fields)
+                business_metrics.record_utility_operation("npi_validation", "missing_fields")
+                response_status = 422
+                error_message = "NPI record missing name fields"
+                raise HTTPException(status_code=422, detail="NPI record missing name fields.")
 
-        corrected_first = capitalize_name_field(first_name)
-        corrected_last = capitalize_name_field(last_name)
+            corrected_first = capitalize_name_field(first_name)
+            corrected_last = capitalize_name_field(last_name)
 
-        # Record successful NPI validation
-        business_metrics.record_utility_operation("npi_validation", "success")
+            # Record successful NPI validation
+            business_metrics.record_utility_operation("npi_validation", "success")
 
-        response_data = {
-            "npi": npi,
-            "first_name": corrected_first,
-            "last_name": corrected_last
-        }
+            response_data = {
+                "npi": npi,
+                "first_name": corrected_first,
+                "last_name": corrected_last
+            }
         return response_data
         
     except HTTPException as http_error:
