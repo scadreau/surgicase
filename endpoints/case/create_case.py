@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-21 02:30:35
+# Last Modified: 2025-08-29 02:10:45
 # Author: Scott Cadreau
 
 # endpoints/case/create_case.py
@@ -11,6 +11,7 @@ from core.models import CaseCreate
 from utils.case_status import update_case_status
 from utils.pay_amount_calculator import update_case_pay_amount
 from utils.monitoring import track_business_operation, business_metrics
+from utils.text_formatting import capitalize_name_field
 import logging
 import time
 import threading
@@ -40,6 +41,10 @@ def create_case_with_procedures(case: CaseCreate, conn) -> dict:
     logger.info(f"Creating case with ID: {case.case_id}")
     logger.info(f"Case data: {case}")
     
+    # Format patient names for proper capitalization
+    formatted_patient_first = capitalize_name_field(case.patient.first)
+    formatted_patient_last = capitalize_name_field(case.patient.last)
+    
     with conn.cursor(pymysql.cursors.DictCursor) as cursor:
         # Insert into cases table
         cursor.execute("""
@@ -48,8 +53,8 @@ def create_case_with_procedures(case: CaseCreate, conn) -> dict:
                 ins_provider, surgeon_id, facility_id, demo_file, note_file, misc_file
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
-            case.case_id, case.user_id, case.case_date, case.patient.first, 
-            case.patient.last, case.patient.ins_provider, case.surgeon_id, 
+            case.case_id, case.user_id, case.case_date, formatted_patient_first, 
+            formatted_patient_last, case.patient.ins_provider, case.surgeon_id, 
             case.facility_id, case.demo_file, case.note_file, case.misc_file
         ))
 
