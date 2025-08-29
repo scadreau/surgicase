@@ -1,5 +1,5 @@
 # Created: 2025-07-21 16:40:47
-# Last Modified: 2025-08-29 20:09:20
+# Last Modified: 2025-08-29 22:05:21
 # Author: Scott Cadreau
 
 # endpoints/facility/search_facility.py
@@ -16,34 +16,46 @@ router = APIRouter()
 @track_business_operation("search", "facility")
 def search_facility(
     request: Request,
-    facility_name: str = Query(..., description="Facility name to search for"),
+    facility_name: str = Query(..., description="Facility name to search for, or a valid 10-digit NPI number"),
     user_id: str = Query(None, description="Optional user ID for enhanced logging and monitoring")
 ):
     """
-    Search for healthcare facilities by name using optimized A-Z partitioned search tables.
+    Search for healthcare facilities by name or NPI number using optimized search tables.
     
     This endpoint provides intelligent facility search functionality across the national NPI registry including:
     - High-performance search across millions of facility records
-    - Optimized A-Z table partitioning for sub-50ms query times
+    - Dual search modes: facility name (A-Z partitioned) or direct NPI lookup
+    - Optimized A-Z table partitioning for sub-50ms query times on name searches
+    - Direct NPI lookup using search_facility_all table for exact matches
     - Partial name matching with intelligent text formatting
     - Comprehensive monitoring and business metrics tracking
     - Full request logging and execution time tracking
     - Prometheus metrics integration for operational monitoring
     
     Search Strategy & Performance:
+        Name Search:
         - Determines appropriate search table based on first letter of facility_name
         - Uses optimized search_facility_[a-z] tables (26 partitions)
         - Distributes millions of records across smaller indexed tables (~20K-100K each)
         - Leverages database indexes (idx_npi, idx_facility_name) for fast execution
         - Performs LIKE search with wildcards for partial matching
         - Typical query time: <50ms vs >3000ms for full table scan
-        - Eliminates need to scan entire NPI dataset for each search
+        
+        NPI Search:
+        - Detects 10-digit numeric input as NPI number
+        - Uses search_facility_all table for direct NPI lookup
+        - Exact match search for fastest possible retrieval
+        - Eliminates need to scan multiple A-Z tables for NPI searches
     
     Table Structure & Data Source:
-        - Tables: search_surgeon_facility.search_facility_a through search_facility_z
+        Name Search Tables: search_surgeon_facility.search_facility_a through search_facility_z
         - Primary indexes: idx_npi (unique), idx_facility_name (search optimized)
         - Data source: npi_data_2 (Organization providers from National NPI registry)
         - Record types: Hospitals, clinics, surgical centers, labs, pharmacies
+        
+        NPI Search Table: search_surgeon_facility.search_facility_all
+        - Contains all facility records for direct NPI lookup
+        - Optimized for exact NPI matching
     
     Text Formatting & Normalization:
         - Applies proper capitalization to facility names via capitalize_facility_field()
@@ -62,7 +74,8 @@ def search_facility(
     
     Args:
         request (Request): FastAPI request object for logging and monitoring
-        facility_name (str): Healthcare facility name to search for (partial matching supported)
+        facility_name (str): Healthcare facility name to search for (partial matching supported) 
+                            OR a valid 10-digit NPI number for exact facility lookup
         user_id (str, optional): User ID for enhanced logging and monitoring
     
     Returns:
@@ -103,8 +116,12 @@ def search_facility(
         - Strips whitespace from search term before processing
         - Returns appropriate 400 error for invalid input
     
-    Example:
+    Examples:
+        Name Search:
         GET /search-facility?facility_name=General Hospital&user_id=user123
+        
+        NPI Search:
+        GET /search-facility?facility_name=1234567890&user_id=user123
         
         Response:
         {
@@ -129,7 +146,8 @@ def search_facility(
         }
     
     Note:
-        - Search is case-insensitive and supports partial matching
+        - Name search is case-insensitive and supports partial matching
+        - NPI search performs exact match on 10-digit numbers
         - Results are automatically formatted for consistent presentation
         - Non-alphabetic search terms default to 'a' table for processing
         - Search covers only organization-type NPI providers (facilities)
@@ -149,22 +167,34 @@ def search_facility(
 
         conn = get_db_connection()
         
-        # Determine which table to search based on first letter of facility name
-        first_letter = facility_name.strip()[0].lower()
-        if not first_letter.isalpha():
-            # For non-alphabetic characters, default to 'a' table
-            first_letter = 'a'
-        
-        table_name = f"search_facility_{first_letter}"
+        # Check if the search string is a valid 10-digit NPI number
+        search_term = facility_name.strip()
+        is_npi_search = search_term.isdigit() and len(search_term) == 10
         
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-                # Search using LIKE for partial matching on facility name in the appropriate A-Z table
-                cursor.execute(f"""
-                    SELECT npi, facility_name, address, city, state, zip
-                    FROM search_surgeon_facility.{table_name}
-                    WHERE facility_name LIKE %s order by state, city, facility_name
-                """, (f"%{facility_name}%",))
+                if is_npi_search:
+                    # Search by NPI in the search_facility_all table
+                    cursor.execute("""
+                        SELECT npi, facility_name, address, city, state, zip
+                        FROM search_surgeon_facility.search_facility_all
+                        WHERE npi = %s
+                    """, (search_term,))
+                else:
+                    # Determine which table to search based on first letter of facility name
+                    first_letter = search_term[0].lower()
+                    if not first_letter.isalpha():
+                        # For non-alphabetic characters, default to 'a' table
+                        first_letter = 'a'
+                    
+                    table_name = f"search_facility_{first_letter}"
+                    
+                    # Search using LIKE for partial matching on facility name in the appropriate A-Z table
+                    cursor.execute(f"""
+                        SELECT npi, facility_name, address, city, state, zip
+                        FROM search_surgeon_facility.{table_name}
+                        WHERE facility_name LIKE %s order by state, city, facility_name
+                    """, (f"%{search_term}%",))
                 
                 facilities = cursor.fetchall()
 
