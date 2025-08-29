@@ -20,6 +20,10 @@ pypdf>=3.0.0
 # HTTP Requests
 requests>=2.31.0
 
+# AI/ML Services
+openai>=1.0.0
+anthropic>=0.7.0
+
 # Security & Encryption
 cryptography>=41.0.0
 
