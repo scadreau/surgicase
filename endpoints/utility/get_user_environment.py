@@ -1,5 +1,5 @@
 # Created: 2025-07-24 17:54:30
-# Last Modified: 2025-08-27 05:08:37
+# Last Modified: 2025-08-29 19:45:57
 # Author: Scott Cadreau
 
 # endpoints/utility/get_user_environment.py
@@ -382,7 +382,7 @@ def get_user_profile_info(user_id: str, conn) -> dict:
             SELECT user_id, user_email, first_name, last_name, addr1, addr2, 
                    city, state, zipcode, telephone, user_npi, referred_by_user, 
                    user_type, message_pref, states_licensed, user_tier, max_case_status,
-                   create_ts, last_updated_ts, last_login_dt, active
+                   create_ts, last_updated_ts, last_login_dt, active, default_pagination_cases
             FROM user_profile 
             WHERE user_id = %s AND active = 1
         """, (user_id,))
@@ -595,6 +595,7 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
                 - user_tier (int): User tier level
                 - max_case_status (int): Maximum case status user can access
                 - max_case_status_desc (str): Description of maximum case status
+                - default_pagination_cases (int): Default number of cases per page for pagination
                 - last_login_dt (str): Last login timestamp (ISO format)
                 - active (int): Account active status
                 - documents (List[dict]): User's uploaded documents
