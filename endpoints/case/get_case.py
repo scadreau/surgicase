@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-27 04:47:49
+# Last Modified: 2025-08-29 23:31:11
 # Author: Scott Cadreau
 
 # endpoints/case/get_case.py
@@ -53,7 +53,7 @@ def _get_case_optimized(cursor, case_id, calling_user_id):
         LEFT JOIN user_profile up ON c.user_id = up.user_id AND up.active = 1
         LEFT JOIN user_profile calling_up ON %s = calling_up.user_id AND calling_up.active = 1
         LEFT JOIN case_procedure_codes cpc ON c.case_id = cpc.case_id
-        LEFT JOIN procedure_codes_desc pc ON cpc.procedure_code = pc.procedure_code
+        LEFT JOIN procedure_codes pc ON cpc.procedure_code = pc.procedure_code
         WHERE c.case_id = %s AND c.active = 1
         GROUP BY 
             c.user_id, c.case_id, c.case_date, c.patient_first, c.patient_last,

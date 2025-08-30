@@ -1,5 +1,5 @@
 # Created: 2025-07-21 16:40:47
-# Last Modified: 2025-08-29 22:44:51
+# Last Modified: 2025-08-29 23:09:55
 # Author: Scott Cadreau
 
 # endpoints/facility/search_facility.py
@@ -11,7 +11,6 @@ from utils.text_formatting import capitalize_name_field, capitalize_facility_fie
 from utils.secrets_manager import get_secret
 import time
 import json
-import openai
 
 router = APIRouter()
 
@@ -428,46 +427,91 @@ def search_facility_ai(
             error_message = f"Failed to retrieve OpenAI API key: {str(e)}"
             raise HTTPException(status_code=500, detail={"error": "AI service configuration error"})
 
-        # Configure OpenAI client
-        openai.api_key = openai_api_key
+
         
         # Prepare AI prompt with structured JSON response requirement
-        ai_prompt = f"""I have a hospital/surgery center/medical facility that I need to get the official organization name and npi number. Can you provide me with the NPI, organization name, address information for {facility_name.strip()} located in {city.strip()}, {state.strip()}.
+        ai_prompt = f"""You are a healthcare facility database expert with access to National Provider Identifier (NPI) registry information. I need you to find the official organization name and NPI number for a medical facility.
 
-Please respond ONLY with a valid JSON object in the following exact format:
+Facility: {facility_name.strip()}
+Location: {city.strip()}, {state.strip()}
+
+INSTRUCTIONS:
+1. Identify the exact legal organization name as it appears in the NPI registry
+2. Find the actual 10-digit NPI number from the official registry
+3. If you know this facility exists but cannot recall the exact NPI, use "UNKNOWN" 
+4. NEVER fabricate, guess, or create fake NPI numbers like "1234567890" or "9876543210"
+5. Consider common variations: "Hospital" vs "Medical Center", "Inc." vs "LLC", etc.
+
+Examples of what I need:
+- "Sunrise Mountain View" might be "Sunrise Mountainview Hospital, Inc." with NPI 1104870187
+- "Banner Desert" might be "Banner Desert Medical Center" with a specific real NPI
+- "Mayo Clinic" locations have different NPIs for different campuses
+
+Respond ONLY with valid JSON in this exact format:
 {{
     "npi": "1234567890",
-    "official_name": "Official Organization Name",
+    "official_name": "Exact Legal Organization Name",
     "address": "Street Address",
-    "city": "City Name",
+    "city": "City Name", 
     "state": "State",
     "zip": "ZIP Code",
     "confidence": "high"
 }}
 
-Requirements:
-- NPI must be exactly 10 digits
-- Use "high", "medium", or "low" for confidence
-- If you cannot find a definitive match, set confidence to "low" and provide your best guess
-- Return ONLY the JSON object, no additional text or explanation"""
+Confidence levels:
+- "high": You are certain of both the name and NPI
+- "medium": You know the facility but not certain of exact NPI (use "UNKNOWN" for NPI)
+- "low": You are unsure about the facility identification (use "UNKNOWN" for NPI)
 
-        # Make AI API call with timing
+Return ONLY the JSON object, no additional text."""
+
+        # Make AI API call with timing - try Anthropic Claude first, fallback to OpenAI
         ai_start_time = time.time()
+        ai_content = None
+        ai_provider = "unknown"
+        
         try:
-            ai_response = openai.ChatCompletion.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "You are a healthcare facility database expert. Respond only with valid JSON as requested."},
-                    {"role": "user", "content": ai_prompt}
-                ],
-                max_tokens=300,
-                temperature=0.1  # Low temperature for more consistent, factual responses
-            )
+            # Try Anthropic Claude first (often better for factual healthcare data)
+            anthropic_api_key = main_config.get("ANTHROPIC_API_KEY")
+            if anthropic_api_key:
+                try:
+                    import anthropic
+                    anthropic_client = anthropic.Anthropic(api_key=anthropic_api_key)
+                    
+                    claude_response = anthropic_client.messages.create(
+                        model="claude-3-5-sonnet-20241022",  # Latest Claude model with most recent training
+                        max_tokens=300,
+                        temperature=0.1,
+                        system="You are a healthcare facility database expert. Respond only with valid JSON as requested.",
+                        messages=[{"role": "user", "content": ai_prompt}]
+                    )
+                    
+                    ai_content = claude_response.content[0].text.strip()
+                    ai_provider = "claude-3.5-sonnet"
+                    
+                except Exception as claude_error:
+                    # Claude failed, will try OpenAI as fallback
+                    pass
+            
+            # Fallback to OpenAI if Claude not available or failed
+            if not ai_content:
+                from openai import OpenAI
+                openai_client = OpenAI(api_key=openai_api_key)
+                
+                ai_response = openai_client.chat.completions.create(
+                    model="gpt-5-2025-08-07",  # Using specific GPT-5 version with August 2025 training cutoff
+                    messages=[
+                        {"role": "system", "content": "You are a healthcare facility database expert. Respond only with valid JSON as requested."},
+                        {"role": "user", "content": ai_prompt}
+                    ],
+                    max_tokens=300,
+                    temperature=0.1  # Low temperature for more consistent, factual responses
+                )
+                
+                ai_content = ai_response.choices[0].message.content.strip()
+                ai_provider = "gpt-5-2025-08-07"
             
             ai_response_time_ms = int((time.time() - ai_start_time) * 1000)
-            
-            # Extract and parse AI response
-            ai_content = ai_response.choices[0].message.content.strip()
             
             # Clean up response (remove any markdown formatting if present)
             if ai_content.startswith("```json"):
@@ -485,19 +529,51 @@ Requirements:
             
             # Validate NPI format
             suggested_npi = str(ai_data["npi"]).strip()
-            if not (suggested_npi.isdigit() and len(suggested_npi) == 10):
+            if suggested_npi.upper() == "UNKNOWN":
+                # AI couldn't find a definitive NPI - return response without database lookup
+                response_data = {
+                    "statusCode": 200,
+                    "body": {
+                        "message": "AI found facility information but could not determine exact NPI",
+                        "search_criteria": {
+                            "facility_name": facility_name,
+                            "city": city,
+                            "state": state
+                        },
+                        "ai_resolution": {
+                            "suggested_name": ai_data.get("official_name", ""),
+                            "suggested_npi": "UNKNOWN",
+                            "confidence": ai_data.get("confidence", "unknown"),
+                            "ai_response_time_ms": ai_response_time_ms,
+                            "ai_provider": ai_provider
+                        },
+                        "facilities": [],
+                        "recommendation": f"Try searching for '{ai_data.get('official_name', facility_name)}' in the regular facility search"
+                    }
+                }
+                if user_id:
+                    response_data["body"]["search_criteria"]["user_id"] = user_id
+                business_metrics.record_facility_operation("ai_search", "unknown_npi", None)
+                return response_data
+            elif not (suggested_npi.isdigit() and len(suggested_npi) == 10):
                 raise ValueError(f"AI returned invalid NPI format: {suggested_npi}")
                 
-        except openai.error.RateLimitError:
-            response_status = 503
-            error_message = "OpenAI API rate limit exceeded"
-            business_metrics.record_facility_operation("ai_search", "rate_limit", None)
-            raise HTTPException(status_code=503, detail={"error": "AI service temporarily unavailable due to rate limits"})
-        except openai.error.APIError as e:
-            response_status = 503
-            error_message = f"OpenAI API error: {str(e)}"
-            business_metrics.record_facility_operation("ai_search", "api_error", None)
-            raise HTTPException(status_code=503, detail={"error": "AI service temporarily unavailable"})
+        except Exception as openai_error:
+            # Handle OpenAI-specific errors
+            error_str = str(openai_error).lower()
+            if "rate limit" in error_str or "quota" in error_str:
+                response_status = 503
+                error_message = "OpenAI API rate limit exceeded"
+                business_metrics.record_facility_operation("ai_search", "rate_limit", None)
+                raise HTTPException(status_code=503, detail={"error": "AI service temporarily unavailable due to rate limits"})
+            elif "api" in error_str or "connection" in error_str or "timeout" in error_str:
+                response_status = 503
+                error_message = f"OpenAI API error: {str(openai_error)}"
+                business_metrics.record_facility_operation("ai_search", "api_error", None)
+                raise HTTPException(status_code=503, detail={"error": "AI service temporarily unavailable"})
+            else:
+                # Re-raise for other processing (JSON parsing, validation, etc.)
+                raise
         except json.JSONDecodeError as e:
             response_status = 500
             error_message = f"Failed to parse AI response as JSON: {str(e)}"
@@ -541,9 +617,54 @@ Requirements:
                     message = "AI successfully resolved facility to exact match"
                     business_metrics.record_facility_operation("ai_search", "success", None)
                 else:
-                    facilities = []
-                    message = f"AI suggested NPI {suggested_npi} not found in database"
-                    business_metrics.record_facility_operation("ai_search", "npi_not_found", None)
+                    # NPI not found - try fallback search using AI-suggested facility name
+                    suggested_name = ai_data.get("official_name", "").strip()
+                    if suggested_name:
+                        # Try searching by the AI-suggested name in the appropriate A-Z table
+                        first_letter = suggested_name[0].lower()
+                        if not first_letter.isalpha():
+                            first_letter = 'a'
+                        
+                        table_name = f"search_facility_{first_letter}"
+                        
+                        cursor.execute(f"""
+                            SELECT npi, facility_name, address, city, state, zip
+                            FROM search_surgeon_facility.{table_name}
+                            WHERE facility_name LIKE %s AND city LIKE %s AND state LIKE %s
+                            ORDER BY 
+                                CASE WHEN facility_name LIKE %s THEN 1 ELSE 2 END,
+                                facility_name
+                            LIMIT 5
+                        """, (f"%{suggested_name}%", f"%{city.strip()}%", f"%{state.strip()}%", f"{suggested_name}%"))
+                        
+                        fallback_results = cursor.fetchall()
+                        
+                        if fallback_results:
+                            # Apply formatting to fallback results
+                            for row in fallback_results:
+                                if 'facility_name' in row and row['facility_name']:
+                                    row['facility_name'] = capitalize_facility_field(row['facility_name'])
+                                if 'city' in row and row['city']:
+                                    row['city'] = capitalize_name_field(row['city'])
+                                if 'address' in row and row['address']:
+                                    row['address'] = capitalize_address_field(row['address'])
+                                if 'state' in row and row['state']:
+                                    if len(row['state']) > 2:
+                                        row['state'] = capitalize_name_field(row['state'])
+                                    else:
+                                        row['state'] = row['state'].upper()
+                            
+                            facilities = fallback_results
+                            message = f"AI suggested NPI {suggested_npi} not found, but found {len(fallback_results)} facility(ies) matching AI-suggested name"
+                            business_metrics.record_facility_operation("ai_search", "fallback_success", None)
+                        else:
+                            facilities = []
+                            message = f"AI suggested NPI {suggested_npi} not found in database, and no facilities found matching suggested name"
+                            business_metrics.record_facility_operation("ai_search", "npi_not_found", None)
+                    else:
+                        facilities = []
+                        message = f"AI suggested NPI {suggested_npi} not found in database"
+                        business_metrics.record_facility_operation("ai_search", "npi_not_found", None)
                     
         finally:
             close_db_connection(conn)
@@ -561,7 +682,8 @@ Requirements:
             "suggested_name": ai_data.get("official_name", ""),
             "suggested_npi": suggested_npi,
             "confidence": ai_data.get("confidence", "unknown"),
-            "ai_response_time_ms": ai_response_time_ms
+            "ai_response_time_ms": ai_response_time_ms,
+            "ai_provider": ai_provider
         }
         
         response_data = {
