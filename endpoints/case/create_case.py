@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-31 00:09:50
+# Last Modified: 2025-08-31 00:14:31
 # Author: Scott Cadreau
 
 # endpoints/case/create_case.py
@@ -64,10 +64,12 @@ def create_case_with_procedures(case: CaseCreate, conn) -> dict:
             for code in case.procedure_codes:
                 cursor.execute("""
                     INSERT INTO case_procedure_codes (case_id, procedure_code, procedure_desc)
-                    SELECT %s, %s, COALESCE(pc.procedure_desc, '')
-                    FROM procedure_codes pc 
-                    WHERE pc.procedure_code = %s 
-                    LIMIT 1
+                    VALUES (%s, %s, (
+                        SELECT COALESCE(pc.procedure_desc, '')
+                        FROM procedure_codes pc 
+                        WHERE pc.procedure_code = %s 
+                        LIMIT 1
+                    ))
                 """, (case.case_id, code, code))
 
         # Calculate and update pay amount if procedure codes exist

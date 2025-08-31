@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-31 00:11:50
+# Last Modified: 2025-08-31 00:14:33
 # Author: Scott Cadreau
 
 # endpoints/case/update_case.py
@@ -226,10 +226,12 @@ def update_case(request: Request, case: CaseUpdate = Body(...)):
                 for code in unique_procedure_codes:
                     cursor.execute("""
                         INSERT INTO case_procedure_codes (case_id, procedure_code, procedure_desc)
-                        SELECT %s, %s, COALESCE(pc.procedure_desc, '')
-                        FROM procedure_codes pc 
-                        WHERE pc.procedure_code = %s 
-                        LIMIT 1
+                        VALUES (%s, %s, (
+                            SELECT COALESCE(pc.procedure_desc, '')
+                            FROM procedure_codes pc 
+                            WHERE pc.procedure_code = %s 
+                            LIMIT 1
+                        ))
                     """, (case.case_id, code, code))
                 updated_fields.append("procedure_codes")
 
