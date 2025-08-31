@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-21 02:30:34
+# Last Modified: 2025-08-31 00:11:50
 # Author: Scott Cadreau
 
 # endpoints/case/update_case.py
@@ -222,12 +222,15 @@ def update_case(request: Request, case: CaseUpdate = Body(...)):
                 
                 # Delete existing codes
                 cursor.execute("DELETE FROM case_procedure_codes WHERE case_id = %s", (case.case_id,))
-                # Insert new unique codes
+                # Insert new unique codes with descriptions
                 for code in unique_procedure_codes:
-                    cursor.execute(
-                        "INSERT INTO case_procedure_codes (case_id, procedure_code) VALUES (%s, %s)",
-                        (case.case_id, code)
-                    )
+                    cursor.execute("""
+                        INSERT INTO case_procedure_codes (case_id, procedure_code, procedure_desc)
+                        SELECT %s, %s, COALESCE(pc.procedure_desc, '')
+                        FROM procedure_codes pc 
+                        WHERE pc.procedure_code = %s 
+                        LIMIT 1
+                    """, (case.case_id, code, code))
                 updated_fields.append("procedure_codes")
 
             if not updated_fields:

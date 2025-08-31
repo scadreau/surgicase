@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-30 23:26:15
+# Last Modified: 2025-08-31 00:04:07
 # Author: Scott Cadreau
 
 # endpoints/case/get_case.py
@@ -40,7 +40,7 @@ def _get_case_optimized(cursor, case_id, calling_user_id):
                         WHEN cpc.procedure_code IS NOT NULL 
                         THEN JSON_OBJECT(
                             'procedure_code', cpc.procedure_code,
-                            'procedure_desc', COALESCE(pc.procedure_desc, '')
+                            'procedure_desc', COALESCE(cpc.procedure_desc, '')
                         )
                         ELSE NULL
                     END
@@ -53,7 +53,6 @@ def _get_case_optimized(cursor, case_id, calling_user_id):
         LEFT JOIN user_profile up ON c.user_id = up.user_id AND up.active = 1
         LEFT JOIN user_profile calling_up ON %s = calling_up.user_id AND calling_up.active = 1
         LEFT JOIN case_procedure_codes cpc ON c.case_id = cpc.case_id
-        LEFT JOIN procedure_codes_desc pc ON cpc.procedure_code = pc.procedure_code
         WHERE c.case_id = %s AND c.active = 1
         GROUP BY 
             c.user_id, c.case_id, c.case_date, c.patient_first, c.patient_last,

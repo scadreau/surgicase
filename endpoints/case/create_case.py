@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-29 02:10:45
+# Last Modified: 2025-08-31 00:09:50
 # Author: Scott Cadreau
 
 # endpoints/case/create_case.py
@@ -58,12 +58,17 @@ def create_case_with_procedures(case: CaseCreate, conn) -> dict:
             case.facility_id, case.demo_file, case.note_file, case.misc_file
         ))
 
-        # Insert procedure codes using batch operation if any exist
+        # Insert procedure codes with descriptions using batch operation if any exist
         if case.procedure_codes:
-            cursor.executemany("""
-                INSERT INTO case_procedure_codes (case_id, procedure_code)
-                VALUES (%s, %s)
-            """, [(case.case_id, code) for code in case.procedure_codes])
+            # Insert procedure codes with descriptions looked up from procedure_codes table
+            for code in case.procedure_codes:
+                cursor.execute("""
+                    INSERT INTO case_procedure_codes (case_id, procedure_code, procedure_desc)
+                    SELECT %s, %s, COALESCE(pc.procedure_desc, '')
+                    FROM procedure_codes pc 
+                    WHERE pc.procedure_code = %s 
+                    LIMIT 1
+                """, (case.case_id, code, code))
 
         # Calculate and update pay amount if procedure codes exist
         pay_amount_result = update_case_pay_amount(case.case_id, case.user_id, conn)
