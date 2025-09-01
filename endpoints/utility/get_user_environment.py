@@ -1,5 +1,5 @@
 # Created: 2025-07-24 17:54:30
-# Last Modified: 2025-08-29 19:45:57
+# Last Modified: 2025-09-01 18:54:31
 # Author: Scott Cadreau
 
 # endpoints/utility/get_user_environment.py
@@ -51,6 +51,53 @@ def _check_user_group_admin(user_id: str, conn) -> bool:
     except Exception as e:
         logging.error(f"Error checking group admin status for user {user_id}: {str(e)}")
         return False
+
+
+def _get_group_users_for_admin(user_id: str, conn) -> list:
+    """
+    Return list of users in the admin's group.
+
+    - Only includes active memberships and active user profiles (active = 1)
+    - Excludes the admin themselves
+    - Sorted by last_name, first_name
+
+    Returns a list of dicts: { user_id, first_name, last_name }
+    """
+    try:
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            # Find the single group the admin manages
+            cursor.execute(
+                """
+                SELECT ug.group_id
+                FROM user_groups ug
+                WHERE ug.user_id = %s AND ug.group_admin = 1
+                LIMIT 1
+                """,
+                (user_id,)
+            )
+            row = cursor.fetchone()
+            if not row or row.get("group_id") is None:
+                return []
+
+            group_id = row["group_id"]
+
+            # Get other active users in that group joined to active profiles, excluding admin
+            cursor.execute(
+                """
+                SELECT up.user_id, up.first_name, up.last_name
+                FROM user_groups ug
+                JOIN user_profile up ON ug.user_id = up.user_id AND up.active = 1
+                WHERE ug.group_id = %s
+                  AND ug.user_id <> %s
+                ORDER BY up.last_name, up.first_name
+                """,
+                (group_id, user_id)
+            )
+            users = cursor.fetchall() or []
+            return users
+    except Exception as e:
+        logging.error(f"Error fetching group users for admin {user_id}: {str(e)}")
+        return []
 
 def _is_user_environment_cache_valid(cache_key: str, cache_ttl: int = 43200) -> bool:
     """Check if cached user environment data is still valid (12 hours = 43200 seconds)"""
@@ -223,6 +270,10 @@ def _warm_single_user_environment_cache(user_id: str) -> bool:
                     "last_login_updated": False  # Don't update login time during warming
                 }
             }
+
+            # Include group users if admin
+            if is_group_admin:
+                response_data["group_users"] = _get_group_users_for_admin(user_id, conn)
             
             # Cache the result
             cache_key = _generate_user_environment_cache_key(user_id)
@@ -810,6 +861,10 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
                 "last_login_updated": login_updated
             }
         }
+
+        # Include group users if admin
+        if is_group_admin:
+            response_data["group_users"] = _get_group_users_for_admin(user_id, conn)
         
         # Cache the result before returning
         cache_success = _cache_user_environment_data(cache_key, response_data, user_id)
