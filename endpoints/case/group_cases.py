@@ -1,5 +1,5 @@
 # Created: 2025-08-26 23:50:11
-# Last Modified: 2025-08-27 00:47:31
+# Last Modified: 2025-08-31 00:20:00
 # Author: Scott Cadreau
 
 # endpoints/case/group_cases.py
@@ -90,7 +90,7 @@ def _get_group_cases_optimized(cursor, requesting_user_id: str, target_user_id: 
                         WHEN cpc.procedure_code IS NOT NULL 
                         THEN JSON_OBJECT(
                             'procedure_code', cpc.procedure_code,
-                            'procedure_desc', COALESCE(pc.procedure_desc, '')
+                            'procedure_desc', COALESCE(cpc.procedure_desc, '')
                         )
                         ELSE NULL
                     END
@@ -100,7 +100,7 @@ def _get_group_cases_optimized(cursor, requesting_user_id: str, target_user_id: 
         FROM cases c
         LEFT JOIN case_status_list csl ON c.case_status = csl.case_status
         LEFT JOIN case_procedure_codes cpc ON c.case_id = cpc.case_id
-        LEFT JOIN procedure_codes_desc pc ON cpc.procedure_code = pc.procedure_code
+#        LEFT JOIN procedure_codes_desc pc ON cpc.procedure_code = pc.procedure_code
         LEFT JOIN user_profile up ON c.user_id = up.user_id AND up.active = 1
         WHERE c.user_id = %s AND c.active = 1
     """
@@ -205,7 +205,7 @@ def _get_all_group_cases_optimized(cursor, requesting_user_id: str, status_list,
                         WHEN cpc.procedure_code IS NOT NULL 
                         THEN JSON_OBJECT(
                             'procedure_code', cpc.procedure_code,
-                            'procedure_desc', COALESCE(pc.procedure_desc, '')
+                            'procedure_desc', COALESCE(cpc.procedure_desc, '')
                         )
                         ELSE NULL
                     END
@@ -215,7 +215,7 @@ def _get_all_group_cases_optimized(cursor, requesting_user_id: str, status_list,
         FROM cases c
         LEFT JOIN case_status_list csl ON c.case_status = csl.case_status
         LEFT JOIN case_procedure_codes cpc ON c.case_id = cpc.case_id
-        LEFT JOIN procedure_codes_desc pc ON cpc.procedure_code = pc.procedure_code
+#        LEFT JOIN procedure_codes_desc pc ON cpc.procedure_code = pc.procedure_code
         LEFT JOIN user_profile up ON c.user_id = up.user_id AND up.active = 1
         WHERE c.user_id IN (%s) AND c.active = 1
     """ % (",".join(["%s"] * len(accessible_users)))

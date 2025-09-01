@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-21 02:30:33
+# Last Modified: 2025-08-31 00:20:02
 # Author: Scott Cadreau
 
 # endpoints/case/filter_cases.py
@@ -189,7 +189,7 @@ def _get_user_cases_optimized(cursor, user_id, status_list, max_case_status):
                         WHEN cpc.procedure_code IS NOT NULL 
                         THEN JSON_OBJECT(
                             'procedure_code', cpc.procedure_code,
-                            'procedure_desc', COALESCE(pc.procedure_desc, '')
+                            'procedure_desc', COALESCE(cpc.procedure_desc, '')
                         )
                         ELSE NULL
                     END
@@ -199,7 +199,7 @@ def _get_user_cases_optimized(cursor, user_id, status_list, max_case_status):
         FROM cases c
         LEFT JOIN case_status_list csl ON c.case_status = csl.case_status
         LEFT JOIN case_procedure_codes cpc ON c.case_id = cpc.case_id
-        LEFT JOIN procedure_codes_desc pc ON cpc.procedure_code = pc.procedure_code
+#        LEFT JOIN procedure_codes_desc pc ON cpc.procedure_code = pc.procedure_code
         WHERE c.user_id = %s AND c.active = 1
     """
     params = [user_id]
