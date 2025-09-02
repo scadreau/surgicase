@@ -1,5 +1,5 @@
 # Created: 2025-07-30 14:30:30
-# Last Modified: 2025-08-26 20:16:49
+# Last Modified: 2025-09-02 17:32:05
 # Author: Scott Cadreau
 
 import boto3
@@ -1253,6 +1253,7 @@ def send_provider_payment_summary_report_emails(
                     to_addresses=[recipient['email_address']],
                     subject=subject,
                     body=body,
+                    from_address="SurgiCase Automation <noreply@metoraymedical.com>",
                     attachments=[attachment],
                     email_type=f"provider_payment_summary_report_{email_type}",
                     report_type="provider_payment_summary_report",
