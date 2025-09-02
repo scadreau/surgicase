@@ -1,5 +1,5 @@
 # Created: 2025-07-24 17:54:30
-# Last Modified: 2025-09-01 18:54:31
+# Last Modified: 2025-09-02 16:49:25
 # Author: Scott Cadreau
 
 # endpoints/utility/get_user_environment.py
@@ -758,6 +758,17 @@ def get_user_environment(request: Request, user_id: str = Query(..., description
         cached_result = _get_cached_user_environment(cache_key)
         if cached_result is not None:
             logging.debug(f"Returning cached user environment data for user: {user_id}")
+            # Ensure last_login_dt is updated even on cache hits
+            try:
+                conn_cache = get_db_connection()
+                try:
+                    cache_login_updated = update_user_last_login(user_id, conn_cache)
+                    if cache_login_updated:
+                        conn_cache.commit()
+                finally:
+                    close_db_connection(conn_cache)
+            except Exception as e:
+                logging.error(f"Failed to update last_login_dt on cache hit for user {user_id}: {str(e)}")
             
             # Calculate execution time for cache hit with better precision
             execution_time_seconds = time.time() - start_time
