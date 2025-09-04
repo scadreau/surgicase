@@ -1,5 +1,5 @@
 # Created: 2025-07-15 11:54:13
-# Last Modified: 2025-08-20 21:09:41
+# Last Modified: 2025-09-04 17:03:39
 # Author: Scott Cadreau
 
 # endpoints/backoffice/get_cases_by_status.py
@@ -237,7 +237,7 @@ def _get_cases_optimized(cursor, status_list, parsed_start_date, parsed_end_date
             c.ins_provider, c.surgeon_id, c.facility_id, c.case_status,
             csl.case_status_desc, c.demo_file, c.note_file, c.misc_file, c.pay_amount,
             up.first_name, up.last_name
-        ORDER BY up.first_name, up.last_name, c.case_id DESC
+        ORDER BY case_date DESC, up.first_name, up.last_name, c.case_id DESC
     """
     
     cursor.execute(sql, params)
