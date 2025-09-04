@@ -1,5 +1,5 @@
 # Created: 2025-07-24 17:54:30
-# Last Modified: 2025-09-02 16:49:25
+# Last Modified: 2025-09-04 17:52:52
 # Author: Scott Cadreau
 
 # endpoints/utility/get_user_environment.py
@@ -433,7 +433,8 @@ def get_user_profile_info(user_id: str, conn) -> dict:
             SELECT user_id, user_email, first_name, last_name, addr1, addr2, 
                    city, state, zipcode, telephone, user_npi, referred_by_user, 
                    user_type, message_pref, states_licensed, user_tier, max_case_status,
-                   create_ts, last_updated_ts, last_login_dt, active, default_pagination_cases
+                   create_ts, last_updated_ts, last_login_dt, active, default_pagination_cases,
+                   timezone
             FROM user_profile 
             WHERE user_id = %s AND active = 1
         """, (user_id,))
