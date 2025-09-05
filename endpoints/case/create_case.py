@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-31 00:14:31
+# Last Modified: 2025-09-05 20:46:27
 # Author: Scott Cadreau
 
 # endpoints/case/create_case.py
@@ -33,6 +33,36 @@ def case_exists(case_id: str, conn) -> bool:
         cursor.execute("SELECT case_id FROM cases WHERE case_id = %s", (case_id,))
         return cursor.fetchone() is not None
 
+def check_duplicate_case(user_id: str, case_date: str, patient_first: str, patient_last: str, conn) -> dict:
+    """
+    Check if a case with the same user_id, date and patient name already exists.
+    Returns dict with 'is_duplicate' boolean and 'existing_case_id' if found.
+    """
+    with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+        cursor.execute("""
+            SELECT case_id, patient_first, patient_last, case_date, user_id
+            FROM cases 
+            WHERE user_id = %s
+            AND case_date = %s 
+            AND LOWER(TRIM(patient_first)) = LOWER(TRIM(%s))
+            AND LOWER(TRIM(patient_last)) = LOWER(TRIM(%s))
+            AND active = 1
+            LIMIT 1
+        """, (user_id, case_date, patient_first, patient_last))
+        
+        result = cursor.fetchone()
+        if result:
+            return {
+                "is_duplicate": True,
+                "existing_case_id": result["case_id"],
+                "existing_case_date": result["case_date"],
+                "existing_patient_first": result["patient_first"],
+                "existing_patient_last": result["patient_last"],
+                "existing_user_id": result["user_id"]
+            }
+        else:
+            return {"is_duplicate": False}
+
 def create_case_with_procedures(case: CaseCreate, conn) -> dict:
     """
     Handles the actual database operations for case creation.
@@ -45,17 +75,20 @@ def create_case_with_procedures(case: CaseCreate, conn) -> dict:
     formatted_patient_first = capitalize_name_field(case.patient.first)
     formatted_patient_last = capitalize_name_field(case.patient.last)
     
+    # Determine dupe_flag value based on force_duplicate parameter
+    dupe_flag = 1 if case.force_duplicate else 0
+    
     with conn.cursor(pymysql.cursors.DictCursor) as cursor:
         # Insert into cases table
         cursor.execute("""
             INSERT INTO cases (
                 case_id, user_id, case_date, patient_first, patient_last, 
-                ins_provider, surgeon_id, facility_id, demo_file, note_file, misc_file
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ins_provider, surgeon_id, facility_id, demo_file, note_file, misc_file, dupe_flag
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             case.case_id, case.user_id, case.case_date, formatted_patient_first, 
             formatted_patient_last, case.patient.ins_provider, case.surgeon_id, 
-            case.facility_id, case.demo_file, case.note_file, case.misc_file
+            case.facility_id, case.demo_file, case.note_file, case.misc_file, dupe_flag
         ))
 
         # Insert procedure codes with descriptions using batch operation if any exist
@@ -95,7 +128,8 @@ def add_case(case: CaseCreate, request: Request):
     Create a new surgical case with associated procedure codes, automatic processing, and intelligent cache management.
     
     This endpoint provides comprehensive case creation functionality including:
-    - Case validation and duplicate prevention
+    - Case validation and duplicate prevention (case_id and patient+date combinations)
+    - Optional duplicate case forcing with dupe_flag tracking
     - Transactional database operations for data integrity
     - Automatic procedure code association
     - Pay amount calculation based on procedure codes
@@ -119,6 +153,7 @@ def add_case(case: CaseCreate, request: Request):
             - demo_file (str, optional): Path to demonstration file
             - note_file (str, optional): Path to notes file
             - misc_file (str, optional): Path to miscellaneous file
+            - force_duplicate (bool, optional): Allow creation of duplicate cases (same patient+date)
         request (Request): FastAPI request object for logging and monitoring
     
     Returns:
@@ -129,10 +164,13 @@ def add_case(case: CaseCreate, request: Request):
             - procedure_codes (List[str]): Associated procedure codes
             - status_update (dict): Results of automatic status update process
             - pay_amount_update (dict): Results of pay amount calculation
+            - forced_duplicate (bool): Whether this case was created as a forced duplicate
+            - dupe_flag (int): Database flag indicating duplicate status (1 if forced, 0 if not)
     
     Raises:
         HTTPException: 
             - 409 Conflict: Case with the same case_id already exists
+            - 409 Conflict: Duplicate case detected (same patient name and date) when force_duplicate=False
             - 500 Internal Server Error: Database or processing errors
     
     Database Operations:
@@ -174,7 +212,8 @@ def add_case(case: CaseCreate, request: Request):
             },
             "surgeon_id": "SURG456",
             "facility_id": "FAC789",
-            "procedure_codes": ["12345", "67890"]
+            "procedure_codes": ["12345", "67890"],
+            "force_duplicate": false
         }
     
     Note:
@@ -182,6 +221,8 @@ def add_case(case: CaseCreate, request: Request):
         - Case status may be automatically updated based on business rules
         - All file paths (demo_file, note_file, misc_file) are optional
         - Procedure codes list is optional but recommended for accurate pay calculations
+        - Duplicate detection checks for same user_id, patient name (first+last) and case date
+        - Set force_duplicate=true to allow legitimate duplicate cases (sets dupe_flag=1)
     """
     conn = None
     start_time = time.time()
@@ -203,6 +244,29 @@ def add_case(case: CaseCreate, request: Request):
             raise HTTPException(
                 status_code=409, 
                 detail={"error": "Case already exists", "case_id": case.case_id}
+            )
+        
+        # Check for duplicate cases based on user_id, date and patient name
+        formatted_patient_first = capitalize_name_field(case.patient.first)
+        formatted_patient_last = capitalize_name_field(case.patient.last)
+        duplicate_check = check_duplicate_case(case.user_id, case.case_date, formatted_patient_first, formatted_patient_last, conn)
+        
+        if duplicate_check["is_duplicate"] and not case.force_duplicate:
+            response_status = 409
+            error_message = "Duplicate case detected"
+            business_metrics.record_case_operation("create", "duplicate_patient", case.case_id)
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "Duplicate case detected",
+                    "message": f"A case for patient {formatted_patient_first} {formatted_patient_last} on {case.case_date} already exists for this user",
+                    "existing_case_id": duplicate_check["existing_case_id"],
+                    "existing_case_date": str(duplicate_check["existing_case_date"]),
+                    "existing_patient_first": duplicate_check["existing_patient_first"],
+                    "existing_patient_last": duplicate_check["existing_patient_last"],
+                    "existing_user_id": duplicate_check["existing_user_id"],
+                    "suggestion": "Set 'force_duplicate: true' in your request if this is a legitimate duplicate case"
+                }
             )
         
         # Start explicit transaction
@@ -267,7 +331,9 @@ def add_case(case: CaseCreate, request: Request):
             "case_id": case.case_id,
             "procedure_codes": case.procedure_codes,
             "status_update": status_update_result["status_update"],
-            "pay_amount_update": status_update_result["pay_amount_update"]
+            "pay_amount_update": status_update_result["pay_amount_update"],
+            "forced_duplicate": case.force_duplicate,
+            "dupe_flag": 1 if case.force_duplicate else 0
         }
         
         return response_data
