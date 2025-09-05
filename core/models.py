@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-09-05 22:19:36
+# Last Modified: 2025-09-05 22:26:24
 # Author: Scott Cadreau
 
 # core/models.py
@@ -168,10 +168,13 @@ class FaqCreate(BaseModel):
     display_order: int
     user_id: str  # For authorization
 
-class PayTierCreate(BaseModel):
-    tier: int
+class PayTierBucket(BaseModel):
     bucket: str  # This will map to code_bucket in the database
     pay_amount: float
+
+class PayTierCreate(BaseModel):
+    tier: int
+    buckets: List[PayTierBucket]  # Multiple bucket/pay_amount combinations
     user_id: str  # For authorization
 
 # Password Management Models

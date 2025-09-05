@@ -1,5 +1,5 @@
 # Created: 2025-08-12 17:16:24
-# Last Modified: 2025-09-05 22:19:07
+# Last Modified: 2025-09-05 22:26:24
 # Author: Scott Cadreau
 
 # endpoints/utility/add_to_lists.py
@@ -760,16 +760,14 @@ def add_pay_tier(request: Request, pay_tier_data: PayTierCreate):
         request (Request): FastAPI request object for logging and monitoring
         pay_tier_data (PayTierCreate): The payment tier creation model containing:
             - tier (int): Payment tier level determining reimbursement amount
-            - bucket (str): Grouping bucket for related procedure codes (maps to code_bucket)
-            - pay_amount (float): Associated payment amount for this tier/bucket combination
+            - buckets (List[PayTierBucket]): List of bucket/pay_amount combinations
             - user_id (str): ID of the user creating the payment tier (for authorization)
     
     Returns:
         dict: Response containing:
             - message (str): Success confirmation message
             - tier (int): Created payment tier level
-            - bucket (str): Created procedure code bucket
-            - pay_amount (float): Associated payment amount
+            - buckets_created (List[dict]): List of created bucket/pay_amount combinations
             - backup_table (str): Name of the created backup table
             - records_updated (int): Number of procedure code records updated
             - created_by (str): User ID who created the payment tier
@@ -778,7 +776,7 @@ def add_pay_tier(request: Request, pay_tier_data: PayTierCreate):
         HTTPException:
             - 404 Not Found: Creating user not found or inactive in user_profile table
             - 403 Forbidden: Creating user has insufficient privileges (user_type < 100)
-            - 409 Conflict: Payment tier with same bucket/tier combination already exists
+            - 409 Conflict: Payment tier with same bucket/tier combination already exists for any bucket
             - 500 Internal Server Error: Database connection or operation errors
     
     Authorization:
@@ -801,18 +799,28 @@ def add_pay_tier(request: Request, pay_tier_data: PayTierCreate):
     Example Request:
         POST /pay_tiers
         {
-            "tier": 2,
-            "bucket": "IMAGING_ADVANCED",
-            "pay_amount": 750.00,
+            "tier": 99,
+            "buckets": [
+                {"bucket": "OB-Gyn", "pay_amount": 1200.00},
+                {"bucket": "General", "pay_amount": 800.00},
+                {"bucket": "Orthopedic", "pay_amount": 1500.00},
+                {"bucket": "Plastic", "pay_amount": 1100.00},
+                {"bucket": "Spine", "pay_amount": 1800.00}
+            ],
             "user_id": "ADMIN001"
         }
     
     Example Response (Success):
         {
             "message": "Payment tier created and procedure codes updated successfully",
-            "tier": 2,
-            "bucket": "IMAGING_ADVANCED", 
-            "pay_amount": 750.00,
+            "tier": 99,
+            "buckets_created": [
+                {"bucket": "OB-Gyn", "pay_amount": 1200.00},
+                {"bucket": "General", "pay_amount": 800.00},
+                {"bucket": "Orthopedic", "pay_amount": 1500.00},
+                {"bucket": "Plastic", "pay_amount": 1100.00},
+                {"bucket": "Spine", "pay_amount": 1800.00}
+            ],
             "backup_table": "procedure_codes_backup20250905_223045",
             "records_updated": 1250,
             "created_by": "ADMIN001"
@@ -827,6 +835,7 @@ def add_pay_tier(request: Request, pay_tier_data: PayTierCreate):
     error_message = None
     backup_table_name = None
     records_updated = 0
+    buckets_created = []
     
     try:
         conn = get_db_connection()
@@ -836,32 +845,38 @@ def add_pay_tier(request: Request, pay_tier_data: PayTierCreate):
         
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-                # Step 1: Check if payment tier configuration already exists in procedure_code_buckets2
-                cursor.execute(
-                    "SELECT code_bucket, tier FROM procedure_code_buckets2 WHERE code_bucket = %s AND tier = %s",
-                    (pay_tier_data.bucket, pay_tier_data.tier)
-                )
-                existing_pay_tier = cursor.fetchone()
-                
-                if existing_pay_tier:
-                    # Record duplicate payment tier creation attempt
-                    business_metrics.record_utility_operation("add_pay_tier", "duplicate")
-                    response_status = 409
-                    error_message = "Payment tier configuration already exists"
-                    raise HTTPException(
-                        status_code=409, 
-                        detail={
-                            "error": "Payment tier configuration already exists", 
-                            "bucket": pay_tier_data.bucket,
-                            "tier": pay_tier_data.tier
-                        }
+                # Step 1: Check if any payment tier configuration already exists in procedure_code_buckets2
+                for bucket_data in pay_tier_data.buckets:
+                    cursor.execute(
+                        "SELECT code_bucket, tier FROM procedure_code_buckets2 WHERE code_bucket = %s AND tier = %s",
+                        (bucket_data.bucket, pay_tier_data.tier)
                     )
+                    existing_pay_tier = cursor.fetchone()
+                    
+                    if existing_pay_tier:
+                        # Record duplicate payment tier creation attempt
+                        business_metrics.record_utility_operation("add_pay_tier", "duplicate")
+                        response_status = 409
+                        error_message = f"Payment tier configuration already exists for bucket: {bucket_data.bucket}"
+                        raise HTTPException(
+                            status_code=409, 
+                            detail={
+                                "error": "Payment tier configuration already exists", 
+                                "bucket": bucket_data.bucket,
+                                "tier": pay_tier_data.tier
+                            }
+                        )
                 
-                # Step 2: Insert new payment tier into procedure_code_buckets2
-                cursor.execute(
-                    "INSERT INTO procedure_code_buckets2 (code_bucket, tier, pay_amount) VALUES (%s, %s, %s)",
-                    (pay_tier_data.bucket, pay_tier_data.tier, pay_tier_data.pay_amount)
-                )
+                # Step 2: Insert all new payment tiers into procedure_code_buckets2
+                for bucket_data in pay_tier_data.buckets:
+                    cursor.execute(
+                        "INSERT INTO procedure_code_buckets2 (code_bucket, tier, pay_amount) VALUES (%s, %s, %s)",
+                        (bucket_data.bucket, pay_tier_data.tier, bucket_data.pay_amount)
+                    )
+                    buckets_created.append({
+                        "bucket": bucket_data.bucket,
+                        "pay_amount": bucket_data.pay_amount
+                    })
                 
                 # Step 3: Update procedure_codes_temp with new tier for all records
                 cursor.execute(
@@ -910,8 +925,7 @@ def add_pay_tier(request: Request, pay_tier_data: PayTierCreate):
         response_data = {
             "message": "Payment tier created and procedure codes updated successfully",
             "tier": pay_tier_data.tier,
-            "bucket": pay_tier_data.bucket,
-            "pay_amount": pay_tier_data.pay_amount,
+            "buckets_created": buckets_created,
             "backup_table": backup_table_name,
             "records_updated": records_updated,
             "created_by": pay_tier_data.user_id
