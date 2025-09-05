@@ -1,5 +1,5 @@
 # Created: 2025-07-21
-# Last Modified: 2025-08-29 22:14:50
+# Last Modified: 2025-09-05 16:55:42
 # Author: Scott Cadreau
 
 # utils/extract_npi_data.py
@@ -24,7 +24,7 @@ data management in the SurgiCase system. It performs the following key operation
 3. SEARCH TABLE CREATION: Creates optimized A-Z search tables for fast lookups
    - Surgeon tables: search_surgeon_a through search_surgeon_z (from npi_data_1)
    - Facility tables: search_facility_a through search_facility_z (from npi_data_2)
-   - Consolidated table: search_facility_all (contains all facility records for NPI lookups)
+   - Consolidated tables: search_facility_all and search_surgeon_all (contain all records for NPI lookups)
    - Uses multi-threading for parallel table creation to minimize execution time
    - Adds database indexes for optimal search performance
 
@@ -50,7 +50,7 @@ REQUIREMENTS:
 
 PERFORMANCE:
     - Typical weekly files: 50-100MB, ~50,000 records, 2-5 minutes execution
-    - Search table creation: 53 tables (26 surgeon + 26 facility + 1 consolidated), parallel processing
+    - Search table creation: 54 tables (26 surgeon + 26 facility + 2 consolidated), parallel processing
     - Memory usage: Moderate (DataFrame processing in batches)
     - Database load: Optimized with batch inserts and transaction management
 
@@ -508,6 +508,81 @@ def create_consolidated_facility_table():
     finally:
         close_db_connection(conn)
 
+def create_consolidated_surgeon_table():
+    """
+    Create a consolidated search_surgeon_all table containing all records 
+    from the A-Z partitioned surgeon tables (search_surgeon_a through search_surgeon_z).
+    
+    This table is used for direct NPI lookups while maintaining the A-Z tables 
+    for optimized name-based searches.
+    """
+    start_time = time.time()
+    conn = get_db_connection()
+    
+    try:
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            # Drop and recreate the consolidated table
+            print("  Dropping existing search_surgeon_all table...")
+            cursor.execute("DROP TABLE IF EXISTS search_surgeon_facility.search_surgeon_all")
+            
+            # Create the table structure (same as individual letter tables)
+            print("  Creating search_surgeon_all table structure...")
+            cursor.execute("""
+                CREATE TABLE search_surgeon_facility.search_surgeon_all (
+                    npi BIGINT,
+                    first_name VARCHAR(50),
+                    last_name VARCHAR(50),
+                    address VARCHAR(55),
+                    city VARCHAR(40),
+                    state VARCHAR(40),
+                    zip VARCHAR(20),
+                    INDEX idx_npi (npi),
+                    INDEX idx_last_name (last_name),
+                    INDEX idx_first_name (first_name),
+                    INDEX idx_last_first (last_name, first_name)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+            """)
+            
+            # Insert all records from A-Z tables
+            total_records = 0
+            print("  Consolidating records from A-Z tables...")
+            
+            for letter in string.ascii_lowercase:
+                table_name = f"search_surgeon_{letter}"
+                print(f"    Adding records from {table_name}...")
+                
+                # Insert records from this letter table
+                cursor.execute(f"""
+                    INSERT INTO search_surgeon_facility.search_surgeon_all 
+                    (npi, first_name, last_name, address, city, state, zip)
+                    SELECT npi, first_name, last_name, address, city, state, zip
+                    FROM search_surgeon_facility.{table_name}
+                """)
+                
+                records_added = cursor.rowcount
+                total_records += records_added
+                print(f"      Added {records_added:,} records from {table_name}")
+            
+            conn.commit()
+            
+            execution_time = time.time() - start_time
+            print(f"  Consolidated table created with {total_records:,} total records in {execution_time:.2f} seconds")
+            
+            # Log the consolidation operation
+            try:
+                log_search_table_creation(cursor, 'surgeon', 'search_surgeon_all', total_records, execution_time, 'success')
+                conn.commit()
+            except Exception as log_error:
+                print(f"Warning: Failed to log consolidation operation: {log_error}")
+                
+    except Exception as e:
+        print(f"Error creating consolidated surgeon table: {e}")
+        if conn:
+            conn.rollback()
+        raise
+    finally:
+        close_db_connection(conn)
+
 def create_search_tables():
     """Create all search tables using threading"""
     print("Starting creation of search tables...")
@@ -544,6 +619,10 @@ def create_search_tables():
     # Create consolidated search_facility_all table
     print("Creating consolidated search_facility_all table...")
     create_consolidated_facility_table()
+    
+    # Create consolidated search_surgeon_all table
+    print("Creating consolidated search_surgeon_all table...")
+    create_consolidated_surgeon_table()
     
     total_time = time.time() - start_time
     print(f"All search tables created in {total_time:.2f} seconds")
