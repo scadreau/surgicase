@@ -1,5 +1,5 @@
 # Created: 2025-07-21 15:08:09
-# Last Modified: 2025-08-29 20:09:23
+# Last Modified: 2025-09-05 16:40:42
 # Author: Scott Cadreau
 
 # endpoints/surgeon/search_surgeon.py
@@ -16,22 +16,25 @@ router = APIRouter()
 @track_business_operation("search", "surgeon")
 def search_surgeon(
     request: Request,
-    first_name: str = Query(..., description="First name to search for"),
-    last_name: str = Query(..., description="Last name to search for"),
+    first_name: str = Query(..., description="First name to search for, or a valid 10-digit NPI number"),
+    last_name: str = Query(None, description="Last name to search for (not required for NPI search)"),
     user_id: str = Query(None, description="Optional user ID for enhanced logging and monitoring")
 ):
     """
-    Search for surgeons by name using optimized A-Z partitioned search tables.
+    Search for surgeons by name or NPI using optimized search tables.
     
     This endpoint provides intelligent surgeon search functionality across the national NPI registry including:
     - High-performance search across millions of individual provider records
-    - Optimized A-Z table partitioning for sub-100ms query times
+    - Dual search modes: surgeon name (A-Z partitioned) or direct NPI lookup
+    - Optimized A-Z table partitioning for sub-100ms query times on name searches
+    - Direct NPI lookup using search_surgeon_all table for exact matches
     - Dual-field name matching with intelligent text formatting
     - Comprehensive monitoring and business metrics tracking
     - Full request logging and execution time tracking
     - Prometheus metrics integration for operational monitoring
     
     Search Strategy & Performance:
+        Name Search:
         - Determines appropriate search table based on first letter of last_name
         - Uses optimized search_surgeon_[a-z] tables (26 partitions)
         - Distributes millions of records across smaller indexed tables (~50K-200K each)
@@ -39,12 +42,23 @@ def search_surgeon(
         - Performs dual LIKE searches on both first_name and last_name with wildcards
         - Typical query time: <100ms vs >5000ms for full table scan
         - Eliminates need to scan entire NPI dataset for each search
+        
+        NPI Search:
+        - Detects 10-digit numeric input in first_name field as NPI number
+        - Uses search_surgeon_all table for direct NPI lookup
+        - Exact match search for fastest possible retrieval
+        - Eliminates need to scan multiple A-Z tables for NPI searches
+        - last_name parameter not required for NPI searches
     
     Table Structure & Data Source:
-        - Tables: search_surgeon_facility.search_surgeon_a through search_surgeon_z
+        Name Search Tables: search_surgeon_facility.search_surgeon_a through search_surgeon_z
         - Primary indexes: idx_npi (unique), idx_last_name, idx_first_name, idx_last_first (composite)
         - Data source: npi_data_1 (Individual providers from National NPI registry)
         - Record types: Physicians, surgeons, specialists, and other individual healthcare providers
+        
+        NPI Search Table: search_surgeon_facility.search_surgeon_all
+        - Contains all surgeon records for direct NPI lookup
+        - Optimized for exact NPI matching
     
     Text Formatting & Normalization:
         - Applies proper capitalization to names via capitalize_name_field()
@@ -64,7 +78,9 @@ def search_surgeon(
     Args:
         request (Request): FastAPI request object for logging and monitoring
         first_name (str): Surgeon's first name to search for (partial matching supported)
+                         OR a valid 10-digit NPI number for exact surgeon lookup
         last_name (str): Surgeon's last name to search for (partial matching supported)
+                        Note: Not required when searching by NPI
         user_id (str, optional): User ID for enhanced logging and monitoring
     
     Returns:
@@ -102,13 +118,18 @@ def search_surgeon(
         - Error logging with full exception details
     
     Input Validation:
-        - Validates both first_name and last_name are not empty or whitespace-only
+        - For name search: Validates both first_name and last_name are not empty or whitespace-only
+        - For NPI search: Validates first_name is a valid 10-digit number, last_name not required
         - Handles non-alphabetic first characters in last_name (defaults to 'a' table)
         - Strips whitespace from search terms before processing
         - Returns appropriate 400 error for invalid input
     
-    Example:
+    Examples:
+        Name Search:
         GET /search-surgeon?first_name=John&last_name=Smith&user_id=user123
+        
+        NPI Search:
+        GET /search-surgeon?first_name=1234567890&user_id=user123
         
         Response:
         {
@@ -135,12 +156,14 @@ def search_surgeon(
         }
     
     Note:
-        - Search is case-insensitive and supports partial matching on both names
+        - Name search is case-insensitive and supports partial matching on both names
+        - NPI search performs exact match on 10-digit numbers
         - Results are automatically formatted for consistent presentation
         - Non-alphabetic last_name characters default to 'a' table for processing
         - Search covers only individual provider NPI records (not organizations)
         - Facility searches should use facility search endpoints
-        - Both first_name and last_name are required parameters
+        - For name search: both first_name and last_name are required parameters
+        - For NPI search: only first_name (containing NPI) is required
     """
     conn = None
     start_time = time.time()
@@ -149,31 +172,53 @@ def search_surgeon(
     error_message = None
     
     try:
-        if not first_name.strip() or not last_name.strip():
-            response_status = 400
-            error_message = "Both first_name and last_name are required and cannot be empty"
-            raise HTTPException(status_code=400, detail={"error": "Both first_name and last_name are required and cannot be empty"})
+        # Check if the first_name is a valid 10-digit NPI number
+        search_term = first_name.strip()
+        is_npi_search = search_term.isdigit() and len(search_term) == 10
+        
+        if is_npi_search:
+            # For NPI search, last_name is not required
+            if not first_name.strip():
+                response_status = 400
+                error_message = "first_name is required and cannot be empty"
+                raise HTTPException(status_code=400, detail={"error": "first_name is required and cannot be empty"})
+        else:
+            # For name search, both first_name and last_name are required
+            if not first_name.strip() or not last_name or not last_name.strip():
+                response_status = 400
+                error_message = "Both first_name and last_name are required and cannot be empty for name search"
+                raise HTTPException(status_code=400, detail={"error": "Both first_name and last_name are required and cannot be empty for name search"})
 
         conn = get_db_connection()
-        first_name_upper = first_name.upper()
-        last_name_upper = last_name.upper()
-
-        # Determine which table to search based on first letter of last name
-        first_letter = last_name.strip()[0].lower()
-        if not first_letter.isalpha():
-            # For non-alphabetic characters, default to 'a' table
-            first_letter = 'a'
         
-        table_name = f"search_surgeon_{first_letter}"
-
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-                # Search using LIKE for partial matching on both names in the appropriate A-Z table
-                cursor.execute(f"""
-                    SELECT npi, first_name, last_name, address, city, state, zip
-                    FROM search_surgeon_facility.{table_name}
-                    WHERE last_name like %s AND first_name like %s order by state, city, last_name, first_name
-                """, (f"%{last_name_upper}%", f"%{first_name_upper}%"))
+                if is_npi_search:
+                    # Search by NPI in the search_surgeon_all table
+                    cursor.execute("""
+                        SELECT npi, first_name, last_name, address, city, state, zip
+                        FROM search_surgeon_facility.search_surgeon_all
+                        WHERE npi = %s
+                    """, (search_term,))
+                else:
+                    # Regular name search using A-Z partitioned tables
+                    first_name_upper = first_name.upper()
+                    last_name_upper = last_name.upper()
+
+                    # Determine which table to search based on first letter of last name
+                    first_letter = last_name.strip()[0].lower()
+                    if not first_letter.isalpha():
+                        # For non-alphabetic characters, default to 'a' table
+                        first_letter = 'a'
+                    
+                    table_name = f"search_surgeon_{first_letter}"
+
+                    # Search using LIKE for partial matching on both names in the appropriate A-Z table
+                    cursor.execute(f"""
+                        SELECT npi, first_name, last_name, address, city, state, zip
+                        FROM search_surgeon_facility.{table_name}
+                        WHERE last_name like %s AND first_name like %s order by state, city, last_name, first_name
+                    """, (f"%{last_name_upper}%", f"%{first_name_upper}%"))
                 
                 surgeons = cursor.fetchall()
 
@@ -202,10 +247,9 @@ def search_surgeon(
             close_db_connection(conn)
             
         # Build search criteria response
-        search_criteria = {
-            "first_name": first_name,
-            "last_name": last_name
-        }
+        search_criteria = {"first_name": first_name}
+        if last_name:
+            search_criteria["last_name"] = last_name
         if user_id:
             search_criteria["user_id"] = user_id
             
