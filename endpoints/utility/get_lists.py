@@ -1,5 +1,5 @@
 # Created: 2025-08-05 22:15:27
-# Last Modified: 2025-08-26 22:57:13
+# Last Modified: 2025-09-05 22:02:48
 # Author: Scott Cadreau
 
 # endpoints/utility/get_lists.py
@@ -733,7 +733,7 @@ def get_pay_tiers(request: Request, user_id: str = Query(..., description="User 
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                 cursor.execute(
-                    "SELECT code_bucket, tier, pay_amount FROM procedure_code_buckets2 ORDER BY tier, code_bucket"
+                    "SELECT code_bucket, tier, pay_amount FROM procedure_code_buckets2 ORDER BY tier, pay_amount"
                 )
                 pay_tiers = cursor.fetchall()
 
@@ -817,7 +817,7 @@ def get_tiers_summary(request: Request, user_id: str = Query(..., description="U
     Database Operations:
         - Queries 'procedure_code_buckets' table with grouped aggregation:
           SELECT tier, code_bucket, pay_amount FROM procedure_code_buckets 
-          GROUP BY tier, code_bucket, pay_amount ORDER BY tier, pay_amount
+          GROUP BY tier, code_bucket, pay_amount ORDER BY tier, pay_amount, code_bucket
         - Aggregates data by tier level and specialty bucket
         - Read-only operation with automatic connection management
         - Results processed for specialty-ordered formatting
