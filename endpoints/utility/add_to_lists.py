@@ -1,5 +1,5 @@
 # Created: 2025-08-12 17:16:24
-# Last Modified: 2025-08-23 00:25:08
+# Last Modified: 2025-09-05 22:19:07
 # Author: Scott Cadreau
 
 # endpoints/utility/add_to_lists.py
@@ -745,38 +745,41 @@ def add_faq(request: Request, faq_data: FaqCreate):
 @track_business_operation("create", "pay_tiers")
 def add_pay_tier(request: Request, pay_tier_data: PayTierCreate):
     """
-    Create a new payment tier configuration for medical billing and reimbursement management.
+    Create a new payment tier configuration and update procedure codes with complex multi-step process.
     
-    This endpoint enables creation of new procedure code payment tier buckets used throughout
-    the application for medical billing calculations, reimbursement analysis, and financial reporting.
-    Payment tiers organize procedure codes into buckets with associated payment amounts based on
-    tier levels, code categories, and bucket classifications for systematic billing and revenue management.
-    Only users with administrative privileges (user_type >= 100) can create new payment tiers.
+    This endpoint performs a complex multi-step operation to add new payment tier configurations:
+    1. Adds records to procedure_code_buckets2 table with tier, bucket, and pay_amount
+    2. Updates procedure_codes_temp table with the new tier for all records
+    3. Updates pay amounts in procedure_codes_temp by joining with procedure_code_buckets2
+    4. Creates a backup table procedure_codes_backup<datetime>
+    5. Inserts updated data from procedure_codes_temp into procedure_codes table
+    
+    Only users with administrative privileges (user_type >= 100) can perform this operation.
     
     Args:
         request (Request): FastAPI request object for logging and monitoring
         pay_tier_data (PayTierCreate): The payment tier creation model containing:
-            - code_category (str): Medical procedure code category classification
-            - code_bucket (str): Grouping bucket for related procedure codes
             - tier (int): Payment tier level determining reimbursement amount
+            - bucket (str): Grouping bucket for related procedure codes (maps to code_bucket)
             - pay_amount (float): Associated payment amount for this tier/bucket combination
             - user_id (str): ID of the user creating the payment tier (for authorization)
     
     Returns:
         dict: Response containing:
             - message (str): Success confirmation message
-            - code_category (str): Created procedure code category
-            - code_bucket (str): Created procedure code bucket
             - tier (int): Created payment tier level
+            - bucket (str): Created procedure code bucket
             - pay_amount (float): Associated payment amount
+            - backup_table (str): Name of the created backup table
+            - records_updated (int): Number of procedure code records updated
             - created_by (str): User ID who created the payment tier
     
     Raises:
         HTTPException:
             - 404 Not Found: Creating user not found or inactive in user_profile table
             - 403 Forbidden: Creating user has insufficient privileges (user_type < 100)
-            - 409 Conflict: Payment tier with same category/bucket/tier combination already exists
-            - 500 Internal Server Error: Database connection or insertion errors
+            - 409 Conflict: Payment tier with same bucket/tier combination already exists
+            - 500 Internal Server Error: Database connection or operation errors
     
     Authorization:
         - Requires user_type >= 100 for access to payment tier management operations
@@ -784,75 +787,46 @@ def add_pay_tier(request: Request, pay_tier_data: PayTierCreate):
         - Validates creating user exists and is active in user_profile table
     
     Database Operations:
-        - Checks for duplicate combinations of code_category, code_bucket, and tier
-        - Inserts new record into 'procedure_code_buckets' table with provided data
-        - Commits transaction immediately after successful insertion
-        - Automatic rollback on any operation failure for data consistency
+        - Multi-step transaction with rollback on any failure
+        - Creates backup table before making changes
+        - Updates multiple tables in coordinated fashion
+        - Maintains data consistency throughout complex operation
     
     Business Logic:
-        - Enforces unique combination constraint (category + bucket + tier) to prevent conflicts
-        - Payment tiers are organized hierarchically with tier levels determining base reimbursement
-        - Code buckets group related procedures for standardized billing calculations
-        - Code categories provide high-level classification of medical procedure types
-        - New payment tiers become immediately available for billing calculations
-    
-    Monitoring & Logging:
-        - Business metrics tracking for payment tier creation operations
-        - Prometheus monitoring via @track_business_operation decorator
-        - Comprehensive request logging with execution time tracking
-        - Success/error/duplicate metrics via business_metrics.record_utility_operation()
-        - Authorization failure tracking for security monitoring
-    
-    Transaction Handling:
-        - Explicit transaction control for data consistency
-        - Duplicate check performed before insertion to prevent billing conflicts
-        - Automatic rollback on any operation failure
-        - Proper database connection cleanup in finally block
+        - Complex workflow for updating payment tier structures
+        - Joins procedure codes with payment buckets for accurate billing
+        - Creates timestamped backups for data recovery
+        - Updates all related procedure codes with new tier information
     
     Example Request:
         POST /pay_tiers
         {
-            "code_category": "DIAGNOSTIC",
-            "code_bucket": "IMAGING_ADVANCED",
             "tier": 2,
+            "bucket": "IMAGING_ADVANCED",
             "pay_amount": 750.00,
             "user_id": "ADMIN001"
         }
     
     Example Response (Success):
         {
-            "message": "Payment tier created successfully",
-            "code_category": "DIAGNOSTIC",
-            "code_bucket": "IMAGING_ADVANCED",
+            "message": "Payment tier created and procedure codes updated successfully",
             "tier": 2,
+            "bucket": "IMAGING_ADVANCED", 
             "pay_amount": 750.00,
+            "backup_table": "procedure_codes_backup20250905_223045",
+            "records_updated": 1250,
             "created_by": "ADMIN001"
         }
-    
-    Example Response (Duplicate):
-        {
-            "error": "Payment tier configuration already exists",
-            "code_category": "DIAGNOSTIC",
-            "code_bucket": "IMAGING_ADVANCED",
-            "tier": 2
-        }
-    
-    Usage:
-        POST /pay_tiers
-        
-    Notes:
-        - Payment tier creation affects billing calculations throughout the system
-        - New payment tiers should follow established category and bucket naming conventions
-        - Tier levels should align with existing payment structure hierarchy
-        - Consider existing payment configurations when creating new tiers
-        - Authorization required to prevent unauthorized modification of billing systems
-        - Changes take effect immediately for case payment calculations and provider reimbursements
     """
+    import datetime
+    
     conn = None
     start_time = time.time()
     response_status = 201
     response_data = None
     error_message = None
+    backup_table_name = None
+    records_updated = 0
     
     try:
         conn = get_db_connection()
@@ -862,10 +836,10 @@ def add_pay_tier(request: Request, pay_tier_data: PayTierCreate):
         
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-                # Check if payment tier configuration already exists
+                # Step 1: Check if payment tier configuration already exists in procedure_code_buckets2
                 cursor.execute(
-                    "SELECT code_category, code_bucket, tier FROM procedure_code_buckets WHERE code_category = %s AND code_bucket = %s AND tier = %s",
-                    (pay_tier_data.code_category, pay_tier_data.code_bucket, pay_tier_data.tier)
+                    "SELECT code_bucket, tier FROM procedure_code_buckets2 WHERE code_bucket = %s AND tier = %s",
+                    (pay_tier_data.bucket, pay_tier_data.tier)
                 )
                 existing_pay_tier = cursor.fetchone()
                 
@@ -878,17 +852,53 @@ def add_pay_tier(request: Request, pay_tier_data: PayTierCreate):
                         status_code=409, 
                         detail={
                             "error": "Payment tier configuration already exists", 
-                            "code_category": pay_tier_data.code_category,
-                            "code_bucket": pay_tier_data.code_bucket,
+                            "bucket": pay_tier_data.bucket,
                             "tier": pay_tier_data.tier
                         }
                     )
                 
-                # Insert new payment tier
+                # Step 2: Insert new payment tier into procedure_code_buckets2
                 cursor.execute(
-                    "INSERT INTO procedure_code_buckets (code_category, code_bucket, tier, pay_amount) VALUES (%s, %s, %s, %s)",
-                    (pay_tier_data.code_category, pay_tier_data.code_bucket, pay_tier_data.tier, pay_tier_data.pay_amount)
+                    "INSERT INTO procedure_code_buckets2 (code_bucket, tier, pay_amount) VALUES (%s, %s, %s)",
+                    (pay_tier_data.bucket, pay_tier_data.tier, pay_tier_data.pay_amount)
                 )
+                
+                # Step 3: Update procedure_codes_temp with new tier for all records
+                cursor.execute(
+                    "UPDATE procedure_codes_temp SET tier = %s WHERE TRUE",
+                    (pay_tier_data.tier,)
+                )
+                
+                # Step 4: Update pay amounts in procedure_codes_temp by joining with procedure_code_buckets2
+                # Join on code_category (from procedure_codes_temp) = code_bucket (from procedure_code_buckets2) and tier = tier
+                cursor.execute("""
+                    UPDATE procedure_codes_temp pct 
+                    JOIN procedure_code_buckets2 pcb2 ON pct.code_category = pcb2.code_bucket AND pct.tier = pcb2.tier 
+                    SET pct.code_pay_amount = pcb2.pay_amount
+                """)
+                
+                # Step 5: Create backup table with datetime stamp
+                current_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                backup_table_name = f"procedure_codes_backup{current_datetime}"
+                
+                cursor.execute(f"""
+                    CREATE TABLE {backup_table_name} AS 
+                    SELECT * FROM procedure_codes
+                """)
+                
+                # Step 6: Clear procedure_codes table and insert from procedure_codes_temp
+                cursor.execute("DELETE FROM procedure_codes")
+                
+                cursor.execute("""
+                    INSERT INTO procedure_codes (procedure_code, procedure_desc, code_category, code_status, code_pay_amount, tier)
+                    SELECT procedure_code, procedure_desc, code_category, code_status, code_pay_amount, tier
+                    FROM procedure_codes_temp
+                """)
+                
+                # Get count of records updated
+                records_updated = cursor.rowcount
+                
+                # Commit all changes
                 conn.commit()
 
                 # Record successful payment tier creation
@@ -898,11 +908,12 @@ def add_pay_tier(request: Request, pay_tier_data: PayTierCreate):
             close_db_connection(conn)
             
         response_data = {
-            "message": "Payment tier created successfully",
-            "code_category": pay_tier_data.code_category,
-            "code_bucket": pay_tier_data.code_bucket,
+            "message": "Payment tier created and procedure codes updated successfully",
             "tier": pay_tier_data.tier,
+            "bucket": pay_tier_data.bucket,
             "pay_amount": pay_tier_data.pay_amount,
+            "backup_table": backup_table_name,
+            "records_updated": records_updated,
             "created_by": pay_tier_data.user_id
         }
         return response_data

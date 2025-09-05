@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-09-05 20:45:18
+# Last Modified: 2025-09-05 22:19:36
 # Author: Scott Cadreau
 
 # core/models.py
@@ -169,9 +169,8 @@ class FaqCreate(BaseModel):
     user_id: str  # For authorization
 
 class PayTierCreate(BaseModel):
-    code_category: str
-    code_bucket: str
     tier: int
+    bucket: str  # This will map to code_bucket in the database
     pay_amount: float
     user_id: str  # For authorization
 
