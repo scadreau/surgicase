@@ -24,9 +24,15 @@ The scheduler provides automatic weekly updates for case status changes, NPI dat
 - **Function**: `weekly_provider_payment_summary_report()`
 - **Features**: State-based grouping, PDF generation, S3 storage, automated email distribution
 
+### Referral Report
+- **Purpose**: Generate referral network analysis report showing referral relationships and fees
+- **Schedule**: Monday at 09:30 UTC (15 minutes after summary report)
+- **Function**: `weekly_referral_report()`
+- **Features**: Referral network analysis, referral fee calculations, PDF generation, S3 storage, automated email distribution
+
 ### Individual Provider Reports
 - **Purpose**: Generate password-protected individual provider reports
-- **Schedule**: Monday at 10:00 UTC (1 hour after consolidated report)
+- **Schedule**: Monday at 10:00 UTC (30 minutes after referral report)
 - **Function**: `weekly_individual_provider_reports()`
 - **Features**: Password protection, individual provider emails, secure distribution
 
@@ -237,6 +243,7 @@ def setup_weekly_scheduler():
     - weekly_pending_payment_update: Monday at 08:00 UTC (status 10 -> 15)
     - weekly_provider_payment_report: Monday at 09:00 UTC (consolidated report + emails)
     - weekly_provider_payment_summary_report: Monday at 09:15 UTC (summary report + emails)
+    - weekly_referral_report: Monday at 09:30 UTC (referral network report + emails)
     - weekly_individual_provider_reports: Monday at 10:00 UTC (individual reports + emails)
     - weekly_npi_update: Tuesday at 08:00 UTC (NPI data refresh)
     - weekly_paid_update: Thursday at 08:00 UTC (status 15 -> 20)
@@ -254,6 +261,9 @@ def setup_weekly_scheduler():
     
     # Schedule provider payment summary report for Monday at 09:15 UTC
     schedule.every().monday.at("09:15").do(weekly_provider_payment_summary_report)
+    
+    # Schedule referral report for Monday at 09:30 UTC
+    schedule.every().monday.at("09:30").do(weekly_referral_report)
     
     # Schedule individual provider reports for Monday at 10:00 UTC
     schedule.every().monday.at("10:00").do(weekly_individual_provider_reports)

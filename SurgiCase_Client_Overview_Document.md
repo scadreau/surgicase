@@ -442,6 +442,11 @@ SurgiCase is designed for healthcare organizations that process surgical cases a
         |                              v
         |                        [Email to Administrators]
         |
+        ├── [Monday 9:30 AM] --> [Generate Referral Network Report]
+        |                              |
+        |                              v
+        |                        [Email to Administrators]
+        |
         ├── [Monday 10:00 AM] -> [Generate Individual Provider Reports]
         |                              |
         |                              v

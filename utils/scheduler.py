@@ -1,5 +1,5 @@
 # Created: 2025-01-15
-# Last Modified: 2025-08-21 18:22:49
+# Last Modified: 2025-09-05 21:26:29
 # Author: Scott Cadreau
 
 import schedule
@@ -368,6 +368,69 @@ def weekly_individual_provider_reports():
     except Exception as e:
         logger.error(f"❌ Error in weekly individual provider reports job: {str(e)}")
 
+def weekly_referral_report():
+    """
+    Weekly scheduled function to generate referral report and send emails.
+    
+    This function:
+    1. Calls the referral report endpoint
+    2. Generates PDF report for referral network analysis with cases status=15 (pending payment)
+    3. Password protects PDF with weekly_YYYYMMDD format
+    4. Automatically sends emails to configured recipients
+    5. Uses weekly email template for professional notifications
+    
+    Runs at 09:30 UTC on Monday mornings, between the summary report and individual reports.
+    """
+    logger.info("Starting weekly referral report job...")
+    
+    try:
+        # Call the referral report endpoint
+        response = requests.get(
+            'http://localhost:8000/referral_report',
+            timeout=300  # 5 minute timeout for report generation
+        )
+        
+        if response.status_code == 200:
+            logger.info("✅ Weekly referral report generated successfully")
+            
+            # Log email status from response headers
+            email_headers = {k: v for k, v in response.headers.items() if k.startswith('X-Email')}
+            if email_headers:
+                emails_sent = email_headers.get('X-Email-Count', '0')
+                total_recipients = email_headers.get('X-Email-Total-Recipients', '0')
+                email_success = email_headers.get('X-Email-Sent', 'False')
+                
+                logger.info(f"📧 Email notifications: {emails_sent}/{total_recipients} sent successfully")
+                logger.info(f"📧 Email status: {email_success}")
+            
+            # Log S3 upload status from response headers
+            s3_headers = {k: v for k, v in response.headers.items() if k.startswith('X-S3')}
+            if s3_headers:
+                s3_success = s3_headers.get('X-S3-Upload-Success', 'False')
+                s3_url = s3_headers.get('X-S3-URL', '')
+                logger.info(f"☁️ S3 upload status: {s3_success}")
+                if s3_url:
+                    logger.info(f"☁️ S3 URL: {s3_url}")
+            
+            # Log report details
+            content_length = len(response.content)
+            logger.info(f"📄 Report size: {content_length} bytes")
+            logger.info("Weekly referral report job completed successfully")
+            
+        elif response.status_code == 404:
+            logger.info("ℹ️ No referral data found for weekly referral report")
+            
+        else:
+            logger.error(f"❌ Referral report failed with status {response.status_code}")
+            logger.error(f"Response: {response.text[:500]}")  # Log first 500 chars of error
+            
+    except requests.exceptions.Timeout:
+        logger.error("❌ Referral report timed out (>5 minutes)")
+    except requests.exceptions.ConnectionError:
+        logger.error("❌ Cannot connect to API server for referral report")
+    except Exception as e:
+        logger.error(f"❌ Error in weekly referral report job: {str(e)}")
+
 def daily_database_backup():
     """
     Daily scheduled function to backup database tables.
@@ -572,6 +635,7 @@ def setup_weekly_scheduler(scheduler_role: str = "leader"):
     - weekly_pending_payment_update: Monday at 08:00 UTC (status 10 -> 15)
     - weekly_provider_payment_report: Monday at 09:00 UTC (generate consolidated report + send emails)
     - weekly_provider_payment_summary_report: Monday at 09:15 UTC (generate summary report + send emails)
+    - weekly_referral_report: Monday at 09:30 UTC (generate referral network report + send emails)
     - weekly_individual_provider_reports: Monday at 10:00 UTC (generate individual provider reports + send emails)
     - weekly_npi_update: Tuesday at 08:00 UTC (NPI data refresh)
     - weekly_paid_update: Friday at 08:00 UTC (status 15 -> 20)
@@ -602,6 +666,7 @@ def setup_weekly_scheduler(scheduler_role: str = "leader"):
         schedule.every().monday.at("08:00").do(weekly_pending_payment_update)
         schedule.every().monday.at("09:00").do(weekly_provider_payment_report)
         schedule.every().monday.at("09:15").do(weekly_provider_payment_summary_report)
+        schedule.every().monday.at("09:30").do(weekly_referral_report)
         schedule.every().monday.at("10:00").do(weekly_individual_provider_reports)
         schedule.every().tuesday.at("08:00").do(weekly_npi_update)
         # schedule.every().friday.at("08:00").do(weekly_paid_update)  # Commented out - client wants to run manually
@@ -623,6 +688,7 @@ def setup_weekly_scheduler(scheduler_role: str = "leader"):
         logger.info("    - Pending payment update: Monday at 08:00 UTC")
         logger.info("    - Consolidated provider payment report: Monday at 09:00 UTC")
         logger.info("    - Provider payment summary report: Monday at 09:15 UTC")
+        logger.info("    - Referral network report: Monday at 09:30 UTC")
         logger.info("    - Individual provider reports: Monday at 10:00 UTC")
         logger.info("    - NPI data update: Tuesday at 08:00 UTC")
         logger.info("    - Paid update: Friday at 08:00 UTC (manual)")
@@ -729,4 +795,11 @@ def run_provider_payment_summary_report_now():
     Utility function to run the provider payment summary report immediately (for testing).
     """
     logger.info("Running provider payment summary report immediately...")
-    weekly_provider_payment_summary_report() 
+    weekly_provider_payment_summary_report()
+
+def run_referral_report_now():
+    """
+    Utility function to run the referral report immediately (for testing).
+    """
+    logger.info("Running referral report immediately...")
+    weekly_referral_report() 
