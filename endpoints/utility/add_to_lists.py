@@ -1,5 +1,5 @@
 # Created: 2025-08-12 17:16:24
-# Last Modified: 2025-09-05 22:26:24
+# Last Modified: 2025-09-06 01:49:17
 # Author: Scott Cadreau
 
 # endpoints/utility/add_to_lists.py
@@ -901,14 +901,15 @@ def add_pay_tier(request: Request, pay_tier_data: PayTierCreate):
                     SELECT * FROM procedure_codes
                 """)
                 
-                # Step 6: Clear procedure_codes table and insert from procedure_codes_temp
-                cursor.execute("DELETE FROM procedure_codes")
+                # Step 6: Delete only the specific tier from procedure_codes and insert updated records
+                cursor.execute("DELETE FROM procedure_codes WHERE tier = %s", (pay_tier_data.tier,))
                 
                 cursor.execute("""
                     INSERT INTO procedure_codes (procedure_code, procedure_desc, code_category, code_status, code_pay_amount, tier)
                     SELECT procedure_code, procedure_desc, code_category, code_status, code_pay_amount, tier
                     FROM procedure_codes_temp
-                """)
+                    WHERE tier = %s
+                """, (pay_tier_data.tier,))
                 
                 # Get count of records updated
                 records_updated = cursor.rowcount
