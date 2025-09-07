@@ -1,41 +1,56 @@
+# Core Technologies & Standards
 Use functional programming primarily (Only use classes when they are needed.  Such as in models.py)
 Python 3.12+
 FastAPI
 Go 1.24.5+
 
+# File Headers
 Always include the following 3 lines at the beginning of any .py or .go file (note the trailing spaces)
 # Created: 
 # Last Modified: 
 # Author: Scott Cadreau
 
-When needed read the most recent table_structures_<date_time>.sql file for current database and table information
+Do not edit the # Last Modified: line.  It is handled by an automatic script on save
 
+# Database & Infrastructure
+When needed read the most recent table_structures_<date_time>.sql file for current database and table information
+For database integration use pymysql
+If you cannot find the schema in the current table_structures_<date_time>.sql file, run the utils/get_table_structures.py command to get the current schemas
+The aws cli user has access to all aws functionality
+Do not use environment variables.  If we need to create a new variable, we will store it in AWS Secrets
 The test server is https://allstarsapi1.metoraymedical.com
 
+# Development Workflow
+Do not try to start or restart the server.  Just pause and tell me to update and reload it.
+If you install a pip package always add --break-system-packages to the command 
 Always add prometheus monitoring to new endpoints
-
 Update the main readme when appropriate
-
 When it is deemed necessary create a separate readme with the functional details
 
-For database integration use pymysql
-
+# Special Commands
 At the end of a conversation, if I type "create update" please create a small .md file called in the updates directory update_<date_time>.md.  
 date_time should be yyyy-MM-dd_HH-mm-ss.  
 Only do this if the create update is entered on its own line.
 
-Do not edit the # Last Modified: line.  It is handled by an automatic script on save
-
-The aws cli user has access to all aws functionality
-
-Do not use environment variables.  If we need to create a new variable, we will store it in AWS Secrets
-
-Do not try to start or restart the server.  Just pause and tell me to update and reload it.
-
-If you cannot find the schema in the current table_structures_<date_time>.sql file, run the utils/get_table_structures.py command to get the current schemas
-
-If you install a pip package always add --break-system-packages to the command 
-
-read the case.create_case endpoint to get a docstring format and include a verbose docstring to all new endpoints
-
+# Code Quality & Style
 use snake case for naming functions and variables.  Leading _ in function names is acceptable for internal functions
+read the case.create_case endpoint to get a docstring format and include a verbose docstring to all new endpoints
+Always include type hints for function parameters and return values in Python code
+Group imports: standard library, third-party, local imports (separated by blank lines)
+Always check if existing codebase already has similar functionality before suggesting new pip packages
+
+# Documentation Requirements
+Include a brief example of expected input/output in endpoint docstrings
+Document any known edge cases or limitations in function docstrings
+Add structured logging to all new endpoints using the existing logging format from other endpoints
+
+# Database & SQL Standards
+Format multi-line SQL queries with proper indentation and line breaks for readability
+For multi-query database operations, wrap in transactions and add comment: "# TRANSACTION --" describing the atomic operation
+
+# Safety & Security
+Anytime you create a sql query that is destructive (delete from, etc), add a comment line directly above the query to warn me explicity about the destructive query.  
+The comment should start with "# ! DANGER --" <note about query>
+When creating endpoints that accept user input, add a comment above the validation logic: "# INPUT VALIDATION --" describing what is being validated
+Always include proper error handling with specific HTTP status codes and meaningful error messages
+Never hardcode URLs, timeouts, or limits - reference existing config patterns or ask about creating new config entries

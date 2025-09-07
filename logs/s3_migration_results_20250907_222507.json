@@ -1,0 +1,21 @@
+{
+  "bucket_name": "amplify-surgicalcasemanag-surgicaldocsbucket5a7ebd-8usdadqv6nnp",
+  "start_time": "2025-09-07T21:38:51.939774+00:00",
+  "dry_run": false,
+  "batch_size": 500,
+  "max_workers": 16,
+  "files_to_process": 422743,
+  "files_processed": 0,
+  "files_moved": 0,
+  "files_skipped": 0,
+  "files_errors": 0,
+  "total_size_moved": 262447268,
+  "categories": {
+    "s3_access_log": 422743
+  },
+  "errors": 0,
+  "processed": 422743,
+  "moved": 422743,
+  "skipped": 0,
+  "end_time": "2025-09-07T22:25:06.924183+00:00"
+}

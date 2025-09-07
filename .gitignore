@@ -157,3 +157,4 @@ case_export_*
 
 # EC2 Monitoring
 tests/ec2_monitoring_*
+*s3_log_reconnaissance_report*.json
