@@ -1,5 +1,5 @@
 # Created: 2025-07-29 03:41:16
-# Last Modified: 2025-08-27 03:50:01
+# Last Modified: 2025-09-07 21:00:30
 # Author: Scott Cadreau
 
 # endpoints/backoffice/get_case_images.py
@@ -85,7 +85,7 @@ def get_case_images(
     Returns:
         FileResponse: ZIP file download containing:
             - Organized directory structure by case (case_id_patient_name/)
-            - Compressed demo and note files with original filenames preserved
+            - Compressed demo, note, and misc files with original filenames preserved
             - Error log file (download_errors.txt) if any download failures occurred
             - Custom HTTP headers with download statistics:
                 * X-Downloaded-Files: Number of successfully downloaded files
@@ -105,12 +105,12 @@ def get_case_images(
     Database Operations:
         1. Validates requesting user's permission level (user_type >= 10)
         2. Retrieves case information for provided case_ids
-        3. Fetches case details including user_id, file paths, and patient information
+        3. Fetches case details including user_id, file paths (demo_file, note_file, misc_file), and patient information
         4. Validates case existence and active status
         5. Only processes active cases (active = 1)
     
     AWS S3 Integration:
-        - Downloads demo_file and note_file from user-specific S3 buckets
+        - Downloads demo_file, note_file, and misc_file from user-specific S3 buckets
         - Handles S3 access errors gracefully with detailed error reporting
         - Uses download_file_from_s3 utility for reliable file retrieval
         - Supports various file types stored in S3 buckets
@@ -270,7 +270,7 @@ def get_case_images(
             # Get case information with optimized query and better indexing
             placeholders = ",".join(["%s"] * len(case_request.case_ids))
             sql = f"""
-                SELECT case_id, user_id, demo_file, note_file, 
+                SELECT case_id, user_id, demo_file, note_file, misc_file,
                        COALESCE(patient_first, '') as patient_first, 
                        COALESCE(patient_last, '') as patient_last
                 FROM cases 
@@ -482,7 +482,7 @@ def _process_case_parallel(case: Dict[str, Any], temp_dir: str, stats_lock: thre
     Process a single case in parallel: create directory, download files, and compress them.
     
     Args:
-        case: Case dictionary with case_id, user_id, demo_file, note_file, patient info
+        case: Case dictionary with case_id, user_id, demo_file, note_file, misc_file, patient info
         temp_dir: Base temporary directory for processing
         stats_lock: Thread lock for updating compression statistics
         
@@ -497,6 +497,7 @@ def _process_case_parallel(case: Dict[str, Any], temp_dir: str, stats_lock: thre
     case_user_id = case["user_id"]
     demo_file = case["demo_file"]
     note_file = case["note_file"]
+    misc_file = case["misc_file"]
     patient_name = f"{case['patient_first'] or ''} {case['patient_last'] or ''}".strip()
     
     result = {
@@ -516,11 +517,13 @@ def _process_case_parallel(case: Dict[str, Any], temp_dir: str, stats_lock: thre
             file_tasks.append(("demo", demo_file, case_user_id, case_dir, case_id))
         if note_file:
             file_tasks.append(("note", note_file, case_user_id, case_dir, case_id))
+        if misc_file:
+            file_tasks.append(("misc", misc_file, case_user_id, case_dir, case_id))
         
-        # Process files in parallel (demo + note files for this case)
+        # Process files in parallel (demo + note + misc files for this case)
         # Use up to 4 workers per case for file processing on powerful hardware
         if file_tasks:
-            file_workers = min(4, len(file_tasks))  # Up to 4 files per case, but typically 2
+            file_workers = min(4, len(file_tasks))  # Up to 4 files per case, but typically 2-3
             with ThreadPoolExecutor(max_workers=file_workers) as file_executor:
                 future_to_file = {
                     file_executor.submit(_process_single_file, *task): task
@@ -554,7 +557,7 @@ def _process_single_file(file_type: str, filename: str, user_id: str, case_dir: 
     Process a single file: download and compress.
     
     Args:
-        file_type: "demo" or "note"
+        file_type: "demo", "note", or "misc"
         filename: Name of the file to process
         user_id: User ID for S3 path
         case_dir: Case directory path
