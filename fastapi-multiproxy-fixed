@@ -1,0 +1,229 @@
+# Updated FastAPI Multiproxy Configuration with Timeout Fixes
+# This configuration will eliminate the 502 Bad Gateway errors for large case exports
+
+# HTTP block (redirects to HTTPS or handles HTTP requests)
+server {
+    listen 80;
+    server_name _;
+
+    # Timeout settings for HTTP
+    proxy_connect_timeout       600s;
+    proxy_send_timeout          600s;
+    proxy_read_timeout          600s;
+    send_timeout                600s;
+
+    # Buffer settings
+    proxy_buffering             off;
+    proxy_buffer_size           128k;
+    proxy_buffers               4 256k;
+    proxy_busy_buffers_size     256k;
+    client_max_body_size        50M;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Additional headers for better handling
+        proxy_set_header Connection "";
+        proxy_cache off;
+    }
+
+    # Special handling for export endpoints with extended timeouts
+    location ~ ^/export_cases {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+        
+        # Extended timeouts specifically for exports (10 minutes)
+        proxy_connect_timeout       600s;
+        proxy_send_timeout          600s;
+        proxy_read_timeout          600s;
+        send_timeout                600s;
+        
+        # Disable all buffering and caching for exports
+        proxy_buffering             off;
+        proxy_cache                 off;
+        proxy_store                 off;
+        
+        # Headers to prevent client-side caching
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+        add_header Expires "0";
+    }
+
+    # Special handling for case images endpoint - VERY long running operations
+    location ~ ^/get_case_images {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+        
+        # VERY extended timeouts for image processing (30 minutes)
+        # This endpoint downloads, compresses, and zips large files
+        proxy_connect_timeout       1800s;  # 30 minutes
+        proxy_send_timeout          1800s;  # 30 minutes  
+        proxy_read_timeout          1800s;  # 30 minutes
+        send_timeout                1800s;  # 30 minutes
+        
+        # Large file handling
+        client_max_body_size        100M;   # Allow large request bodies
+        proxy_max_temp_file_size    0;      # Disable temp file size limit
+        
+        # Disable all buffering for large file responses
+        proxy_buffering             off;
+        proxy_cache                 off;
+        proxy_store                 off;
+        proxy_request_buffering     off;    # Don't buffer request body
+        
+        # Headers for large file downloads
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+        add_header Expires "0";
+        
+        # Buffer settings for large responses
+        proxy_buffer_size           256k;
+        proxy_buffers               8 256k;
+        proxy_busy_buffers_size     512k;
+    }
+}
+
+# HTTPS block
+server {
+    listen 443 ssl;
+    server_name allstarsapi1.metoraymedical.com;
+
+    ssl_certificate     /etc/ssl/certs/allstarsapi1_fullchain.pem;
+    ssl_certificate_key /etc/ssl/private/allstarsapi1_key.pem;
+
+    # Global timeout settings for HTTPS
+    proxy_connect_timeout       600s;
+    proxy_send_timeout          600s;
+    proxy_read_timeout          600s;
+    send_timeout                600s;
+
+    # Global buffer settings
+    proxy_buffering             off;
+    proxy_buffer_size           128k;
+    proxy_buffers               4 256k;
+    proxy_busy_buffers_size     256k;
+    client_max_body_size        50M;
+
+    # Keepalive settings
+    keepalive_timeout           65s;
+    keepalive_requests          1000;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Additional headers for better handling
+        proxy_set_header Connection "";
+        proxy_cache off;
+    }
+
+    # Special handling for export endpoints with extended timeouts
+    location ~ ^/export_cases {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+        
+        # Extended timeouts specifically for exports (10 minutes)
+        proxy_connect_timeout       600s;
+        proxy_send_timeout          600s;
+        proxy_read_timeout          600s;
+        send_timeout                600s;
+        
+        # Disable all buffering and caching for exports
+        proxy_buffering             off;
+        proxy_cache                 off;
+        proxy_store                 off;
+        
+        # Headers to prevent client-side caching
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+        add_header Expires "0";
+    }
+
+    # Optional: Special handling for streaming export endpoint
+    location ~ ^/export_cases_stream {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+        
+        # Extended timeouts for streaming
+        proxy_connect_timeout       600s;
+        proxy_send_timeout          600s;
+        proxy_read_timeout          600s;
+        send_timeout                600s;
+        
+        # Critical for streaming: disable all buffering
+        proxy_buffering             off;
+        proxy_cache                 off;
+        proxy_store                 off;
+        
+        # Streaming-specific headers
+        add_header Cache-Control "no-cache";
+        add_header X-Accel-Buffering "no";
+    }
+
+    # Special handling for case images endpoint - VERY long running operations (HTTPS)
+    location ~ ^/get_case_images {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+        
+        # VERY extended timeouts for image processing (30 minutes)
+        # This endpoint downloads, compresses, and zips large files
+        proxy_connect_timeout       1800s;  # 30 minutes
+        proxy_send_timeout          1800s;  # 30 minutes  
+        proxy_read_timeout          1800s;  # 30 minutes
+        send_timeout                1800s;  # 30 minutes
+        
+        # Large file handling
+        client_max_body_size        100M;   # Allow large request bodies
+        proxy_max_temp_file_size    0;      # Disable temp file size limit
+        
+        # Disable all buffering for large file responses
+        proxy_buffering             off;
+        proxy_cache                 off;
+        proxy_store                 off;
+        proxy_request_buffering     off;    # Don't buffer request body
+        
+        # Headers for large file downloads
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+        add_header Expires "0";
+        
+        # Buffer settings for large responses
+        proxy_buffer_size           256k;
+        proxy_buffers               8 256k;
+        proxy_busy_buffers_size     512k;
+    }
+}

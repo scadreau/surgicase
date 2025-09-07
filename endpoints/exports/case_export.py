@@ -1,14 +1,14 @@
 # Created: 2025-07-28 19:48:18
-# Last Modified: 2025-08-06 16:04:25
+# Last Modified: 2025-09-07 19:56:01
 # Author: Scott Cadreau
 
 # endpoints/exports/case_export.py
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 import pymysql.cursors
 from core.database import get_db_connection, close_db_connection
-from utils.monitoring import track_business_operation, business_metrics
+from utils.monitoring import track_business_operation, business_metrics, logger
 from utils.s3_storage import upload_file_to_s3, generate_s3_key
 from utils.report_cleanup import cleanup_old_reports
 from typing import List, Dict, Any
@@ -26,49 +26,281 @@ router = APIRouter()
 class CaseExportRequest(BaseModel):
     case_ids: List[str]
 
+# --- Streaming Export Endpoint ---
+
+@router.post("/export_cases_stream")
+@track_business_operation("export", "cases_stream")
+def export_cases_stream(request_obj: Request, export_request: CaseExportRequest):
+    """
+    Streaming version of case export to handle large datasets without 502 timeouts.
+    
+    This endpoint processes cases in very small batches and streams the response
+    to prevent nginx/server timeouts with large datasets.
+    """
+    import json
+    
+    def generate_streaming_response():
+        start_time = time.time()
+        
+        try:
+            if not export_request.case_ids:
+                yield json.dumps({"error": "case_ids list cannot be empty"})
+                return
+            
+            total_cases = len(export_request.case_ids)
+            if logger:
+                logger.info(f"Starting streaming case export for {total_cases} cases")
+            
+            conn = get_db_connection()
+            
+            try:
+                with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                    # Use very small batch size for streaming (3 cases at a time)
+                    batch_size = 3
+                    all_cases = []
+                    
+                    total_batches = (total_cases + batch_size - 1) // batch_size
+                    
+                    # Send initial response header
+                    yield '{"status": "processing", "total_cases": ' + str(total_cases) + ', "batches": ' + str(total_batches) + ', "cases": ['
+                    
+                    first_case = True
+                    
+                    for i in range(0, total_cases, batch_size):
+                        batch_case_ids = export_request.case_ids[i:i + batch_size]
+                        batch_num = (i // batch_size) + 1
+                        
+                        try:
+                            batch_cases = _get_cases_batch_optimized(cursor, batch_case_ids)
+                            
+                            # Stream each case as we process it
+                            for case in batch_cases:
+                                if not first_case:
+                                    yield ","
+                                yield json.dumps(case)
+                                first_case = False
+                                
+                            all_cases.extend(batch_cases)
+                            
+                            # Small delay between batches
+                            time.sleep(0.05)  # 50ms delay
+                            
+                        except Exception as batch_error:
+                            if logger:
+                                logger.error(f"Streaming batch {batch_num} failed: {batch_error}")
+                            continue
+                    
+                    # Send final response footer with summary
+                    found_case_ids = [case['case_id'] for case in all_cases]
+                    missing_case_ids = [case_id for case_id in export_request.case_ids if case_id not in found_case_ids]
+                    
+                    summary = {
+                        "total_requested": total_cases,
+                        "total_found": len(all_cases),
+                        "total_missing": len(missing_case_ids),
+                        "found_case_ids": found_case_ids,
+                        "missing_case_ids": missing_case_ids,
+                        "execution_time_ms": int((time.time() - start_time) * 1000)
+                    }
+                    
+                    yield '], "summary": ' + json.dumps(summary) + '}'
+                    
+                    business_metrics.record_utility_operation("case_export_stream", "success")
+                    
+            finally:
+                close_db_connection(conn)
+                
+        except Exception as e:
+            business_metrics.record_utility_operation("case_export_stream", "error")
+            yield json.dumps({"error": f"Error streaming cases: {str(e)}"})
+    
+    return StreamingResponse(
+        generate_streaming_response(),
+        media_type="application/json",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"  # Disable nginx buffering
+        }
+    )
+
 # --- Pure Functions for Data Processing ---
 
 def get_cases_with_procedures(cursor: pymysql.cursors.DictCursor, case_ids: List[str]) -> List[Dict[str, Any]]:
     """
-    Extract case data with associated procedure codes.
+    Extract case data with associated procedure codes using optimized query.
     Pure function that takes a cursor and case_ids and returns comprehensive case data.
+    
+    Optimizations:
+    - Uses JSON_ARRAYAGG to avoid Cartesian product
+    - Processes cases in batches to prevent timeouts
+    - More efficient memory usage
     """
     if not case_ids:
         return []
     
-    # Create placeholders for the IN clause
+    # Process in batches to prevent timeouts and memory issues
+    # 502 Bad Gateway indicates nginx/server timeout - use very small batches
+    # Even with database indexes, we need tiny batches to avoid server timeouts
+    batch_size = 5 if len(case_ids) > 50 else 10
+    all_cases = []
+    
+    for i in range(0, len(case_ids), batch_size):
+        batch_case_ids = case_ids[i:i + batch_size]
+        batch_num = (i // batch_size) + 1
+        total_batches = (len(case_ids) + batch_size - 1) // batch_size
+        
+        if logger:
+            logger.info(f"Processing batch {batch_num}/{total_batches} ({len(batch_case_ids)} cases)")
+        
+        batch_start_time = time.time()
+        try:
+            batch_cases = _get_cases_batch_optimized(cursor, batch_case_ids)
+            batch_duration = time.time() - batch_start_time
+            
+            if logger:
+                logger.info(f"Batch {batch_num} completed in {batch_duration:.2f}s, found {len(batch_cases)} cases")
+            
+            # Add a small delay between batches to prevent overwhelming the server
+            if batch_num < total_batches:  # Don't delay after the last batch
+                time.sleep(0.1)  # 100ms delay between batches
+                
+        except Exception as batch_error:
+            if logger:
+                logger.error(f"Batch {batch_num} failed: {batch_error}")
+            # Continue with other batches instead of failing completely
+            batch_cases = []
+        
+        all_cases.extend(batch_cases)
+    
+    return all_cases
+
+def _get_cases_batch_optimized(cursor: pymysql.cursors.DictCursor, case_ids: List[str]) -> List[Dict[str, Any]]:
+    """
+    Get a batch of cases using optimized query with fallback mechanism.
+    """
+    if not case_ids:
+        return []
+    
+    # Try optimized JSON_ARRAYAGG approach first
+    try:
+        return _get_cases_with_json_agg(cursor, case_ids)
+    except Exception as e:
+        if logger:
+            logger.warning(f"JSON_ARRAYAGG query failed, falling back to traditional method: {str(e)}")
+        # Fallback to traditional method
+        return _get_cases_traditional_method(cursor, case_ids)
+
+def _get_cases_with_json_agg(cursor: pymysql.cursors.DictCursor, case_ids: List[str]) -> List[Dict[str, Any]]:
+    """
+    Optimized method using JSON_ARRAYAGG for MySQL 8.x.
+    """
     placeholders = ','.join(['%s'] * len(case_ids))
     
-    # Query to get all data from cases table joined with case_procedure_codes
+    # Use JSON_ARRAYAGG since we're on MySQL 8.x
     sql = f"""
         SELECT 
-            c.*,
-            cpc.procedure_code
+            c.case_id, c.user_id, c.case_date, c.patient_first, c.patient_last, 
+            c.ins_provider, c.surgeon_id, c.facility_id, c.case_create_ts, 
+            c.case_updated_ts, c.case_status, c.paid_to_provider_ts, 
+            c.biller_status, c.sent_to_biller_ts, c.received_pmnt_ts, 
+            c.sent_to_negotiation_ts, c.settled_ts, c.sent_to_idr_ts, 
+            c.idr_decision_ts, c.closed_ts, c.demo_file, c.note_file, 
+            c.misc_file, c.active, c.human_case_id, c.pay_amount, 
+            c.pay_category, c.pending_payment_ts,
+            COALESCE(
+                JSON_ARRAYAGG(
+                    CASE 
+                        WHEN cpc.procedure_code IS NOT NULL 
+                        THEN cpc.procedure_code
+                        ELSE NULL
+                    END
+                ), 
+                JSON_ARRAY()
+            ) as procedure_codes_json
         FROM cases c
         LEFT JOIN case_procedure_codes cpc ON c.case_id = cpc.case_id
         WHERE c.case_id IN ({placeholders})
-        ORDER BY c.case_id, cpc.procedure_code
+        GROUP BY c.case_id, c.user_id, c.case_date, c.patient_first, c.patient_last, 
+                 c.ins_provider, c.surgeon_id, c.facility_id, c.case_create_ts, 
+                 c.case_updated_ts, c.case_status, c.paid_to_provider_ts, 
+                 c.biller_status, c.sent_to_biller_ts, c.received_pmnt_ts, 
+                 c.sent_to_negotiation_ts, c.settled_ts, c.sent_to_idr_ts, 
+                 c.idr_decision_ts, c.closed_ts, c.demo_file, c.note_file, 
+                 c.misc_file, c.active, c.human_case_id, c.pay_amount, 
+                 c.pay_category, c.pending_payment_ts
+        ORDER BY c.case_id
     """
     
     cursor.execute(sql, case_ids)
     results = cursor.fetchall()
     
-    # Group results by case_id to handle multiple procedure codes per case
-    cases_dict = {}
+    # Process results and convert concatenated string to list
+    cases = []
     for row in results:
-        case_id = row['case_id']
+        case_data = {k: v for k, v in row.items() if k != 'procedure_codes_concat'}
         
-        if case_id not in cases_dict:
-            # Create new case entry with all case data
-            case_data = {k: v for k, v in row.items() if k != 'procedure_code'}
-            case_data['procedure_codes'] = []
-            cases_dict[case_id] = case_data
+        # Parse concatenated procedure codes
+        procedure_codes_concat = row.get('procedure_codes_concat', '')
+        if procedure_codes_concat:
+            procedure_codes = [code.strip() for code in procedure_codes_concat.split(',') if code.strip()]
+        else:
+            procedure_codes = []
         
-        # Add procedure code if it exists
-        if row['procedure_code'] is not None:
-            cases_dict[case_id]['procedure_codes'].append(row['procedure_code'])
+        case_data['procedure_codes'] = procedure_codes
+        cases.append(case_data)
     
-    return list(cases_dict.values())
+    return cases
+
+def _get_cases_traditional_method(cursor: pymysql.cursors.DictCursor, case_ids: List[str]) -> List[Dict[str, Any]]:
+    """
+    Traditional method - separate queries for cases and procedure codes.
+    More compatible but potentially slower.
+    """
+    placeholders = ','.join(['%s'] * len(case_ids))
+    
+    # Get cases first
+    cases_sql = f"""
+        SELECT * FROM cases c
+        WHERE c.case_id IN ({placeholders})
+        ORDER BY c.case_id
+    """
+    
+    cursor.execute(cases_sql, case_ids)
+    cases_results = cursor.fetchall()
+    
+    if not cases_results:
+        return []
+    
+    # Get procedure codes for all cases in one query
+    procedure_sql = f"""
+        SELECT case_id, procedure_code
+        FROM case_procedure_codes
+        WHERE case_id IN ({placeholders})
+        ORDER BY case_id, procedure_code
+    """
+    
+    cursor.execute(procedure_sql, case_ids)
+    procedure_results = cursor.fetchall()
+    
+    # Group procedure codes by case_id
+    procedure_dict = {}
+    for proc_row in procedure_results:
+        case_id = proc_row['case_id']
+        if case_id not in procedure_dict:
+            procedure_dict[case_id] = []
+        if proc_row['procedure_code']:
+            procedure_dict[case_id].append(proc_row['procedure_code'])
+    
+    # Combine cases with their procedure codes
+    cases = []
+    for case_row in cases_results:
+        case_data = dict(case_row)
+        case_id = case_data['case_id']
+        case_data['procedure_codes'] = procedure_dict.get(case_id, [])
+        cases.append(case_data)
+    
+    return cases
 
 def format_export_response(cases: List[Dict[str, Any]], requested_case_ids: List[str]) -> Dict[str, Any]:
     """
@@ -231,17 +463,37 @@ def export_cases(request_obj: Request, export_request: CaseExportRequest):
             error_message = "case_ids list cannot be empty"
             raise HTTPException(status_code=400, detail="case_ids list cannot be empty")
         
+        # Log export request details for monitoring
+        total_cases = len(export_request.case_ids)
+        if logger:
+            logger.info(f"Starting case export for {total_cases} cases")
+        
+        # Warn for large exports
+        if total_cases > 100:
+            if logger:
+                logger.warning(f"Large case export requested: {total_cases} cases - using batched processing")
+        
         conn = get_db_connection()
         
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-                # Get case data with procedure codes
+                # Get case data with procedure codes (now optimized with batching)
                 cases = get_cases_with_procedures(cursor, export_request.case_ids)
                 
                 # Format response with metadata
                 response = format_export_response(cases, export_request.case_ids)
                 
+                # Add performance metadata
+                response['performance'] = {
+                    'total_cases_requested': total_cases,
+                    'batched_processing': total_cases > 50,
+                    'execution_time_ms': int((time.time() - start_time) * 1000)
+                }
+                
                 business_metrics.record_utility_operation("case_export", "success")
+                
+                if logger:
+                    logger.info(f"Case export completed: {len(cases)} cases found, {total_cases - len(cases)} missing")
                 
                 response_data = response
                 return response
@@ -380,11 +632,21 @@ def export_cases_csv(request_obj: Request, export_request: CaseExportRequest):
             error_message = "case_ids list cannot be empty"
             raise HTTPException(status_code=400, detail="case_ids list cannot be empty")
         
+        # Log export request details for monitoring
+        total_cases = len(export_request.case_ids)
+        if logger:
+            logger.info(f"Starting CSV case export for {total_cases} cases")
+        
+        # Warn for large exports
+        if total_cases > 100:
+            if logger:
+                logger.warning(f"Large CSV case export requested: {total_cases} cases - using batched processing")
+        
         conn = get_db_connection()
         
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-                # Get case data with procedure codes
+                # Get case data with procedure codes (now optimized with batching)
                 cases = get_cases_with_procedures(cursor, export_request.case_ids)
                 
                 # Create exports directory

@@ -1,9 +1,10 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-27 02:50:25
+# Last Modified: 2025-09-07 20:04:30
 # Author: Scott Cadreau
 
 # main.py
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
 # Import all routers
@@ -139,6 +140,31 @@ app = FastAPI(
     title="SurgiCase API",
     description="API for surgical case management",
     version="0.8.0"
+)
+
+# Add CORS middleware for React 19+/Vite frontend
+# This fixes CORS issues with large file downloads (>6MB)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Configure this to your frontend domain in production
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=[
+        # Expose custom headers for file downloads
+        "Content-Disposition",
+        "Content-Length", 
+        "X-Downloaded-Files",
+        "X-Download-Errors",
+        "X-Cases-Processed",
+        "X-Images-Compressed",
+        "X-PDFs-Compressed",
+        "X-Compression-Errors",
+        "X-Export-Summary",
+        "X-S3-Upload-Status"
+    ],
+    # Critical for large file downloads
+    max_age=3600  # Cache preflight requests for 1 hour
 )
 
 # Add request monitoring middleware
