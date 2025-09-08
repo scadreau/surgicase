@@ -1,5 +1,5 @@
 # Created: 2025-08-05 22:15:27
-# Last Modified: 2025-09-05 22:02:48
+# Last Modified: 2025-09-08 21:38:19
 # Author: Scott Cadreau
 
 # endpoints/utility/get_lists.py
@@ -887,7 +887,7 @@ def get_tiers_summary(request: Request, user_id: str = Query(..., description="U
 
                 # Process the data to create tier summary
                 # Define the specialty order as requested: (OB-Gyn/General/Other/Orthopedic/Plastic/Spine)
-                specialty_order = ["OB-Gyn", "General", "Other", "Orthopedic", "Plastic", "Spine"]
+                specialty_order = ["OB-Gyn", "General", "Orthopedic", "Plastic", "Spine"]
                 
                 # Group data by tier
                 tiers_data = {}
@@ -923,7 +923,7 @@ def get_tiers_summary(request: Request, user_id: str = Query(..., description="U
             close_db_connection(conn)
             
         response_data = {
-            "buckets": "OB-Gyn/General/Other/Orthopedic/Plastic/Spine",
+            "buckets": "OB-Gyn/General/Orthopedic/Plastic/Spine",
             "tiers_summary": tiers_summary
         }
         return response_data
