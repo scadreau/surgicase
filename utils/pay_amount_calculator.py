@@ -1,5 +1,5 @@
 # Created: 2025-07-16 14:50:43
-# Last Modified: 2025-09-08 11:39:42
+# Last Modified: 2025-09-10 09:09:49
 # Author: Scott Cadreau
 
 # utils/pay_amount_calculator.py
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 def calculate_case_pay_amount(case_id: str, user_id: str, conn) -> dict:
     """
-    Calculate the minimum non-zero pay amount for a case based on its procedure codes.
+    Calculate the maximum non-zero pay amount for a case based on its procedure codes.
     Uses the user's tier to determine which procedure codes to use for pay calculation.
     Skips any procedure codes with 0.00 pay amounts to avoid edge cases.
     
@@ -76,14 +76,14 @@ def calculate_case_pay_amount(case_id: str, user_id: str, conn) -> dict:
             codes = [row['procedure_code'] for row in procedure_codes]
             logger.info(f"Found {len(codes)} procedure codes for case {case_id}: {codes}")
             
-            # Query procedure_codes table for the minimum non-zero pay amount and its category using tier
+            # Query procedure_codes table for the maximum non-zero pay amount and its category using tier
             # Use placeholders for the IN clause
             placeholders = ','.join(['%s'] * len(codes))
             query = f"""
                 SELECT code_pay_amount, code_category
                 FROM procedure_codes 
                 WHERE tier = %s AND procedure_code IN ({placeholders}) AND code_pay_amount > 0
-                ORDER BY code_pay_amount ASC, procedure_code ASC
+                ORDER BY code_pay_amount DESC, procedure_code ASC
                 LIMIT 1
             """
             # Build parameters: tier first, then all procedure codes
@@ -108,14 +108,14 @@ def calculate_case_pay_amount(case_id: str, user_id: str, conn) -> dict:
             pay_amount = Decimal(str(result['code_pay_amount']))
             pay_category = result['code_category']
             
-            logger.info(f"Calculated minimum non-zero pay amount {pay_amount} with category '{pay_category}' for case {case_id} with {len(codes)} procedure codes (tier {user_tier})")
+            logger.info(f"Calculated maximum non-zero pay amount {pay_amount} with category '{pay_category}' for case {case_id} with {len(codes)} procedure codes (tier {user_tier})")
             
             return {
                 "success": True,
                 "pay_amount": pay_amount,
                 "pay_category": pay_category,
                 "procedure_codes_found": len(codes),
-                "message": f"Successfully calculated minimum non-zero pay amount {pay_amount} with category '{pay_category}' from {len(codes)} procedure codes (tier {user_tier})"
+                "message": f"Successfully calculated maximum non-zero pay amount {pay_amount} with category '{pay_category}' from {len(codes)} procedure codes (tier {user_tier})"
             }
             
     except Exception as e:
