@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-09-07 20:04:30
+# Last Modified: 2025-09-11 22:48:17
 # Author: Scott Cadreau
 
 # main.py
@@ -40,6 +40,9 @@ from endpoints.utility.get_timezones import router as get_timezones_router
 from endpoints.utility.get_lists import router as get_lists_router
 from endpoints.utility.add_to_lists import router as add_to_lists_router
 from endpoints.utility.bugs import router as bugs_router
+from endpoints.utility.cache_diagnostics import router as cache_diagnostics_router
+
+from endpoints.admin.cache_management import router as cache_management_router
 
 from endpoints.health import router as health_router
 from endpoints.metrics import router as metrics_router
@@ -213,6 +216,7 @@ app.include_router(get_timezones_router, tags=["utility"])
 app.include_router(get_lists_router, tags=["utility"])
 app.include_router(add_to_lists_router, tags=["utility"])
 app.include_router(bugs_router, tags=["utility"])
+app.include_router(cache_diagnostics_router, tags=["utility"])
 
 # Health check
 app.include_router(health_router, tags=["health"])
@@ -232,6 +236,9 @@ app.include_router(user_dashboard_data_router, tags=["backoffice"])
 app.include_router(bulk_update_case_status_router, tags=["backoffice"])
 app.include_router(get_case_images_router, tags=["backoffice"])
 app.include_router(build_dashboard_router, tags=["backoffice"])
+
+# Admin endpoints
+app.include_router(cache_management_router, tags=["admin"])
 
 # Report endpoints
 app.include_router(provider_payment_report_router, tags=["reports"])
