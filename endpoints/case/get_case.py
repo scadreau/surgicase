@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-09-10 22:39:17
+# Last Modified: 2025-09-14 08:55:11
 # Author: Scott Cadreau
 
 # endpoints/case/get_case.py
@@ -40,7 +40,8 @@ def _get_case_optimized(cursor, case_id, calling_user_id):
                         WHEN cpc.procedure_code IS NOT NULL 
                         THEN JSON_OBJECT(
                             'procedure_code', cpc.procedure_code,
-                            'procedure_desc', COALESCE(cpc.procedure_desc, '')
+                            'procedure_desc', COALESCE(cpc.procedure_desc, ''),
+                            'asst_surg', COALESCE(cpc.asst_surg, 0)
                         )
                         ELSE NULL
                     END
@@ -176,6 +177,7 @@ def get_case(
                 - procedure_codes (List[dict]): Array of procedure information:
                     - procedure_code (str): Medical procedure code
                     - procedure_desc (str): Description of the procedure
+                    - asst_surg (int): Assistant surgeon flag (0=not applicable, 1=optional, 2=billable, 9=not allowed)
             - user_id (str): The user ID who owns the case
             - case_id (str): The case ID that was requested
     
@@ -254,11 +256,13 @@ def get_case(
                 "procedure_codes": [
                     {
                         "procedure_code": "47562",
-                        "procedure_desc": "Laparoscopic Cholecystectomy"
+                        "procedure_desc": "Laparoscopic Cholecystectomy",
+                        "asst_surg": 2
                     },
                     {
                         "procedure_code": "76705",
-                        "procedure_desc": "Ultrasound, Abdominal"
+                        "procedure_desc": "Ultrasound, Abdominal",
+                        "asst_surg": 0
                     }
                 ]
             },
