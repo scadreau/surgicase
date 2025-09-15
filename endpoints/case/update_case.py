@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-09-14 08:18:36
+# Last Modified: 2025-09-15 02:18:38
 # Author: Scott Cadreau
 
 # endpoints/case/update_case.py
@@ -11,6 +11,7 @@ from core.database import get_db_connection, close_db_connection, is_connection_
 from core.models import CaseUpdate
 from utils.case_status import update_case_status
 from utils.pay_amount_calculator import update_case_pay_amount
+from utils.procedure_code_auto_fix import auto_fix_procedure_codes, format_corrections_for_response
 from utils.monitoring import track_business_operation, business_metrics
 
 logger = logging.getLogger(__name__)
@@ -215,15 +216,23 @@ def update_case(request: Request, case: CaseUpdate = Body(...)):
                 if cursor.rowcount > 0:
                     updated_fields.extend(update_fields.keys())
 
+            # Initialize auto-fix variables
+            corrected_codes = []
+            corrections_made = []
+            unique_procedure_codes = []
+            
             # Update procedure codes if provided
             if case.procedure_codes is not None:
                 # Remove duplicates while preserving order
                 unique_procedure_codes = list(dict.fromkeys(case.procedure_codes))
                 
+                # Apply auto-fixes for common procedure code issues
+                corrected_codes, corrections_made = auto_fix_procedure_codes(conn, unique_procedure_codes, case.case_id)
+                
                 # Delete existing codes
                 cursor.execute("DELETE FROM case_procedure_codes WHERE case_id = %s", (case.case_id,))
                 # Insert new unique codes with descriptions
-                for code in unique_procedure_codes:
+                for code in corrected_codes:
                     cursor.execute("""
                         INSERT INTO case_procedure_codes (case_id, procedure_code, procedure_desc, asst_surg)
                         VALUES (%s, %s, (
@@ -337,15 +346,23 @@ def update_case(request: Request, case: CaseUpdate = Body(...)):
                 # Don't fail the main operation if cache re-warming fails
                 logger.error(f"❌ Failed to re-warm caches after case update {case.case_id}: {str(e)}", exc_info=True)
 
+        response_body = {
+            "message": "Case updated successfully",
+            "case_id": case.case_id,
+            "updated_fields": updated_fields,
+            "status_update": status_update_result,
+            "pay_amount_update": pay_amount_result
+        }
+        
+        # Add auto-fix information if corrections were made
+        if case.procedure_codes is not None and corrections_made:
+            response_body["procedure_code_corrections"] = format_corrections_for_response(corrections_made)
+            response_body["original_procedure_codes"] = unique_procedure_codes
+            response_body["corrected_procedure_codes"] = corrected_codes
+        
         response_data = {
             "statusCode": 200,
-            "body": {
-                "message": "Case updated successfully",
-                "case_id": case.case_id,
-                "updated_fields": updated_fields,
-                "status_update": status_update_result,
-                "pay_amount_update": pay_amount_result
-            }
+            "body": response_body
         }
         return response_data
 

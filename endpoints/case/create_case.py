@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-09-14 08:18:36
+# Last Modified: 2025-09-15 02:18:38
 # Author: Scott Cadreau
 
 # endpoints/case/create_case.py
@@ -10,6 +10,7 @@ from core.database import get_db_connection, close_db_connection, is_connection_
 from core.models import CaseCreate
 from utils.case_status import update_case_status
 from utils.pay_amount_calculator import update_case_pay_amount
+from utils.procedure_code_auto_fix import auto_fix_procedure_codes, format_corrections_for_response
 from utils.monitoring import track_business_operation, business_metrics
 from utils.text_formatting import capitalize_name_field
 import logging
@@ -91,10 +92,15 @@ def create_case_with_procedures(case: CaseCreate, conn) -> dict:
             case.facility_id, case.demo_file, case.note_file, case.misc_file, dupe_flag
         ))
 
+        # Auto-fix variables already initialized at function level
+        
         # Insert procedure codes with descriptions using batch operation if any exist
         if case.procedure_codes:
+            # Apply auto-fixes for common procedure code issues (function imported at top level)
+            corrected_codes, corrections_made = auto_fix_procedure_codes(conn, case.procedure_codes, case.case_id)
+            
             # Insert procedure codes with descriptions looked up from procedure_codes table
-            for code in case.procedure_codes:
+            for code in corrected_codes:
                 cursor.execute("""
                     INSERT INTO case_procedure_codes (case_id, procedure_code, procedure_desc, asst_surg)
                     VALUES (%s, %s, (
@@ -235,6 +241,10 @@ def add_case(case: CaseCreate, request: Request):
     response_data = None
     error_message = None
     
+    # Initialize auto-fix variables at function level
+    corrected_codes = []
+    corrections_made = []
+    
     try:
         logger.info(f"Creating case with ID: {case.case_id}")
         logger.info(f"Case data: {case}")
@@ -334,12 +344,17 @@ def add_case(case: CaseCreate, request: Request):
             "message": "Case and procedure codes created successfully",
             "user_id": case.user_id,
             "case_id": case.case_id,
-            "procedure_codes": case.procedure_codes,
+            "procedure_codes": corrected_codes if corrected_codes else (case.procedure_codes if case.procedure_codes else []),
             "status_update": status_update_result["status_update"],
             "pay_amount_update": status_update_result["pay_amount_update"],
             "forced_duplicate": case.force_duplicate,
             "dupe_flag": 1 if case.force_duplicate else 0
         }
+        
+        # Add auto-fix information if corrections were made
+        if case.procedure_codes and corrections_made:
+            response_data["procedure_code_corrections"] = format_corrections_for_response(corrections_made)
+            response_data["original_procedure_codes"] = case.procedure_codes
         
         return response_data
 

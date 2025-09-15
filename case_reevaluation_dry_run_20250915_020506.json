@@ -1,0 +1,419 @@
+{
+  "dry_run": true,
+  "timestamp": "2025-09-15T02:05:06.341848",
+  "total_cases_evaluated": 22,
+  "cases_moved_to_status_10": 14,
+  "cases_remaining_status_7": 8,
+  "cases_with_errors": 0,
+  "status_changes": [
+    {
+      "case_id": "0408e428-9091-7080-420c-b0088fa0bc4d_1757691504175",
+      "user_id": "0408e428-9091-7080-420c-b0088fa0bc4d",
+      "case_date": "2025-09-12",
+      "patient_first": "Chelsey",
+      "patient_last": "Smith",
+      "billable_procedures": 1,
+      "action": "Would change from status 7 to 10",
+      "reason": "No billable assistant surgeon procedures (found 0 billable procedures)",
+      "current_status": 7,
+      "predicted_new_status": 10,
+      "procedures": [
+        {
+          "code": "59514",
+          "asst_surg": 2
+        }
+      ]
+    },
+    {
+      "case_id": "0408e428-9091-7080-420c-b0088fa0bc4d_1757732779636",
+      "user_id": "0408e428-9091-7080-420c-b0088fa0bc4d",
+      "case_date": "2025-09-12",
+      "patient_first": "Elizabeth",
+      "patient_last": "McFarland",
+      "billable_procedures": 1,
+      "action": "Would change from status 7 to 10",
+      "reason": "No billable assistant surgeon procedures (found 0 billable procedures)",
+      "current_status": 7,
+      "predicted_new_status": 10,
+      "procedures": [
+        {
+          "code": "59514",
+          "asst_surg": 2
+        }
+      ]
+    },
+    {
+      "case_id": "0408e428-9091-7080-420c-b0088fa0bc4d_1757631909432",
+      "user_id": "0408e428-9091-7080-420c-b0088fa0bc4d",
+      "case_date": "2025-09-11",
+      "patient_first": "Amanda",
+      "patient_last": "Palmer",
+      "billable_procedures": 1,
+      "action": "Would change from status 7 to 10",
+      "reason": "No billable assistant surgeon procedures (found 0 billable procedures)",
+      "current_status": 7,
+      "predicted_new_status": 10,
+      "procedures": [
+        {
+          "code": "59514",
+          "asst_surg": 2
+        }
+      ]
+    },
+    {
+      "case_id": "0408e428-9091-7080-420c-b0088fa0bc4d_1757642010937",
+      "user_id": "0408e428-9091-7080-420c-b0088fa0bc4d",
+      "case_date": "2025-09-11",
+      "patient_first": "Rachel",
+      "patient_last": "Wahlers",
+      "billable_procedures": 1,
+      "action": "Would change from status 7 to 10",
+      "reason": "No billable assistant surgeon procedures (found 0 billable procedures)",
+      "current_status": 7,
+      "predicted_new_status": 10,
+      "procedures": [
+        {
+          "code": "59514",
+          "asst_surg": 2
+        }
+      ]
+    },
+    {
+      "case_id": "0408e428-9091-7080-420c-b0088fa0bc4d_1757608159189",
+      "user_id": "0408e428-9091-7080-420c-b0088fa0bc4d",
+      "case_date": "2025-09-10",
+      "patient_first": "Ashlyn",
+      "patient_last": "Owens",
+      "billable_procedures": 1,
+      "action": "Would change from status 7 to 10",
+      "reason": "No billable assistant surgeon procedures (found 0 billable procedures)",
+      "current_status": 7,
+      "predicted_new_status": 10,
+      "procedures": [
+        {
+          "code": "59514",
+          "asst_surg": 2
+        }
+      ]
+    },
+    {
+      "case_id": "0438f418-d051-70dc-0c6a-f122b245fa06_1757535562593",
+      "user_id": "0438f418-d051-70dc-0c6a-f122b245fa06",
+      "case_date": "2025-09-10",
+      "patient_first": "Karen",
+      "patient_last": "Garcia",
+      "billable_procedures": 1,
+      "action": "Would change from status 7 to 10",
+      "reason": "No billable assistant surgeon procedures (found 0 billable procedures)",
+      "current_status": 7,
+      "predicted_new_status": 10,
+      "procedures": [
+        {
+          "code": "59514",
+          "asst_surg": 2
+        }
+      ]
+    },
+    {
+      "case_id": "0408e428-9091-7080-420c-b0088fa0bc4d_1757459606276",
+      "user_id": "0408e428-9091-7080-420c-b0088fa0bc4d",
+      "case_date": "2025-09-09",
+      "patient_first": "Brooke",
+      "patient_last": "Kalamen",
+      "billable_procedures": 1,
+      "action": "Would change from status 7 to 10",
+      "reason": "No billable assistant surgeon procedures (found 0 billable procedures)",
+      "current_status": 7,
+      "predicted_new_status": 10,
+      "procedures": [
+        {
+          "code": "59514",
+          "asst_surg": 2
+        }
+      ]
+    },
+    {
+      "case_id": "7448c418-c0a1-704a-6d0d-95675da50362_1757435643693",
+      "user_id": "7448c418-c0a1-704a-6d0d-95675da50362",
+      "case_date": "2025-09-09",
+      "patient_first": "Ana",
+      "patient_last": "Garciaendsley",
+      "billable_procedures": 1,
+      "action": "Would change from status 7 to 10",
+      "reason": "No billable assistant surgeon procedures (found 0 billable procedures)",
+      "current_status": 7,
+      "predicted_new_status": 10,
+      "procedures": [
+        {
+          "code": "59514",
+          "asst_surg": 2
+        }
+      ]
+    },
+    {
+      "case_id": "949834c8-80b1-7061-35db-7b1d317000df_1757770379654",
+      "user_id": "949834c8-80b1-7061-35db-7b1d317000df",
+      "case_date": "2025-09-09",
+      "patient_first": "Blanca",
+      "patient_last": "Flores",
+      "billable_procedures": 0,
+      "action": "Would remain at status 7",
+      "reason": "No billable assistant surgeon procedures (found 0 billable procedures)",
+      "current_status": 7,
+      "predicted_new_status": 7,
+      "procedures": [
+        {
+          "code": "19342",
+          "asst_surg": 0
+        },
+        {
+          "code": "19370",
+          "asst_surg": 1
+        }
+      ]
+    },
+    {
+      "case_id": "0408e428-9091-7080-420c-b0088fa0bc4d_1757335455654",
+      "user_id": "0408e428-9091-7080-420c-b0088fa0bc4d",
+      "case_date": "2025-09-08",
+      "patient_first": "Holly",
+      "patient_last": "Prynn",
+      "billable_procedures": 1,
+      "action": "Would change from status 7 to 10",
+      "reason": "No billable assistant surgeon procedures (found 0 billable procedures)",
+      "current_status": 7,
+      "predicted_new_status": 10,
+      "procedures": [
+        {
+          "code": "59514",
+          "asst_surg": 2
+        }
+      ]
+    },
+    {
+      "case_id": "0408e428-9091-7080-420c-b0088fa0bc4d_1757335503188",
+      "user_id": "0408e428-9091-7080-420c-b0088fa0bc4d",
+      "case_date": "2025-09-08",
+      "patient_first": "Kasey",
+      "patient_last": "Meyer",
+      "billable_procedures": 1,
+      "action": "Would change from status 7 to 10",
+      "reason": "No billable assistant surgeon procedures (found 0 billable procedures)",
+      "current_status": 7,
+      "predicted_new_status": 10,
+      "procedures": [
+        {
+          "code": "59514",
+          "asst_surg": 2
+        }
+      ]
+    },
+    {
+      "case_id": "0408e428-9091-7080-420c-b0088fa0bc4d_1757335600424",
+      "user_id": "0408e428-9091-7080-420c-b0088fa0bc4d",
+      "case_date": "2025-09-08",
+      "patient_first": "Mary",
+      "patient_last": "Kelley",
+      "billable_procedures": 1,
+      "action": "Would change from status 7 to 10",
+      "reason": "No billable assistant surgeon procedures (found 0 billable procedures)",
+      "current_status": 7,
+      "predicted_new_status": 10,
+      "procedures": [
+        {
+          "code": "59514",
+          "asst_surg": 2
+        }
+      ]
+    },
+    {
+      "case_id": "c4e81438-4031-701a-5dd3-f445333702ee_1757623791755",
+      "user_id": "c4e81438-4031-701a-5dd3-f445333702ee",
+      "case_date": "2025-09-08",
+      "patient_first": "Carhart",
+      "patient_last": "Elysie",
+      "billable_procedures": 0,
+      "action": "Would remain at status 7",
+      "reason": "No billable assistant surgeon procedures (found 0 billable procedures)",
+      "current_status": 7,
+      "predicted_new_status": 7,
+      "procedures": [
+        {
+          "code": "19330",
+          "asst_surg": 1
+        },
+        {
+          "code": "19342",
+          "asst_surg": 0
+        },
+        {
+          "code": "19342",
+          "asst_surg": 0
+        }
+      ]
+    },
+    {
+      "case_id": "0408e428-9091-7080-420c-b0088fa0bc4d_1757277360104",
+      "user_id": "0408e428-9091-7080-420c-b0088fa0bc4d",
+      "case_date": "2025-09-07",
+      "patient_first": "Rosemary",
+      "patient_last": "Ajcasantiago",
+      "billable_procedures": 1,
+      "action": "Would change from status 7 to 10",
+      "reason": "No billable assistant surgeon procedures (found 0 billable procedures)",
+      "current_status": 7,
+      "predicted_new_status": 10,
+      "procedures": [
+        {
+          "code": "59514",
+          "asst_surg": 2
+        }
+      ]
+    },
+    {
+      "case_id": "0408e428-9091-7080-420c-b0088fa0bc4d_1757200944016",
+      "user_id": "0408e428-9091-7080-420c-b0088fa0bc4d",
+      "case_date": "2025-09-06",
+      "patient_first": "Teryn",
+      "patient_last": "Hergatt",
+      "billable_procedures": 1,
+      "action": "Would change from status 7 to 10",
+      "reason": "No billable assistant surgeon procedures (found 0 billable procedures)",
+      "current_status": 7,
+      "predicted_new_status": 10,
+      "procedures": [
+        {
+          "code": "59514",
+          "asst_surg": 2
+        }
+      ]
+    },
+    {
+      "case_id": "0408e428-9091-7080-420c-b0088fa0bc4d_1757200986964",
+      "user_id": "0408e428-9091-7080-420c-b0088fa0bc4d",
+      "case_date": "2025-09-06",
+      "patient_first": "Katharine",
+      "patient_last": "Fender",
+      "billable_procedures": 1,
+      "action": "Would change from status 7 to 10",
+      "reason": "No billable assistant surgeon procedures (found 0 billable procedures)",
+      "current_status": 7,
+      "predicted_new_status": 10,
+      "procedures": [
+        {
+          "code": "59514",
+          "asst_surg": 2
+        }
+      ]
+    },
+    {
+      "case_id": "a428e4b8-90b1-708e-571a-c0958543b00d_1757616194595",
+      "user_id": "a428e4b8-90b1-708e-571a-c0958543b00d",
+      "case_date": "2025-08-22",
+      "patient_first": "Alex",
+      "patient_last": "Ledesma",
+      "billable_procedures": 0,
+      "action": "Would remain at status 7",
+      "reason": "No billable assistant surgeon procedures (found 0 billable procedures)",
+      "current_status": 7,
+      "predicted_new_status": 7,
+      "procedures": [
+        {
+          "code": "29876",
+          "asst_surg": 1
+        }
+      ]
+    },
+    {
+      "case_id": "8408f488-2051-70b8-fcae-20af45c0a636_1757619600263",
+      "user_id": "8408f488-2051-70b8-fcae-20af45c0a636",
+      "case_date": "2025-08-19",
+      "patient_first": "Yale",
+      "patient_last": "Gurney",
+      "billable_procedures": 0,
+      "action": "Would remain at status 7",
+      "reason": "No billable assistant surgeon procedures (found 0 billable procedures)",
+      "current_status": 7,
+      "predicted_new_status": 7,
+      "procedures": [
+        {
+          "code": "29880",
+          "asst_surg": 0
+        }
+      ]
+    },
+    {
+      "case_id": "8408f488-2051-70b8-fcae-20af45c0a636_1757618886428",
+      "user_id": "8408f488-2051-70b8-fcae-20af45c0a636",
+      "case_date": "2025-08-14",
+      "patient_first": "Alberto",
+      "patient_last": "Fischzang",
+      "billable_procedures": 0,
+      "action": "Would remain at status 7",
+      "reason": "No billable assistant surgeon procedures (found 0 billable procedures)",
+      "current_status": 7,
+      "predicted_new_status": 7,
+      "procedures": [
+        {
+          "code": "29880",
+          "asst_surg": 0
+        }
+      ]
+    },
+    {
+      "case_id": "a428e4b8-90b1-708e-571a-c0958543b00d_1757614449685",
+      "user_id": "a428e4b8-90b1-708e-571a-c0958543b00d",
+      "case_date": "2025-07-31",
+      "patient_first": "Kingsley",
+      "patient_last": "Moses",
+      "billable_procedures": 0,
+      "action": "Would remain at status 7",
+      "reason": "No billable assistant surgeon procedures (found 0 billable procedures)",
+      "current_status": 7,
+      "predicted_new_status": 7,
+      "procedures": [
+        {
+          "code": "29877",
+          "asst_surg": 0
+        }
+      ]
+    },
+    {
+      "case_id": "549854d8-7091-7098-c01f-45d0d7a9c6ab_1757779469644",
+      "user_id": "549854d8-7091-7098-c01f-45d0d7a9c6ab",
+      "case_date": "2025-04-11",
+      "patient_first": "Andrea",
+      "patient_last": "Levine",
+      "billable_procedures": 0,
+      "action": "Would remain at status 7",
+      "reason": "No billable assistant surgeon procedures (found 0 billable procedures)",
+      "current_status": 7,
+      "predicted_new_status": 7,
+      "procedures": [
+        {
+          "code": "58558",
+          "asst_surg": 1
+        }
+      ]
+    },
+    {
+      "case_id": "549854d8-7091-7098-c01f-45d0d7a9c6ab_1757778054855",
+      "user_id": "549854d8-7091-7098-c01f-45d0d7a9c6ab",
+      "case_date": "2025-02-04",
+      "patient_first": "Lisa",
+      "patient_last": "Wanamaker",
+      "billable_procedures": 0,
+      "action": "Would remain at status 7",
+      "reason": "No billable assistant surgeon procedures (found 0 billable procedures)",
+      "current_status": 7,
+      "predicted_new_status": 7,
+      "procedures": [
+        {
+          "code": "58561",
+          "asst_surg": 0
+        }
+      ]
+    }
+  ],
+  "error_cases": []
+}
