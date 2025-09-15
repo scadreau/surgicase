@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-08-23 20:03:37
+# Last Modified: 2025-09-15 15:36:29
 # Author: Scott Cadreau
 
 # endpoints/reports/provider_payment_report.py
@@ -19,7 +19,7 @@ import os
 import tempfile
 import logging
 import time
-from typing import Optional
+from typing import Optional, List, Dict
 from pypdf import PdfReader, PdfWriter
 
 logger = logging.getLogger(__name__)
@@ -184,6 +184,33 @@ class ProviderPaymentReportPDF(FPDF):
         self.cell(0, 8, f"Total Providers: {provider_count}", ln=True)
         self.cell(0, 8, f"Total Cases: {case_count}", ln=True)
         self.cell(0, 8, f"Total Amount: ${total_amount:.2f}", ln=True)
+
+    def add_pay_category_summary(self, category_data: List[Dict]):
+        """Add pay category summary section at the end"""
+        # Add some blank lines before the category summary
+        self.ln(8)
+        self.ln(8)
+        
+        # Category summary header
+        self.set_font("Arial", 'B', 12)
+        self.cell(0, 8, "Payment Summary by Category", ln=True, align="L")
+        self.ln(3)
+        
+        # Only show summary if we have category data
+        if category_data:
+            self.set_font("Arial", '', 11)
+            
+            for category in category_data:
+                pay_category = category.get('pay_category') or 'Unspecified'
+                case_count = category.get('case_count', 0) or 0
+                total_amount = category.get('total_amount', 0) or 0
+                
+                # Format the line: "Category - X cases - $X.XX"
+                category_line = f"{pay_category} - {case_count} cases - ${total_amount:.2f}"
+                self.cell(0, 6, category_line, ln=True)
+        else:
+            self.set_font("Arial", 'I', 10)
+            self.cell(0, 6, "No payment category data available", ln=True)
 
 def password_protect_pdf(input_path: str, output_path: str, password: str) -> bool:
     """
@@ -483,6 +510,40 @@ def generate_provider_payment_report(
                     procedure_codes = [row['procedure_code'] for row in cursor.fetchall()]
                     case['procedures'] = procedure_codes
                 
+                # Get pay category summary using the same filters
+                category_sql = """
+                    SELECT 
+                        c.pay_category,
+                        COUNT(c.case_id) as case_count,
+                        SUM(c.pay_amount) as total_amount
+                    FROM cases c
+                    INNER JOIN user_profile up ON c.user_id = up.user_id
+                    WHERE c.case_status = 15
+                    AND c.active = 1 
+                    AND up.active = 1
+                    AND c.user_id NOT IN ('04e884e8-4011-70e9-f3bd-d89fabd15c7b', '94883428-50c1-7049-9d3d-e095ca81f174', '94b80418-6091-701b-eac8-8b325f95a799')
+                """
+                
+                # Add the same date and user filters as the main query
+                category_params = []
+                if start_date:
+                    category_sql += " AND c.case_date >= %s"
+                    category_params.append(start_date)
+                if end_date:
+                    category_sql += " AND c.case_date <= %s"
+                    category_params.append(end_date)
+                if user_id:
+                    category_sql += " AND c.user_id = %s"
+                    category_params.append(user_id)
+                
+                category_sql += """
+                    GROUP BY c.pay_category
+                    ORDER BY c.pay_category
+                """
+                
+                cursor.execute(category_sql, category_params)
+                category_data = cursor.fetchall()
+                
                 # Group cases by provider
                 providers = {}
                 for case in cases:
@@ -520,6 +581,9 @@ def generate_provider_payment_report(
                 
                 # Add summary
                 pdf.add_summary(total_amount, len(providers), total_cases)
+                
+                # Add pay category summary
+                pdf.add_pay_category_summary(category_data)
                 
                 # Create reports directory if it doesn't exist
                 reports_dir = os.path.join(os.getcwd(), "reports")
