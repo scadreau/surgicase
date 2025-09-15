@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-20 09:58:26
+# Last Modified: 2025-09-15 12:35:00
 # Author: Scott Cadreau
 
 # core/database.py
@@ -33,28 +33,163 @@ def get_db_credentials(secret_name: str) -> Dict[str, Any]:
     from utils.secrets_manager import get_secret
     return get_secret(secret_name, cache_ttl=14400)  # 4 hours cache (DB secret rotates weekly)
 
+def drain_connection_pool():
+    """
+    Drain all connections from the pool (they likely have stale credentials).
+    This is called when credential rotation is detected.
+    """
+    global _connection_pool, _connection_metadata
+    
+    if not _connection_pool:
+        return
+        
+    drained_count = 0
+    with _pool_lock:
+        # Drain all connections from pool
+        while not _connection_pool.empty():
+            try:
+                conn = _connection_pool.get_nowait()
+                conn_id = id(conn)
+                
+                # Clean up metadata
+                if conn_id in _connection_metadata:
+                    del _connection_metadata[conn_id]
+                
+                # Close the connection
+                try:
+                    conn.close()
+                    drained_count += 1
+                except Exception:
+                    pass  # Ignore close errors for stale connections
+                    
+            except Exception:
+                break  # Queue is empty
+    
+    if logger and drained_count > 0:
+        logger.info(f"🔄 Drained {drained_count} connections from pool due to credential rotation")
+
+def _rewarm_secrets_and_pool():
+    """
+    Background function to rewarm secrets cache and connection pool after credential rotation.
+    Runs in a separate thread to avoid blocking the main request.
+    """
+    try:
+        # Rewarm the database credentials cache
+        from utils.secrets_manager import get_secret
+        secret_name = "arn:aws:secretsmanager:us-east-1:002118831669:secret:rds!cluster-9376049b-abee-46d9-9cdb-95b95d6cdda0-fjhTNH"
+        get_secret(secret_name, cache_ttl=14400)  # Rewarm with normal TTL
+        
+        if logger:
+            logger.info("🔥 Database credentials cache rewarmed")
+        
+        # Rewarm connection pool (create some connections in advance)
+        if _connection_pool:
+            target_connections = min(_pool_config.get("pool_size", 50) // 2, 10)  # Rewarm half the pool, max 10
+            created_count = 0
+            
+            for _ in range(target_connections):
+                try:
+                    if not _connection_pool.full():
+                        conn = _create_connection()
+                        _connection_pool.put(conn, block=False)
+                        
+                        # Track connection metadata
+                        conn_id = id(conn)
+                        current_time = time.time()
+                        _connection_metadata[conn_id] = {
+                            "created_at": current_time,
+                            "last_used": current_time
+                        }
+                        created_count += 1
+                    else:
+                        break
+                except Exception as e:
+                    if logger:
+                        logger.warning(f"Failed to create connection during rewarm: {e}")
+                    break
+            
+            if logger and created_count > 0:
+                logger.info(f"🔥 Connection pool rewarmed with {created_count} new connections")
+                
+    except Exception as e:
+        if logger:
+            logger.error(f"❌ Error during background rewarm: {e}")
+
 def _create_connection() -> pymysql.Connection:
-    """Create a new database connection"""
+    """Create a new database connection with automatic credential rotation handling"""
     # Hardcoded values (optimization: eliminates one secrets call)
     rds_host = "dev1-metoray-aurora-a98fdy.cluster-cahckueig7sf.us-east-1.rds.amazonaws.com"
     db_name = "allstars"
+    secret_name = "arn:aws:secretsmanager:us-east-1:002118831669:secret:rds!cluster-9376049b-abee-46d9-9cdb-95b95d6cdda0-fjhTNH"
     
-    # Fetch credentials from Secrets Manager (cached)
-    secretdb = get_db_credentials("arn:aws:secretsmanager:us-east-1:002118831669:secret:rds!cluster-9376049b-abee-46d9-9cdb-95b95d6cdda0-fjhTNH")
-    db_user = secretdb["username"]
-    db_pass = secretdb["password"]
-    
-    # Create connection with autocommit=False for transaction control
-    connection = pymysql.connect(
-        host=rds_host, 
-        user=db_user, 
-        password=db_pass, 
-        database=db_name,
-        autocommit=False,  # Explicitly disable autocommit
-        charset='utf8mb4',
-        cursorclass=pymysql.cursors.DictCursor
-    )
-    return connection
+    try:
+        # Fetch credentials from Secrets Manager (cached)
+        secretdb = get_db_credentials(secret_name)
+        db_user = secretdb["username"]
+        db_pass = secretdb["password"]
+        
+        # Create connection with autocommit=False for transaction control
+        connection = pymysql.connect(
+            host=rds_host, 
+            user=db_user, 
+            password=db_pass, 
+            database=db_name,
+            autocommit=False,  # Explicitly disable autocommit
+            charset='utf8mb4',
+            cursorclass=pymysql.cursors.DictCursor
+        )
+        return connection
+        
+    except pymysql.OperationalError as e:
+        # Check if this is an authentication failure (credential rotation)
+        if "Access denied" in str(e) or "authentication" in str(e).lower():
+            if logger:
+                logger.warning("🔄 Database authentication failed - credential rotation detected")
+                logger.info("✨ Implementing automagic recovery logic - doing some cool shit to fix this!")
+            
+            # Clear the secrets cache immediately
+            from utils.secrets_manager import secrets_manager
+            secrets_manager.clear_cache(secret_name)
+            
+            # Drain the connection pool (all connections have stale credentials)
+            drain_connection_pool()
+            
+            # Start background rewarm thread (non-blocking)
+            import threading
+            rewarm_thread = threading.Thread(target=_rewarm_secrets_and_pool, daemon=True)
+            rewarm_thread.start()
+            
+            if logger:
+                logger.info("🔄 Cache cleared, pool drained, background rewarm started")
+            
+            # Retry connection with fresh credentials
+            try:
+                secretdb = get_db_credentials(secret_name)
+                db_user = secretdb["username"]
+                db_pass = secretdb["password"]
+                
+                connection = pymysql.connect(
+                    host=rds_host, 
+                    user=db_user, 
+                    password=db_pass, 
+                    database=db_name,
+                    autocommit=False,
+                    charset='utf8mb4',
+                    cursorclass=pymysql.cursors.DictCursor
+                )
+                
+                if logger:
+                    logger.info("✅ Database connection recovered after credential rotation")
+                
+                return connection
+                
+            except Exception as retry_error:
+                if logger:
+                    logger.error(f"❌ Failed to recover database connection after credential rotation: {retry_error}")
+                raise
+        else:
+            # Not an auth error, re-raise original exception
+            raise
 
 def _initialize_pool():
     """Initialize the connection pool"""

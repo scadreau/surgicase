@@ -1,5 +1,5 @@
 # Created: 2025-07-30 14:30:30
-# Last Modified: 2025-09-02 17:32:05
+# Last Modified: 2025-09-15 11:55:35
 # Author: Scott Cadreau
 
 import boto3
@@ -1478,6 +1478,7 @@ def send_referral_report_emails(
                     subject=subject,
                     body=body,
                     attachments=[attachment],
+                    from_address="SurgiCase Automation <noreply@metoraymedical.com>",
                     email_type=f"referral_report_{email_type}",
                     report_type="referral_report",
                     aws_region=aws_region
