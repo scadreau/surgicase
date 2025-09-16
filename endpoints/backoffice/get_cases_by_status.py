@@ -1,5 +1,5 @@
 # Created: 2025-07-15 11:54:13
-# Last Modified: 2025-09-04 17:03:39
+# Last Modified: 2025-09-16 02:27:46
 # Author: Scott Cadreau
 
 # endpoints/backoffice/get_cases_by_status.py
@@ -194,6 +194,7 @@ def _get_cases_optimized(cursor, status_list, parsed_start_date, parsed_end_date
             c.demo_file, c.note_file, c.misc_file, c.pay_amount,
             up.first_name as provider_first_name,
             up.last_name as provider_last_name,
+            f.facility_state,
             COALESCE(
                 JSON_ARRAYAGG(
                     CASE 
@@ -209,6 +210,7 @@ def _get_cases_optimized(cursor, status_list, parsed_start_date, parsed_end_date
             ) as procedure_codes_json
         FROM cases c
         LEFT JOIN case_status_list csl ON c.case_status = csl.case_status
+        LEFT JOIN facility_list f ON c.facility_id = f.facility_id
         LEFT JOIN user_profile up ON c.user_id = up.user_id
         LEFT JOIN case_procedure_codes cpc ON c.case_id = cpc.case_id
         WHERE c.active = 1
