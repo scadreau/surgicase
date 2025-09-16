@@ -1,5 +1,5 @@
 # Created: 2025-07-28 19:48:18
-# Last Modified: 2025-09-07 19:56:01
+# Last Modified: 2025-09-15 21:21:55
 # Author: Scott Cadreau
 
 # endpoints/exports/case_export.py
@@ -140,9 +140,8 @@ def get_cases_with_procedures(cursor: pymysql.cursors.DictCursor, case_ids: List
         return []
     
     # Process in batches to prevent timeouts and memory issues
-    # 502 Bad Gateway indicates nginx/server timeout - use very small batches
-    # Even with database indexes, we need tiny batches to avoid server timeouts
-    batch_size = 5 if len(case_ids) > 50 else 10
+    # On m8g.8xlarge with low utilization, we can use much larger batches
+    batch_size = 50 if len(case_ids) > 100 else 25
     all_cases = []
     
     for i in range(0, len(case_ids), batch_size):
@@ -163,7 +162,7 @@ def get_cases_with_procedures(cursor: pymysql.cursors.DictCursor, case_ids: List
             
             # Add a small delay between batches to prevent overwhelming the server
             if batch_num < total_batches:  # Don't delay after the last batch
-                time.sleep(0.1)  # 100ms delay between batches
+                time.sleep(0.02)  # 20ms delay between batches (reduced for powerful server)
                 
         except Exception as batch_error:
             if logger:
@@ -177,19 +176,12 @@ def get_cases_with_procedures(cursor: pymysql.cursors.DictCursor, case_ids: List
 
 def _get_cases_batch_optimized(cursor: pymysql.cursors.DictCursor, case_ids: List[str]) -> List[Dict[str, Any]]:
     """
-    Get a batch of cases using optimized query with fallback mechanism.
+    Get a batch of cases using optimized JSON_ARRAYAGG query.
     """
     if not case_ids:
         return []
     
-    # Try optimized JSON_ARRAYAGG approach first
-    try:
-        return _get_cases_with_json_agg(cursor, case_ids)
-    except Exception as e:
-        if logger:
-            logger.warning(f"JSON_ARRAYAGG query failed, falling back to traditional method: {str(e)}")
-        # Fallback to traditional method
-        return _get_cases_traditional_method(cursor, case_ids)
+    return _get_cases_with_json_agg(cursor, case_ids)
 
 def _get_cases_with_json_agg(cursor: pymysql.cursors.DictCursor, case_ids: List[str]) -> List[Dict[str, Any]]:
     """
@@ -205,9 +197,9 @@ def _get_cases_with_json_agg(cursor: pymysql.cursors.DictCursor, case_ids: List[
             c.case_updated_ts, c.case_status, c.paid_to_provider_ts, 
             c.biller_status, c.sent_to_biller_ts, c.received_pmnt_ts, 
             c.sent_to_negotiation_ts, c.settled_ts, c.sent_to_idr_ts, 
-            c.idr_decision_ts, c.closed_ts, c.demo_file, c.note_file, 
-            c.misc_file, c.active, c.human_case_id, c.pay_amount, 
-            c.pay_category, c.pending_payment_ts,
+            c.idr_decision_ts, c.closed_ts, c.pay_amount, 
+            c.pay_category, c.pending_payment_ts, sl.surgeon_npi,
+            fl.facility_npi, fl.facility_state,
             COALESCE(
                 JSON_ARRAYAGG(
                     CASE 
@@ -220,15 +212,17 @@ def _get_cases_with_json_agg(cursor: pymysql.cursors.DictCursor, case_ids: List[
             ) as procedure_codes_json
         FROM cases c
         LEFT JOIN case_procedure_codes cpc ON c.case_id = cpc.case_id
+        LEFT JOIN surgeon_list sl ON c.surgeon_id = sl.surgeon_id
+        LEFT JOIN facility_list fl ON c.facility_id = fl.facility_id
         WHERE c.case_id IN ({placeholders})
         GROUP BY c.case_id, c.user_id, c.case_date, c.patient_first, c.patient_last, 
                  c.ins_provider, c.surgeon_id, c.facility_id, c.case_create_ts, 
                  c.case_updated_ts, c.case_status, c.paid_to_provider_ts, 
                  c.biller_status, c.sent_to_biller_ts, c.received_pmnt_ts, 
                  c.sent_to_negotiation_ts, c.settled_ts, c.sent_to_idr_ts, 
-                 c.idr_decision_ts, c.closed_ts, c.demo_file, c.note_file, 
-                 c.misc_file, c.active, c.human_case_id, c.pay_amount, 
-                 c.pay_category, c.pending_payment_ts
+                 c.idr_decision_ts, c.closed_ts, c.pay_amount, 
+                 c.pay_category, c.pending_payment_ts, sl.surgeon_npi,
+                 fl.facility_npi, fl.facility_state
         ORDER BY c.case_id
     """
     
@@ -248,56 +242,6 @@ def _get_cases_with_json_agg(cursor: pymysql.cursors.DictCursor, case_ids: List[
             procedure_codes = []
         
         case_data['procedure_codes'] = procedure_codes
-        cases.append(case_data)
-    
-    return cases
-
-def _get_cases_traditional_method(cursor: pymysql.cursors.DictCursor, case_ids: List[str]) -> List[Dict[str, Any]]:
-    """
-    Traditional method - separate queries for cases and procedure codes.
-    More compatible but potentially slower.
-    """
-    placeholders = ','.join(['%s'] * len(case_ids))
-    
-    # Get cases first
-    cases_sql = f"""
-        SELECT * FROM cases c
-        WHERE c.case_id IN ({placeholders})
-        ORDER BY c.case_id
-    """
-    
-    cursor.execute(cases_sql, case_ids)
-    cases_results = cursor.fetchall()
-    
-    if not cases_results:
-        return []
-    
-    # Get procedure codes for all cases in one query
-    procedure_sql = f"""
-        SELECT case_id, procedure_code
-        FROM case_procedure_codes
-        WHERE case_id IN ({placeholders})
-        ORDER BY case_id, procedure_code
-    """
-    
-    cursor.execute(procedure_sql, case_ids)
-    procedure_results = cursor.fetchall()
-    
-    # Group procedure codes by case_id
-    procedure_dict = {}
-    for proc_row in procedure_results:
-        case_id = proc_row['case_id']
-        if case_id not in procedure_dict:
-            procedure_dict[case_id] = []
-        if proc_row['procedure_code']:
-            procedure_dict[case_id].append(proc_row['procedure_code'])
-    
-    # Combine cases with their procedure codes
-    cases = []
-    for case_row in cases_results:
-        case_data = dict(case_row)
-        case_id = case_data['case_id']
-        case_data['procedure_codes'] = procedure_dict.get(case_id, [])
         cases.append(case_data)
     
     return cases
@@ -327,7 +271,16 @@ def create_cases_csv(cases: List[Dict[str, Any]], filepath: str) -> None:
     if not cases:
         # Create empty CSV with headers only
         with open(filepath, 'w', newline='', encoding='utf-8') as csvfile:
-            fieldnames = ['case_id', 'user_id', 'case_date', 'patient_first', 'patient_last', 'procedure_codes']
+            fieldnames = [
+                'case_id', 'user_id', 'case_date', 'patient_first', 'patient_last', 
+                'ins_provider', 'surgeon_id', 'facility_id', 'case_create_ts', 
+                'case_updated_ts', 'case_status', 'paid_to_provider_ts', 
+                'biller_status', 'sent_to_biller_ts', 'received_pmnt_ts', 
+                'sent_to_negotiation_ts', 'settled_ts', 'sent_to_idr_ts', 
+                'idr_decision_ts', 'closed_ts', 'pay_amount', 
+                'pay_category', 'pending_payment_ts', 'surgeon_npi',
+                'facility_npi', 'facility_state', 'procedure_codes'
+            ]
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
         return
