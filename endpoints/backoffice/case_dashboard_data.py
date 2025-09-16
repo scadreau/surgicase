@@ -1,5 +1,5 @@
 # Created: 2025-07-27 02:29:13
-# Last Modified: 2025-09-04 17:43:41
+# Last Modified: 2025-09-16 22:02:44
 # Author: Scott Cadreau
 
 # endpoints/backoffice/case_dashboard_data.py
@@ -32,6 +32,7 @@ def case_dashboard_data(
     
     Key Features:
     - Case status distribution analytics with count and financial aggregation
+    - Pay category distribution analytics with count and financial aggregation
     - Optional date range filtering for temporal analysis
     - Status description integration for human-readable reporting
     - Financial summary calculations with total amounts per status
@@ -55,6 +56,10 @@ def case_dashboard_data(
                 - case_status_desc (str): Human-readable status description
                 - cases (int): Number of cases in this status
                 - total_amount (str): Total payment amount for cases in this status (formatted as decimal string)
+            - pay_category_data (List[dict]): Array of pay category aggregations, each containing:
+                - pay_category (str): Payment category name
+                - cases (int): Number of cases in this pay category
+                - total_amount (str): Total payment amount for cases in this pay category (formatted as decimal string)
             - summary (dict): Overall statistics:
                 - total_cases (int): Total number of cases across all statuses
                 - total_amount (str): Total payment amount across all cases (formatted as decimal string)
@@ -72,8 +77,9 @@ def case_dashboard_data(
         2. Constructs dynamic case aggregation query with optional date filtering
         3. Groups cases by case_status with COUNT and SUM operations
         4. Retrieves status descriptions from case_status_list table
-        5. Combines aggregated data with descriptive information
-        6. Only includes active cases (active = 1) in calculations
+        5. Executes secondary query grouping cases by pay_category with COUNT and SUM operations
+        6. Combines aggregated data with descriptive information
+        7. Only includes active cases (active = 1) in all calculations
     
     Business Intelligence Features:
         - Status distribution analysis for operational insights
@@ -139,6 +145,23 @@ def case_dashboard_data(
                     "case_status_desc": "Completed",
                     "cases": 25,
                     "total_amount": "37500.00"
+                }
+            ],
+            "pay_category_data": [
+                {
+                    "pay_category": "Insurance",
+                    "cases": 30,
+                    "total_amount": "45000.00"
+                },
+                {
+                    "pay_category": "Self-Pay",
+                    "cases": 12,
+                    "total_amount": "18000.00"
+                },
+                {
+                    "pay_category": "Workers Comp",
+                    "cases": 6,
+                    "total_amount": "9000.00"
                 }
             ],
             "summary": {
@@ -211,11 +234,11 @@ def case_dashboard_data(
                 
                 # Add date filtering if provided
                 if start_date:
-                    base_query += " AND c.case_created_ts >= %s"
+                    base_query += " AND c.case_create_ts >= %s"
                     params.append(start_date)
                 
                 if end_date:
-                    base_query += " AND c.case_created_ts <= %s"
+                    base_query += " AND c.case_create_ts <= %s"
                     params.append(end_date)
                 
                 base_query += " GROUP BY c.case_status, csl.case_status_desc ORDER BY c.case_status"
@@ -223,6 +246,36 @@ def case_dashboard_data(
                 # Execute the optimized single query
                 cursor.execute(base_query, params)
                 case_stats = cursor.fetchall()
+                
+                # Build the pay_category query with same filtering logic
+                pay_category_query = """
+                    SELECT 
+                        pay_category, 
+                        COUNT(*) as cases, 
+                        SUM(pay_amount) as total_amount
+                    FROM cases 
+                    WHERE active = 1
+                    AND user_id NOT IN (
+                        '04e884e8-4011-70e9-f3bd-d89fabd15c7b', 
+                        '94883428-50c1-7049-9d3d-e095ca81f174', 
+                        '94b80418-6091-701b-eac8-8b325f95a799', 
+                        '74081438-80d1-7055-f5df-2221b7f96049',
+                        '54d8e448-0091-7031-86bb-d66da5e8f7e0'
+                    )
+                """
+                
+                # Add same date filtering as main query
+                if start_date:
+                    pay_category_query += " AND case_create_ts >= %s"
+                
+                if end_date:
+                    pay_category_query += " AND case_create_ts <= %s"
+                
+                pay_category_query += " GROUP BY pay_category ORDER BY pay_category"
+                
+                # Execute the pay_category query with same parameters
+                cursor.execute(pay_category_query, params)
+                pay_category_stats = cursor.fetchall()
                 
                 # Process the joined data (no need for separate status lookup)
                 dashboard_data = []
@@ -244,6 +297,20 @@ def case_dashboard_data(
                     
                     total_cases += cases_count
                     total_amount += amount
+                
+                # Process pay_category data
+                pay_category_data = []
+                
+                for stat in pay_category_stats:
+                    pay_category = stat['pay_category'] or 'Unknown'
+                    cases_count = stat['cases']
+                    amount = float(stat['total_amount']) if stat['total_amount'] else 0.0
+                    
+                    pay_category_data.append({
+                        'pay_category': pay_category,
+                        'cases': cases_count,
+                        'total_amount': f"{amount:.2f}"
+                    })
 
                 # Record successful dashboard data retrieval
                 business_metrics.record_utility_operation("case_dashboard_data", "success")
@@ -253,6 +320,7 @@ def case_dashboard_data(
             
         response_data = {
             "dashboard_data": dashboard_data,
+            "pay_category_data": pay_category_data,
             "summary": {
                 "total_cases": total_cases,
                 "total_amount": f"{total_amount:.2f}"
