@@ -1,5 +1,5 @@
 # Created: 2025-07-30 14:30:30
-# Last Modified: 2025-09-15 11:55:35
+# Last Modified: 2025-09-18 08:21:28
 # Author: Scott Cadreau
 
 import boto3
@@ -255,28 +255,28 @@ def send_email(
         if not is_email_enabled(aws_region):
             logger.info("Email sending is disabled via ENABLE_EMAIL setting. Email will not be sent.")
             
-            # Normalize email addresses to lists for logging
-            if isinstance(to_addresses, str):
-                to_addresses_list = [to_addresses]
+            # Normalize original addresses to lists for logging (preserve +tags for tracking)
+            if isinstance(original_to_addresses, str):
+                original_to_addresses_list = [original_to_addresses]
             else:
-                to_addresses_list = to_addresses
-            if isinstance(cc_addresses, str):
-                cc_addresses_list = [cc_addresses]
+                original_to_addresses_list = original_to_addresses
+            if isinstance(original_cc_addresses, str):
+                original_cc_addresses_list = [original_cc_addresses]
             else:
-                cc_addresses_list = cc_addresses
-            if isinstance(bcc_addresses, str):
-                bcc_addresses_list = [bcc_addresses]
+                original_cc_addresses_list = original_cc_addresses
+            if isinstance(original_bcc_addresses, str):
+                original_bcc_addresses_list = [original_bcc_addresses]
             else:
-                bcc_addresses_list = bcc_addresses
+                original_bcc_addresses_list = original_bcc_addresses
             
-            # Log the email as "disabled" in the database for tracking
+            # Log the email as "disabled" in the database for tracking (using original addresses with +tags)
             log_email_to_database(
-                to_addresses=to_addresses_list,
+                to_addresses=original_to_addresses_list,
                 subject=subject,
                 body=body,
                 from_address=from_address or "system@disabled",
-                cc_addresses=cc_addresses_list,
-                bcc_addresses=bcc_addresses_list,
+                cc_addresses=original_cc_addresses_list,
+                bcc_addresses=original_bcc_addresses_list,
                 attachments=attachments,
                 email_type=email_type,
                 report_type=report_type,
@@ -289,7 +289,7 @@ def send_email(
                 "success": False,
                 "error": "Email sending is disabled via ENABLE_EMAIL setting",
                 "disabled": True,
-                "to_addresses": to_addresses_list
+                "to_addresses": original_to_addresses_list
             }
         
         # Validate required parameters
@@ -300,6 +300,11 @@ def send_email(
         if not body and not body_html:
             raise ValueError("Either body or body_html is required")
         
+        # Store original addresses for logging purposes (preserve +tags for tracking)
+        original_to_addresses = to_addresses
+        original_cc_addresses = cc_addresses
+        original_bcc_addresses = bcc_addresses
+        
         # Normalize email addresses to lists
         if isinstance(to_addresses, str):
             to_addresses = [to_addresses]
@@ -307,6 +312,14 @@ def send_email(
             cc_addresses = [cc_addresses]
         if isinstance(bcc_addresses, str):
             bcc_addresses = [bcc_addresses]
+            
+        # Normalize email addresses to remove +tags for SES compatibility
+        # This allows sending to base addresses instead of requiring verification for each +tag variant
+        to_addresses = [normalize_email_address(email) for email in to_addresses]
+        if cc_addresses:
+            cc_addresses = [normalize_email_address(email) for email in cc_addresses]
+        if bcc_addresses:
+            bcc_addresses = [normalize_email_address(email) for email in bcc_addresses]
             
         # Get from address from AWS Secrets Manager if not provided
         if not from_address:
@@ -322,16 +335,21 @@ def send_email(
                 cc_addresses, bcc_addresses
             )
             
-            # Log successful email to database
+            # Log successful email to database (using original addresses with +tags for tracking)
             if result.get("success"):
+                # Convert original addresses back to lists for logging
+                original_to_list = [original_to_addresses] if isinstance(original_to_addresses, str) else original_to_addresses
+                original_cc_list = [original_cc_addresses] if isinstance(original_cc_addresses, str) else original_cc_addresses if original_cc_addresses else None
+                original_bcc_list = [original_bcc_addresses] if isinstance(original_bcc_addresses, str) else original_bcc_addresses if original_bcc_addresses else None
+                
                 log_email_to_database(
-                    to_addresses=to_addresses,
+                    to_addresses=original_to_list,
                     subject=subject,
                     body=body,
                     from_address=from_address,
                     message_id=result.get("message_id"),
-                    cc_addresses=cc_addresses,
-                    bcc_addresses=bcc_addresses,
+                    cc_addresses=original_cc_list,
+                    bcc_addresses=original_bcc_list,
                     attachments=attachments,
                     email_type=email_type,
                     report_type=report_type,
@@ -347,16 +365,21 @@ def send_email(
             attachments, cc_addresses, bcc_addresses, body_html
         )
         
-        # Log successful email to database
+        # Log successful email to database (using original addresses with +tags for tracking)
         if result.get("success"):
+            # Convert original addresses back to lists for logging
+            original_to_list = [original_to_addresses] if isinstance(original_to_addresses, str) else original_to_addresses
+            original_cc_list = [original_cc_addresses] if isinstance(original_cc_addresses, str) else original_cc_addresses if original_cc_addresses else None
+            original_bcc_list = [original_bcc_addresses] if isinstance(original_bcc_addresses, str) else original_bcc_addresses if original_bcc_addresses else None
+            
             log_email_to_database(
-                to_addresses=to_addresses,
+                to_addresses=original_to_list,
                 subject=subject,
                 body=body,
                 from_address=from_address,
                 message_id=result.get("message_id"),
-                cc_addresses=cc_addresses,
-                bcc_addresses=bcc_addresses,
+                cc_addresses=original_cc_list,
+                bcc_addresses=original_bcc_list,
                 attachments=attachments,
                 email_type=email_type,
                 report_type=report_type,
@@ -370,14 +393,18 @@ def send_email(
         error_msg = f"AWS SES error: {e.response['Error']['Message']}"
         logger.error(error_msg)
         
-        # Log failed email to database
+        # Log failed email to database (using original addresses with +tags for tracking)
+        original_to_list = [original_to_addresses] if isinstance(original_to_addresses, str) else original_to_addresses
+        original_cc_list = [original_cc_addresses] if isinstance(original_cc_addresses, str) else original_cc_addresses if original_cc_addresses else None
+        original_bcc_list = [original_bcc_addresses] if isinstance(original_bcc_addresses, str) else original_bcc_addresses if original_bcc_addresses else None
+        
         log_email_to_database(
-            to_addresses=to_addresses,
+            to_addresses=original_to_list,
             subject=subject,
             body=body,
             from_address=from_address or "unknown",
-            cc_addresses=cc_addresses,
-            bcc_addresses=bcc_addresses,
+            cc_addresses=original_cc_list,
+            bcc_addresses=original_bcc_list,
             attachments=attachments,
             email_type=email_type,
             report_type=report_type,
@@ -395,14 +422,18 @@ def send_email(
         error_msg = f"Email sending failed: {str(e)}"
         logger.error(error_msg)
         
-        # Log failed email to database
+        # Log failed email to database (using original addresses with +tags for tracking)
+        original_to_list = [original_to_addresses] if isinstance(original_to_addresses, str) else original_to_addresses
+        original_cc_list = [original_cc_addresses] if isinstance(original_cc_addresses, str) else original_cc_addresses if original_cc_addresses else None
+        original_bcc_list = [original_bcc_addresses] if isinstance(original_bcc_addresses, str) else original_bcc_addresses if original_bcc_addresses else None
+        
         log_email_to_database(
-            to_addresses=to_addresses,
+            to_addresses=original_to_list,
             subject=subject,
             body=body,
             from_address=from_address or "unknown",
-            cc_addresses=cc_addresses,
-            bcc_addresses=bcc_addresses,
+            cc_addresses=original_cc_list,
+            bcc_addresses=original_bcc_list,
             attachments=attachments,
             email_type=email_type,
             report_type=report_type,
@@ -561,6 +592,68 @@ def create_attachment_from_data(filename: str, data: bytes, content_type: str = 
         EmailAttachment object
     """
     return EmailAttachment(filename, data, content_type)
+
+def normalize_email_address(email: str) -> str:
+    """
+    Normalize email address by removing the '+tag' portion for SES compatibility
+    
+    This function removes the '+tag' portion from email addresses to work around
+    SES verification requirements. Since '+tag' emails all route to the base email
+    anyway, we can send to the base address instead.
+    
+    Args:
+        email: Email address that may contain a '+tag' portion
+        
+    Returns:
+        Normalized email address with '+tag' portion removed
+        
+    Examples:
+        normalize_email_address('user+tag@example.com') -> 'user@example.com'
+        normalize_email_address('user@example.com') -> 'user@example.com'
+        normalize_email_address('user+multiple+tags@example.com') -> 'user@example.com'
+    """
+    if not email or '@' not in email:
+        return email
+    
+    try:
+        local_part, domain_part = email.rsplit('@', 1)
+        
+        # Remove everything from the first '+' to the end of the local part
+        if '+' in local_part:
+            local_part = local_part.split('+')[0]
+        
+        normalized = f"{local_part}@{domain_part}"
+        
+        # Log the normalization for debugging if needed
+        if normalized != email:
+            logger.debug(f"Normalized email address: {email} -> {normalized}")
+        
+        return normalized
+        
+    except Exception as e:
+        logger.warning(f"Error normalizing email address '{email}': {str(e)}, returning original")
+        return email
+
+def normalize_email_list(emails: Union[str, List[str], None]) -> Union[str, List[str], None]:
+    """
+    Normalize a list of email addresses or a single email address
+    
+    Args:
+        emails: Single email string, list of emails, or None
+        
+    Returns:
+        Normalized email(s) in the same format as input
+    """
+    if emails is None:
+        return None
+    
+    if isinstance(emails, str):
+        return normalize_email_address(emails)
+    
+    if isinstance(emails, list):
+        return [normalize_email_address(email) for email in emails]
+    
+    return emails
 
 def _get_content_type(filename: str) -> str:
     """Get appropriate MIME content type based on file extension"""
