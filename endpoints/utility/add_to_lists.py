@@ -1,5 +1,5 @@
 # Created: 2025-08-12 17:16:24
-# Last Modified: 2025-09-06 01:49:17
+# Last Modified: 2025-09-18 12:59:34
 # Author: Scott Cadreau
 
 # endpoints/utility/add_to_lists.py
@@ -913,6 +913,17 @@ def add_pay_tier(request: Request, pay_tier_data: PayTierCreate):
                 
                 # Get count of records updated
                 records_updated = cursor.rowcount
+                
+                # Step 7: Update asst_surg field from cpt_assist table
+                cursor.execute("""
+                    UPDATE procedure_codes aa 
+                    SET asst_surg = (
+                        SELECT bb.asst_surg 
+                        FROM cpt_assist bb 
+                        WHERE aa.procedure_code = bb.cpt_code
+                    ) 
+                    WHERE asst_surg IS NULL
+                """)
                 
                 # Commit all changes
                 conn.commit()
