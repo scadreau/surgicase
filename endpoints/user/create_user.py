@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-28 20:16:23
+# Last Modified: 2025-09-18 16:18:55
 # Author: Scott Cadreau
 
 # endpoints/user/create_user.py
@@ -254,18 +254,6 @@ def add_user(request: Request, user: UserCreate):
             # Record successful user creation
             business_metrics.record_user_operation("create", "success", user.user_id)
             
-            # Check and handle SES verification for plus-tagged emails
-            ses_verification_result = None
-            try:
-                from utils.ses_verification_helper import check_and_verify_email_for_ses, should_verify_email_for_ses
-                
-                if should_verify_email_for_ses(user.user_email):
-                    ses_verification_result = check_and_verify_email_for_ses(user.user_email)
-                    print(f"SES verification check for {user.user_email}: {ses_verification_result.get('message')}")
-                
-            except Exception as ses_error:
-                print(f"Error checking SES verification for {user.user_email}: {str(ses_error)}")
-            
             # Send welcome email to new user
             try:
                 from utils.email_service import send_welcome_email
@@ -278,18 +266,10 @@ def add_user(request: Request, user: UserCreate):
                     print(f"Welcome email sent successfully to {user.user_email}")
                 else:
                     print(f"Failed to send welcome email to {user.user_email}: {welcome_result.get('message')}")
-                    
-                    # If welcome email failed and we sent SES verification, inform about it
-                    if ses_verification_result and ses_verification_result.get('verification_sent'):
-                        print(f"Note: {user.user_email} needs to verify their email address with AWS SES to receive emails")
                         
             except Exception as email_error:
                 # Don't fail user creation if email fails
                 print(f"Error sending welcome email to {user.user_email}: {str(email_error)}")
-                
-                # If welcome email failed and we sent SES verification, inform about it
-                if ses_verification_result and ses_verification_result.get('verification_sent'):
-                    print(f"Note: {user.user_email} needs to verify their email address with AWS SES to receive emails")
             
             # Send email notification to admin about new user signup
             try:
@@ -341,26 +321,13 @@ This is an automated notification from the SurgiCase user registration system.
                 # Don't fail user creation if email fails
                 print(f"Error sending email notification for {user.user_email}: {str(email_error)}")
             
-        # Prepare response with SES verification info if applicable
-        response_body = {
-            "message": "User created successfully",
-            "user_id": user.user_id
-        }
-        
-        # Add SES verification info to response if verification was sent
-        if ses_verification_result and ses_verification_result.get('verification_sent'):
-            response_body["email_verification_required"] = True
-            response_body["email_verification_message"] = (
-                f"A verification email has been sent to {user.user_email}. "
-                "Please check your email (including spam folder) and click the verification link "
-                "to receive emails from SurgiCase."
-            )
-        elif ses_verification_result and ses_verification_result.get('already_verified'):
-            response_body["email_verification_required"] = False
-        
+        # Prepare response
         response_data = {
             "statusCode": 201,
-            "body": response_body
+            "body": {
+                "message": "User created successfully",
+                "user_id": user.user_id
+            }
         }
         return response_data
 
