@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-09-16 02:15:55
+# Last Modified: 2025-09-21 17:12:30
 # Author: Scott Cadreau
 
 # endpoints/case/filter_cases.py
@@ -182,7 +182,7 @@ def _get_user_cases_optimized(cursor, user_id, status_list, max_case_status):
             c.user_id, c.case_id, c.case_date, c.patient_first, c.patient_last, 
             c.ins_provider, c.surgeon_id, c.facility_id, c.case_status, 
             csl.case_status_desc,
-            c.demo_file, c.note_file, c.misc_file, c.pay_amount,
+            c.demo_file, c.note_file, c.misc_file, c.pay_amount, c.paid_to_provider_ts,
             COALESCE(
                 JSON_ARRAYAGG(
                     CASE 
@@ -230,7 +230,7 @@ def _get_user_cases_optimized(cursor, user_id, status_list, max_case_status):
         GROUP BY 
             c.case_id, c.user_id, c.case_date, c.patient_first, c.patient_last,
             c.ins_provider, c.surgeon_id, c.facility_id, c.case_status,
-            csl.case_status_desc, c.demo_file, c.note_file, c.misc_file, c.pay_amount
+            csl.case_status_desc, c.demo_file, c.note_file, c.misc_file, c.pay_amount, c.paid_to_provider_ts
         ORDER BY c.case_id DESC
     """
     
