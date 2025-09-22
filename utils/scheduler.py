@@ -1,5 +1,5 @@
 # Created: 2025-01-15
-# Last Modified: 2025-09-05 21:26:29
+# Last Modified: 2025-09-22 09:40:03
 # Author: Scott Cadreau
 
 import schedule
@@ -719,7 +719,7 @@ def run_scheduler(scheduler_role: str = "leader"):
         schedule.run_pending()
         
         # Sleep in smaller intervals to check shutdown flag more frequently
-        for _ in range(3600):  # 3600 seconds (1 hour) total
+        for _ in range(300):  # 3600 seconds (1 hour) total
             if shutdown_requested:
                 break
             time.sleep(1)  # Check shutdown flag every second
