@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-09-15 02:18:38
+# Last Modified: 2025-09-26 14:49:54
 # Author: Scott Cadreau
 
 # endpoints/case/create_case.py
@@ -145,6 +145,7 @@ def add_case(case: CaseCreate, request: Request):
     - Automatic procedure code association
     - Pay amount calculation based on procedure codes
     - Case status updates when applicable
+    - Automatic file validation for uploaded documents (PDF/JPEG)
     - Intelligent cache invalidation and rewarming
     - Full monitoring and logging integration
     - Prometheus metrics tracking
@@ -177,6 +178,7 @@ def add_case(case: CaseCreate, request: Request):
             - pay_amount_update (dict): Results of pay amount calculation
             - forced_duplicate (bool): Whether this case was created as a forced duplicate
             - dupe_flag (int): Database flag indicating duplicate status (1 if forced, 0 if not)
+            - file_validation_errors (List[dict], optional): File validation errors if any files were invalid
     
     Raises:
         HTTPException: 
@@ -190,6 +192,10 @@ def add_case(case: CaseCreate, request: Request):
         - Triggers automatic pay amount calculation via update_case_pay_amount()
         - Triggers automatic case status update via update_case_status()
         - All operations wrapped in a database transaction for atomicity
+        - Validates uploaded files (demo_file, note_file, misc_file) after successful commit:
+            - Downloads files from S3 and validates format (PDF/JPEG only)
+            - Removes invalid files from S3 and sets filename to NULL in database
+            - Reports validation errors in response
     
     Monitoring & Logging:
         - Business metrics tracking for case creation operations
@@ -201,6 +207,15 @@ def add_case(case: CaseCreate, request: Request):
         - Explicit transaction begin/commit for data consistency
         - Automatic rollback on any operation failure
         - Connection validation and proper cleanup in finally block
+    
+    File Validation:
+        - Triggered automatically when demo_file, note_file, or misc_file are provided
+        - Downloads files from S3 and validates format using appropriate libraries
+        - Supported formats: PDF (using pypdf), JPEG/JPG (using PIL/Pillow)
+        - Unsupported formats (PNG, etc.) are passed through without validation
+        - Invalid files are automatically deleted from S3 and filename set to NULL
+        - Validation errors included in response but do not fail the entire operation
+        - Typical validation time: ~120ms for 4MB files (includes S3 download)
     
     Cache Management:
         - Automatically clears global cases cache (get_cases_by_status) after successful creation
@@ -224,13 +239,37 @@ def add_case(case: CaseCreate, request: Request):
             "surgeon_id": "SURG456",
             "facility_id": "FAC789",
             "procedure_codes": ["12345", "67890"],
+            "demo_file": "surgical_demo.pdf",
             "force_duplicate": false
+        }
+    
+    Example Response with File Validation Errors:
+        {
+            "message": "Case created successfully, but some files were invalid and removed",
+            "user_id": "USER123",
+            "case_id": "CASE-2024-001",
+            "procedure_codes": ["12345", "67890"],
+            "status_update": {"success": true, "message": "Status updated to In Progress"},
+            "pay_amount_update": {"success": true, "new_amount": 1500.00},
+            "forced_duplicate": false,
+            "dupe_flag": 0,
+            "file_validation_errors": [
+                {
+                    "field": "demo_file",
+                    "filename": "corrupted_demo.pdf",
+                    "error": "File corrupted_demo.pdf is not readable and has been removed. Please upload a new file."
+                }
+            ]
         }
     
     Note:
         - Case creation triggers automatic pay amount calculation if procedure codes are provided
         - Case status may be automatically updated based on business rules
         - All file paths (demo_file, note_file, misc_file) are optional
+        - File validation is triggered automatically for any provided file paths
+        - Invalid files are removed from S3 and their database references are set to NULL
+        - File validation errors do not cause the entire creation operation to fail
+        - Only PDF and JPEG/JPG files are validated; other formats pass through unchanged
         - Procedure codes list is optional but recommended for accurate pay calculations
         - Duplicate detection checks for same user_id, patient name (first+last) and case date
         - Set force_duplicate=true to allow legitimate duplicate cases (sets dupe_flag=1)
@@ -314,6 +353,57 @@ def add_case(case: CaseCreate, request: Request):
         conn.commit()
         logger.info(f"✅ COMMITTED database changes for case creation: {case.case_id}")
         
+        # INPUT VALIDATION -- Validate uploaded files after successful DB commit
+        file_validation_errors = []
+        file_fields_to_validate = []
+        
+        # Check which file fields have values
+        if case.demo_file:
+            file_fields_to_validate.append(('demo_file', case.demo_file))
+        if case.note_file:
+            file_fields_to_validate.append(('note_file', case.note_file))
+        if case.misc_file:
+            file_fields_to_validate.append(('misc_file', case.misc_file))
+        
+        if file_fields_to_validate:
+            from utils.validate_case_file import validate_case_file
+            
+            for field_name, filename in file_fields_to_validate:
+                logger.info(f"🔍 Validating {field_name}: {filename} for case {case.case_id}")
+                validation_result = validate_case_file(case.user_id, filename)
+                
+                if not validation_result["valid"]:
+                    # File validation failed - update database to remove filename
+                    try:
+                        # TRANSACTION -- Update case to remove invalid filename
+                        with conn.cursor(pymysql.cursors.DictCursor) as validation_cursor:
+                            conn.begin()
+                            validation_cursor.execute(
+                                f"UPDATE cases SET {field_name} = NULL WHERE case_id = %s",
+                                (case.case_id,)
+                            )
+                            conn.commit()
+                            logger.info(f"🗑️ Removed invalid filename {filename} from {field_name} for case {case.case_id}")
+                            
+                            # Add to validation errors for response
+                            file_validation_errors.append({
+                                "field": field_name,
+                                "filename": filename,
+                                "error": validation_result.get("user_error", f"File {filename} is not readable")
+                            })
+                            
+                    except Exception as db_error:
+                        logger.error(f"❌ Failed to update database after file validation failure: {str(db_error)}")
+                        conn.rollback()
+                        # Still add to errors even if DB update failed
+                        file_validation_errors.append({
+                            "field": field_name,
+                            "filename": filename,
+                            "error": f"File {filename} validation failed and could not be removed from database"
+                        })
+                else:
+                    logger.info(f"✅ File validation successful for {field_name}: {filename}")
+        
         # Re-warm caches after successful commit
         try:
             # Re-warm global cases cache in background
@@ -350,6 +440,12 @@ def add_case(case: CaseCreate, request: Request):
             "forced_duplicate": case.force_duplicate,
             "dupe_flag": 1 if case.force_duplicate else 0
         }
+        
+        # Add file validation results if any files were validated
+        if file_validation_errors:
+            response_data["file_validation_errors"] = file_validation_errors
+            # Update message to indicate some files had issues
+            response_data["message"] = "Case created successfully, but some files were invalid and removed"
         
         # Add auto-fix information if corrections were made
         if case.procedure_codes and corrections_made:

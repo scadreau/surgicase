@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-09-15 02:18:38
+# Last Modified: 2025-09-26 17:15:53
 # Author: Scott Cadreau
 
 # endpoints/case/update_case.py
@@ -33,6 +33,7 @@ def update_case(request: Request, case: CaseUpdate = Body(...)):
     - Complete procedure code replacement with duplicate removal
     - Automatic pay amount recalculation when procedure codes change
     - Automatic case status updates based on business rules
+    - Automatic file validation for uploaded documents (PDF/JPEG)
     - Transactional operations for data integrity
     - Comprehensive validation and error handling
     - Monitoring and performance tracking
@@ -63,6 +64,7 @@ def update_case(request: Request, case: CaseUpdate = Body(...)):
                 - updated_fields (List[str]): List of fields that were actually modified
                 - status_update (dict): Results of automatic case status update
                 - pay_amount_update (dict): Results of automatic pay amount calculation
+                - file_validation_errors (List[dict], optional): File validation errors if any files were invalid
     
     Raises:
         HTTPException:
@@ -79,6 +81,10 @@ def update_case(request: Request, case: CaseUpdate = Body(...)):
         4. Triggers automatic pay amount calculation if procedure codes changed
         5. Triggers automatic case status update based on business rules
         6. Commits all changes atomically or rolls back on failure
+        7. Validates uploaded files (demo_file, note_file, misc_file) after successful commit:
+            - Downloads files from S3 and validates format (PDF/JPEG only)
+            - Removes invalid files from S3 and sets filename to NULL in database
+            - Reports validation errors in response
     
     Business Logic:
         - Only non-null fields in the request are updated
@@ -101,6 +107,15 @@ def update_case(request: Request, case: CaseUpdate = Body(...)):
         - Status changes logged and included in response
         - Independent of other update operations
         - Always attempted after field and procedure code updates
+    
+    File Validation:
+        - Triggered automatically when demo_file, note_file, or misc_file are updated
+        - Downloads files from S3 and validates format using appropriate libraries
+        - Supported formats: PDF (using pypdf), JPEG/JPG (using PIL/Pillow)
+        - Unsupported formats (PNG, etc.) are passed through without validation
+        - Invalid files are automatically deleted from S3 and filename set to NULL
+        - Validation errors included in response but do not fail the entire operation
+        - Typical validation time: ~120ms for 4MB files (includes S3 download)
     
     Monitoring & Logging:
         - Business metrics tracking for update operations
@@ -157,6 +172,25 @@ def update_case(request: Request, case: CaseUpdate = Body(...)):
             }
         }
     
+    Example Response with File Validation Errors:
+        {
+            "statusCode": 200,
+            "body": {
+                "message": "Case updated successfully, but some files were invalid and removed",
+                "case_id": "CASE-2024-001",
+                "updated_fields": ["patient_first", "surgeon_id"],
+                "status_update": {"success": true, "message": "No status change needed"},
+                "pay_amount_update": null,
+                "file_validation_errors": [
+                    {
+                        "field": "demo_file",
+                        "filename": "corrupted_document.pdf",
+                        "error": "File corrupted_document.pdf is not readable and has been removed. Please upload a new file."
+                    }
+                ]
+            }
+        }
+    
     Example Error Response (No Changes):
         {
             "statusCode": 400,
@@ -172,7 +206,10 @@ def update_case(request: Request, case: CaseUpdate = Body(...)):
         - Pay amount recalculation is triggered only when procedure codes change
         - Case status updates are automatic and based on current business rules
         - All field updates are atomic - either all succeed or all are rolled back
-        - File path updates do not trigger automatic file operations
+        - File validation is triggered automatically for demo_file, note_file, and misc_file updates
+        - Invalid files are removed from S3 and their database references are set to NULL
+        - File validation errors do not cause the entire update operation to fail
+        - Only PDF and JPEG/JPG files are validated; other formats pass through unchanged
         - Empty arrays for procedure_codes will remove all existing procedure codes
     """
     conn = None
@@ -283,6 +320,7 @@ def update_case(request: Request, case: CaseUpdate = Body(...)):
             
             # Clear caches BEFORE commit to prevent race conditions
             # This ensures no stale data gets cached between clear and commit
+            logger.info("🚨 FILE VALIDATION CHECKPOINT - We made it to validation logic!")
             logger.info(f"🔄 STARTING cache invalidation for case update: {case.case_id}")
             try:
                 # 1. Clear global cases cache (affects admin dashboard) - but don't re-warm yet
@@ -319,6 +357,56 @@ def update_case(request: Request, case: CaseUpdate = Body(...)):
             # Record successful case update
             business_metrics.record_case_operation("update", "success", case.case_id)
             
+            # INPUT VALIDATION -- Validate uploaded files after successful DB commit
+            logger.info("🚨 FILE VALIDATION CHECKPOINT 2 - We made it to validation logic!")
+            file_validation_errors = []
+            file_fields_updated = [field for field in updated_fields if field in ['demo_file', 'note_file', 'misc_file']]
+            
+            if file_fields_updated and target_user_id:
+                from utils.validate_case_file import validate_case_file
+                
+                for field_name in file_fields_updated:
+                    filename = getattr(case, field_name)
+                    if filename:  # Only validate if filename is not None/empty
+                        logger.info(f"🔍 Validating {field_name}: {filename} for case {case.case_id}")
+                        validation_result = validate_case_file(target_user_id, filename)
+                        
+                        if not validation_result["valid"]:
+                            # File validation failed - update database to remove filename
+                            try:
+                                # TRANSACTION -- Update case to remove invalid filename
+                                with conn.cursor(pymysql.cursors.DictCursor) as validation_cursor:
+                                    conn.begin()
+                                    validation_cursor.execute(
+                                        f"UPDATE cases SET {field_name} = NULL WHERE case_id = %s",
+                                        (case.case_id,)
+                                    )
+                                    conn.commit()
+                                    logger.info(f"🗑️ Removed invalid filename {filename} from {field_name} for case {case.case_id}")
+                                    
+                                    # Remove the field from updated_fields since we nullified it
+                                    if field_name in updated_fields:
+                                        updated_fields.remove(field_name)
+                                    
+                                    # Add to validation errors for response
+                                    file_validation_errors.append({
+                                        "field": field_name,
+                                        "filename": filename,
+                                        "error": validation_result.get("user_error", f"File {filename} is not readable")
+                                    })
+                                    
+                            except Exception as db_error:
+                                logger.error(f"❌ Failed to update database after file validation failure: {str(db_error)}")
+                                conn.rollback()
+                                # Still add to errors even if DB update failed
+                                file_validation_errors.append({
+                                    "field": field_name,
+                                    "filename": filename,
+                                    "error": f"File {filename} validation failed and could not be removed from database"
+                                })
+                        else:
+                            logger.info(f"✅ File validation successful for {field_name}: {filename}")
+            
             # Re-warm caches after successful commit
             try:
                 # Re-warm global cases cache in background
@@ -353,6 +441,12 @@ def update_case(request: Request, case: CaseUpdate = Body(...)):
             "status_update": status_update_result,
             "pay_amount_update": pay_amount_result
         }
+        
+        # Add file validation results if any files were validated
+        if file_validation_errors:
+            response_body["file_validation_errors"] = file_validation_errors
+            # Update message to indicate some files had issues
+            response_body["message"] = "Case updated successfully, but some files were invalid and removed"
         
         # Add auto-fix information if corrections were made
         if case.procedure_codes is not None and corrections_made:
