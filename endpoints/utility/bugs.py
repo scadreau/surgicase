@@ -1,5 +1,5 @@
 # Created: 2025-08-06 14:20:21
-# Last Modified: 2025-08-20 08:38:53
+# Last Modified: 2025-09-30 16:57:24
 # Author: Scott Cadreau
 
 # endpoints/utility/bugs.py
@@ -117,6 +117,80 @@ def _map_priority_to_clickup(priority: str) -> int:
         "low": 4
     }
     return priority_map.get(priority.lower(), 3)  # Default to Normal
+
+def send_bug_notification_email(bug_data: 'BugReport', bug_id: int) -> bool:
+    """
+    Send email notification to developers when a new bug is created
+    
+    Args:
+        bug_data: The bug report data
+        bug_id: The generated bug ID from the database
+        
+    Returns:
+        bool: True if email sent successfully, False otherwise
+    """
+    try:
+        from utils.secrets_manager import get_secret
+        from utils.email_service import send_email, get_email_templates
+        
+        # Get main configuration for developer emails and feature toggle
+        config = get_secret("surgicase/main")
+        
+        # Check if bug email notifications are enabled
+        if not config.get("ENABLE_BUG_EMAIL_NOTIFICATIONS"):
+            print("Bug email notifications are disabled")
+            return False
+            
+        # Get developer email addresses
+        dev_emails = config.get("DEV_EMAIL_ADDRESSES", [])
+        if not dev_emails:
+            print("No developer email addresses configured")
+            return False
+        
+        # Get email templates
+        templates = get_email_templates()
+        bug_template = templates.get("email_templates", {}).get("bug_notification")
+        
+        if not bug_template:
+            print("Bug notification email template not found")
+            return False
+        
+        # Prepare template variables
+        template_vars = {
+            "bug_id": str(bug_id),
+            "title": bug_data.bug.get("title", "Untitled Bug"),
+            "description": bug_data.bug.get("description", "No description provided"),
+            "priority": bug_data.priority,
+            "reported_by": f"{bug_data.user_profile.get('first_name', '')} {bug_data.user_profile.get('last_name', '')}".strip(),
+            "calling_page": bug_data.calling_page,
+            "bug_date": bug_data.bug_date
+        }
+        
+        # Format email subject and body
+        subject = bug_template["subject"].format(**template_vars)
+        body = bug_template["body"].format(**template_vars)
+        
+        # Send email to all developer addresses
+        result = send_email(
+            to_addresses=dev_emails,
+            subject=subject,
+            body=body,
+            email_type="bug_notification"
+        )
+        
+        if result.get("success"):
+            print(f"Bug notification email sent successfully for bug #{bug_id}")
+            business_metrics.record_utility_operation("send_bug_notification_email", "success")
+            return True
+        else:
+            print(f"Failed to send bug notification email for bug #{bug_id}: {result.get('error', 'Unknown error')}")
+            business_metrics.record_utility_operation("send_bug_notification_email", "error")
+            return False
+            
+    except Exception as e:
+        print(f"Error sending bug notification email: {str(e)}")
+        business_metrics.record_utility_operation("send_bug_notification_email", "error")
+        return False
 
 class BugReport(BaseModel):
     bug_date: str
@@ -318,6 +392,22 @@ def create_bug_report(request: Request, bug_data: BugReport, user_id: str = Quer
                     name=f"clickup_bug_{bug_id}"
                 )
                 clickup_thread.start()
+                
+                # Send bug notification email in background thread (fire-and-forget)
+                def _send_bug_email_background():
+                    try:
+                        send_bug_notification_email(bug_data, bug_id)
+                    except Exception as email_error:
+                        # Log the error but don't fail the bug creation
+                        print(f"Warning: Failed to send bug notification email for bug #{bug_id}: {str(email_error)}")
+                
+                # Start background thread for email notification
+                email_thread = threading.Thread(
+                    target=_send_bug_email_background,
+                    daemon=True,  # Thread will not prevent app shutdown
+                    name=f"bug_email_{bug_id}"
+                )
+                email_thread.start()
                 
         finally:
             close_db_connection(conn)
