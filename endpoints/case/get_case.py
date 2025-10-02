@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-09-16 02:16:19
+# Last Modified: 2025-10-01 20:29:34
 # Author: Scott Cadreau
 
 # endpoints/case/get_case.py
@@ -23,7 +23,7 @@ def _get_case_optimized(cursor, case_id, calling_user_id):
         SELECT 
             c.user_id, c.case_id, c.case_date, c.patient_first, c.patient_last, 
             c.ins_provider, c.surgeon_id, c.facility_id, c.case_status, 
-            c.demo_file, c.note_file, c.misc_file, c.pay_amount, c.pay_category,
+            c.demo_file, c.note_file, c.misc_file, c.admin_file, c.pay_amount, c.pay_category,
             CONCAT(s.first_name, ' ', s.last_name) as surgeon_name,
             f.facility_name, f.facility_state, f.facility_npi, s.surgeon_npi,
             up.max_case_status as owner_max_case_status,
@@ -58,7 +58,7 @@ def _get_case_optimized(cursor, case_id, calling_user_id):
         GROUP BY 
             c.user_id, c.case_id, c.case_date, c.patient_first, c.patient_last,
             c.ins_provider, c.surgeon_id, c.facility_id, c.case_status,
-            c.demo_file, c.note_file, c.misc_file, c.pay_amount, c.pay_category,
+            c.demo_file, c.note_file, c.misc_file, c.admin_file, c.pay_amount, c.pay_category,
             s.first_name, s.last_name, f.facility_name, f.facility_state,
             up.max_case_status, up.first_name, up.last_name,
             calling_up.max_case_status

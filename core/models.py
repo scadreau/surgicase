@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-09-05 22:26:24
+# Last Modified: 2025-10-02 01:48:50
 # Author: Scott Cadreau
 
 # core/models.py
@@ -86,6 +86,7 @@ class CaseUpdate(BaseModel):
     demo_file: Optional[str] = None
     note_file: Optional[str] = None
     misc_file: Optional[str] = None
+    admin_file: Optional[str] = None
     procedure_codes: Optional[List[str]] = None
 
 class CaseRequest(BaseModel):
