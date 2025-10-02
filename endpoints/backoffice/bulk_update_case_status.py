@@ -1,5 +1,5 @@
 # Created: 2025-07-27 02:00:40
-# Last Modified: 2025-08-20 22:28:52
+# Last Modified: 2025-10-02 20:29:58
 # Author: Scott Cadreau
 
 # endpoints/backoffice/bulk_update_case_status.py
@@ -17,33 +17,36 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Configuration mapping for status transitions to timestamp fields
-# Format: (from_status, to_status): timestamp_field_name
+# Configuration mapping for status codes to timestamp fields
+# Format: status_code: timestamp_field_name
+# Timestamps are updated whenever a case transitions TO the specified status
 STATUS_TIMESTAMP_MAPPING = {
-    (10, 15): "pending_payment_ts",
-    (15, 20): "paid_to_provider_ts",
-    (20, 30): "sent_to_biller_ts",
-    (30, 40): "received_pmnt_ts",
-    (40, 50): "sent_to_negotiation_ts",
-    (50, 60): "settled_ts",
-    (60, 70): "send_to_idr_ts",
-    (70, 80): "idr_decision_ts",
-    (80, 500): "closed_ts",
+    7: "billable_flag_ts",
+    8: "docs_needed_ts",
+    15: "pending_payment_ts",
+    20: "paid_to_provider_ts",
+    30: "sent_to_biller_ts",
+    40: "received_pmnt_ts",
+    50: "sent_to_negotiation_ts",
+    60: "settled_ts",
+    70: "send_to_idr_ts",
+    80: "idr_decision_ts",
+    400: "rejected_ts",
+    500: "closed_ts",
     # Add future timestamp mappings here as needed
 }
 
-def get_timestamp_field_for_transition(from_status: int, to_status: int) -> str:
+def get_timestamp_field_for_status(to_status: int) -> str:
     """
-    Get the timestamp field name for a specific status transition.
+    Get the timestamp field name for a target status.
     
     Args:
-        from_status: Current case status
         to_status: Target case status
         
     Returns:
         str: Timestamp field name or None if no mapping exists
     """
-    return STATUS_TIMESTAMP_MAPPING.get((from_status, to_status))
+    return STATUS_TIMESTAMP_MAPPING.get(to_status)
 
 def build_update_query_with_timestamps(timestamp_field: str = None) -> str:
     """
@@ -76,19 +79,19 @@ def bulk_update_case_status(request: Request, update_request: BulkCaseStatusUpda
     
     This function updates the case_status for a list of case IDs to a new status value.
     It performs validation to prevent backward status progression unless explicitly forced.
-    Additionally updates specific timestamps based on configured status transitions and
+    Additionally updates specific timestamps based on target status values and
     automatically invalidates and re-warms relevant caches to ensure data consistency.
     
-    Current timestamp mappings:
-    - Status 10 → 15: Updates pending_payment_ts
-    - Status 15 → 20: Updates paid_to_provider_ts
-    - Status 20 → 30: Updates sent_to_biller_ts
-    - Status 30 → 40: Updates received_pmnt_ts
-    - Status 40 → 50: Updates sent_to_negotiation_ts
-    - Status 50 → 60: Updates settled_ts
-    - Status 60 → 70: Updates send_to_idr_ts
-    - Status 70 → 80: Updates idr_decision_ts
-    - Status 80 → 500: Updates closed_ts
+    Current timestamp mappings (updated when transitioning TO these statuses):
+    - Status 15: Updates pending_payment_ts
+    - Status 20: Updates paid_to_provider_ts
+    - Status 30: Updates sent_to_biller_ts
+    - Status 40: Updates received_pmnt_ts
+    - Status 50: Updates sent_to_negotiation_ts
+    - Status 60: Updates settled_ts
+    - Status 70: Updates send_to_idr_ts
+    - Status 80: Updates idr_decision_ts
+    - Status 500: Updates closed_ts
     
     Args:
         update_request: BulkCaseStatusUpdate object containing:
@@ -111,6 +114,7 @@ def bulk_update_case_status(request: Request, update_request: BulkCaseStatusUpda
         
     Timestamp Updates:
         - Automatically updates appropriate timestamp fields based on STATUS_TIMESTAMP_MAPPING
+        - Timestamps are updated whenever transitioning TO a mapped status, regardless of previous status
         - New mappings can be added to STATUS_TIMESTAMP_MAPPING without code changes
     
     Cache Management:
@@ -202,8 +206,8 @@ def bulk_update_case_status(request: Request, update_request: BulkCaseStatusUpda
                             })
                             continue
                         
-                        # Determine if we need to update timestamps based on status transition
-                        timestamp_field = get_timestamp_field_for_transition(current_status, update_request.new_status)
+                        # Determine if we need to update timestamps based on target status
+                        timestamp_field = get_timestamp_field_for_status(update_request.new_status)
                         
                         # Build the UPDATE query dynamically
                         update_query = build_update_query_with_timestamps(timestamp_field)
