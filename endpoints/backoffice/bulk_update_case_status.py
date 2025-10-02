@@ -1,5 +1,5 @@
 # Created: 2025-07-27 02:00:40
-# Last Modified: 2025-10-02 20:29:58
+# Last Modified: 2025-10-02 20:31:36
 # Author: Scott Cadreau
 
 # endpoints/backoffice/bulk_update_case_status.py
@@ -83,6 +83,8 @@ def bulk_update_case_status(request: Request, update_request: BulkCaseStatusUpda
     automatically invalidates and re-warms relevant caches to ensure data consistency.
     
     Current timestamp mappings (updated when transitioning TO these statuses):
+    - Status 7: Updates billable_flag_ts
+    - Status 8: Updates docs_needed_ts
     - Status 15: Updates pending_payment_ts
     - Status 20: Updates paid_to_provider_ts
     - Status 30: Updates sent_to_biller_ts
@@ -91,6 +93,7 @@ def bulk_update_case_status(request: Request, update_request: BulkCaseStatusUpda
     - Status 60: Updates settled_ts
     - Status 70: Updates send_to_idr_ts
     - Status 80: Updates idr_decision_ts
+    - Status 400: Updates rejected_ts
     - Status 500: Updates closed_ts
     
     Args:
