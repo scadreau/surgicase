@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-27 05:38:36
+# Last Modified: 2025-10-03 18:49:22
 # Author: Scott Cadreau
 
 # endpoints/user/get_user.py
@@ -54,6 +54,7 @@ def get_user(request: Request, user_id: str = Query(..., description="The user I
                 - message_pref (str): Communication preference settings
                 - states_licensed (str): States where user holds professional licenses
                 - user_tier (int): User tier classification for billing/permissions
+                - credentials (str): User's professional credentials (e.g., MD, DO, PA, NP, CSA, PA-C)
                 - create_ts (timestamp): Timestamp when the user account was created
                 - last_updated_ts (timestamp): Timestamp when the user account was last updated
                 - last_login_dt (timestamp): Date and time of the user's last login
@@ -195,7 +196,8 @@ def get_user(request: Request, user_id: str = Query(..., description="The user I
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
                 # fetch from users table with user type description
                 cursor.execute("""select up.user_id, up.user_email, up.first_name, up.last_name, up.addr1, up.addr2, up.city, up.state, up.zipcode, up.telephone, up.user_npi, 
-                    up.referred_by_user, up.user_type, utl.user_type_desc, up.message_pref, up.states_licensed, up.user_tier, up.create_ts, up.last_updated_ts, up.last_login_dt, up.max_case_status
+                    up.referred_by_user, up.user_type, utl.user_type_desc, up.message_pref, up.states_licensed, up.user_tier, up.create_ts, up.last_updated_ts, up.last_login_dt, 
+                    up.max_case_status, up.credentials
                     from user_profile up
                     left join user_type_list utl on up.user_type = utl.user_type
                     where up.user_id = %s and up.active = 1""", (user_id))

@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-09-18 16:18:55
+# Last Modified: 2025-10-03 18:48:56
 # Author: Scott Cadreau
 
 # endpoints/user/create_user.py
@@ -50,6 +50,7 @@ def add_user(request: Request, user: UserCreate):
             - message_pref (str, optional): Communication preference settings
             - states_licensed (str, optional): States where user holds professional licenses
             - timezone (str, optional): User's timezone preference
+            - credentials (str, optional): User's professional credentials (e.g., MD, DO, PA, NP, CSA, PA-C)
             - documents (List[UserDocument], optional): List of user documents:
                 - document_type (str): Type/category of document
                 - document_name (str): Name/path of the document file
@@ -133,6 +134,7 @@ def add_user(request: Request, user: UserCreate):
             "message_pref": "email",
             "states_licensed": "CA,NY,TX",
             "timezone": "America/Los_Angeles",
+            "credentials": "MD",
             "documents": [
                 {
                     "document_type": "medical_license",
@@ -233,11 +235,11 @@ def add_user(request: Request, user: UserCreate):
             # Insert new user
             cursor.execute("""
                 INSERT INTO user_profile (
-                    user_id, user_email, first_name, last_name, addr1, addr2, city, state, zipcode, telephone, user_npi, referred_by_user, message_pref, states_licensed, timezone, user_tier
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    user_id, user_email, first_name, last_name, addr1, addr2, city, state, zipcode, telephone, user_npi, referred_by_user, message_pref, states_licensed, timezone, credentials, user_tier
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 user.user_id, user.user_email, formatted_first_name, formatted_last_name, user.addr1, user.addr2,
-                user.city, user.state, user.zipcode, user.telephone, user.user_npi, user.referred_by_user, user.message_pref, user.states_licensed, user.timezone, user_tier
+                user.city, user.state, user.zipcode, user.telephone, user.user_npi, user.referred_by_user, user.message_pref, user.states_licensed, user.timezone, user.credentials, user_tier
             ))
             # Insert user documents if provided
             if user.documents:

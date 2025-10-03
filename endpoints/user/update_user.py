@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-08-21 17:52:17
+# Last Modified: 2025-10-03 18:49:07
 # Author: Scott Cadreau
 
 # endpoints/user/update_user.py
@@ -53,6 +53,7 @@ def update_user(request: Request, user: UserUpdate = Body(...)):
             - message_pref (str, optional): Updated communication preferences
             - states_licensed (str, optional): Updated licensing state information
             - timezone (str, optional): Updated timezone preference
+            - credentials (str, optional): Updated professional credentials (e.g., MD, DO, PA, NP, CSA, PA-C)
             - user_tier (int, optional): Updated user tier level
             - documents (List[UserDocument], optional): Document list for replacement:
                 - document_type (str): Type/category of document
@@ -147,6 +148,7 @@ def update_user(request: Request, user: UserUpdate = Body(...)):
             "user_npi": "0987654321",
             "user_type": 10,
             "user_tier": 2,
+            "credentials": "DO",
             "documents": [
                 {
                     "document_type": "medical_license",
@@ -165,7 +167,7 @@ def update_user(request: Request, user: UserUpdate = Body(...)):
             "body": {
                 "message": "User updated successfully",
                 "user_id": "USER123",
-                "updated_fields": ["first_name", "telephone", "user_npi", "user_type", "user_tier", "max_case_status", "documents"]
+                "updated_fields": ["first_name", "telephone", "user_npi", "user_type", "user_tier", "credentials", "max_case_status", "documents"]
             }
         }
     
