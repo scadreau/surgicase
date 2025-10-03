@@ -1,5 +1,5 @@
 # Created: 2025-07-22 12:20:56
-# Last Modified: 2025-08-22 08:16:39
+# Last Modified: 2025-10-03 18:52:38
 # Author: Scott Cadreau
 
 # endpoints/backoffice/get_users.py
@@ -55,6 +55,7 @@ def get_users(request: Request, user_id: str = Query(..., description="The user 
                 - message_pref (str): Communication preference settings
                 - states_licensed (str): States where user holds professional licenses
                 - user_tier (int): User tier classification for billing/permissions
+                - credentials (str): User's professional credentials (e.g., MD, DO, PA, NP, CSA, PA-C)
                 - create_ts (datetime): Account creation timestamp
                 - last_updated_ts (datetime): Last profile update timestamp
                 - documents (List[dict]): Array of user documents:
@@ -193,7 +194,8 @@ def get_users(request: Request, user_id: str = Query(..., description="The user 
                 # Fetch all active users with user_tier where user_type <= requesting user's user_type
                 cursor.execute("""
                     SELECT user_id, user_email, first_name, last_name, addr1, addr2, city, state, zipcode, 
-                           telephone, user_npi, referred_by_user, user_type, message_pref, states_licensed, user_tier, create_ts, last_updated_ts
+                           telephone, user_npi, referred_by_user, user_type, message_pref, states_licensed, user_tier, 
+                           create_ts, last_updated_ts, credentials
                     FROM user_profile 
                     WHERE active = 1 AND user_type <= %s
                     ORDER BY user_type, first_name, last_name
