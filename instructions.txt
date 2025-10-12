@@ -23,12 +23,11 @@ The test server is https://allstarsapi1.metoraymedical.com
 # Development Workflow
 Do not try to start or restart the server.  Just pause and tell me to update and reload it.
 If you install a pip package always add --break-system-packages to the command 
-Always add prometheus monitoring to new endpoints
 Update the main readme when appropriate
 When it is deemed necessary create a separate readme with the functional details
 
 # Special Commands
-At the end of a conversation, if I type "create update" please create a small .md file called in the updates directory update_<date_time>.md.  
+At the end of a conversation, if I type "create update" please create a small .md file called in the updates directory update_<date_time>.md
 date_time should be yyyy-MM-dd_HH-mm-ss.  
 Only do this if the create update is entered on its own line.
 
