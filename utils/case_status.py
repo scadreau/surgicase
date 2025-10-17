@@ -1,5 +1,5 @@
 # Created: 2025-07-15 23:02:51
-# Last Modified: 2025-10-17 18:16:11
+# Last Modified: 2025-10-17 18:46:32
 # Author: Scott Cadreau
 
 # utils/case_status.py
@@ -50,15 +50,6 @@ def update_case_status(case_id: str, conn) -> dict:
                     "success": False,
                     "message": "Case not found or inactive",
                     "case_id": case_id
-                }
-            
-            # Check if case status is already 10 (ready for submission)
-            if case_data["case_status"] == 10:
-                return {
-                    "success": True,
-                    "message": "Case status already updated to 10",
-                    "case_id": case_id,
-                    "case_status": 10
                 }
             
             # Check if demo_file and note_file are not null
