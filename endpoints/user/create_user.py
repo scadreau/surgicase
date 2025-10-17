@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-10-03 18:48:56
+# Last Modified: 2025-10-17 17:58:43
 # Author: Scott Cadreau
 
 # endpoints/user/create_user.py
@@ -307,7 +307,7 @@ This is an automated notification from the SurgiCase user registration system.
 """
                 
                 email_result = send_email(
-                    to_addresses="support@metoraymedical.com",
+                    to_addresses=["support@metoraymedical.com", "kim@allstarssurgical.com"],
                     subject=subject,
                     body=body,
                     from_address="SurgiCase System <noreply@metoraymedical.com>",

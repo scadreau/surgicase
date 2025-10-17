@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-10-03 18:48:56
+# Last Modified: 2025-10-17 18:00:35
 # Author: Scott Cadreau
 
 # core/models.py
@@ -75,6 +75,7 @@ class CaseCreate(BaseModel):
     misc_file: Optional[str] = None
     procedure_codes: Optional[List[str]] = None
     force_duplicate: Optional[bool] = False
+    patient_dob: Optional[str] = None
 
 class CaseUpdate(BaseModel):
     case_id: str
@@ -90,7 +91,7 @@ class CaseUpdate(BaseModel):
     misc_file: Optional[str] = None
     admin_file: Optional[str] = None
     procedure_codes: Optional[List[str]] = None
-
+    patient_dob: Optional[str] = None
 class CaseRequest(BaseModel):
     case_id: str
 

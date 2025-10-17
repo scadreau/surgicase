@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-09-26 14:49:54
+# Last Modified: 2025-10-17 18:01:24
 # Author: Scott Cadreau
 
 # endpoints/case/create_case.py
@@ -84,12 +84,12 @@ def create_case_with_procedures(case: CaseCreate, conn) -> dict:
         cursor.execute("""
             INSERT INTO cases (
                 case_id, user_id, case_date, patient_first, patient_last, 
-                ins_provider, surgeon_id, facility_id, demo_file, note_file, misc_file, dupe_flag
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ins_provider, surgeon_id, facility_id, demo_file, note_file, misc_file, dupe_flag, patient_dob
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             case.case_id, case.user_id, case.case_date, formatted_patient_first, 
             formatted_patient_last, case.patient.ins_provider, case.surgeon_id, 
-            case.facility_id, case.demo_file, case.note_file, case.misc_file, dupe_flag
+            case.facility_id, case.demo_file, case.note_file, case.misc_file, dupe_flag, case.patient_dob
         ))
 
         # Auto-fix variables already initialized at function level
