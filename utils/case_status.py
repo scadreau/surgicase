@@ -1,5 +1,5 @@
 # Created: 2025-07-15 23:02:51
-# Last Modified: 2025-10-17 18:46:32
+# Last Modified: 2025-10-18 17:19:45
 # Author: Scott Cadreau
 
 # utils/case_status.py
@@ -10,12 +10,15 @@ def update_case_status(case_id: str, conn) -> dict:
     """
     Update case status from 0 to 7 or 10 based on completeness, patient age, and billing eligibility:
     
+    Important: If case status is already > 10, no changes are made (preserves workflow progress)
+    
     Conditions for status update:
     - demo_file is not null
     - note_file is not null  
     - at least 1 procedure code exists
     
     Status determination:
+    - No change: Case status > 10 (case has progressed beyond initial review)
     - Status 7: All conditions met AND patient is >= 65 years old (needs insurance confirmation)
     - Status 10: All conditions met AND patient < 65 (or DOB is NULL) AND at least one procedure has asst_surg = 2 (billable)
     - Status 7: All conditions met AND patient < 65 (or DOB is NULL) BUT no procedures have asst_surg = 2 (needs review)
@@ -50,6 +53,15 @@ def update_case_status(case_id: str, conn) -> dict:
                     "success": False,
                     "message": "Case not found or inactive",
                     "case_id": case_id
+                }
+            
+            # Check if case status is already greater than 10 (don't revert progress)
+            if case_data["case_status"] > 10:
+                return {
+                    "success": True,
+                    "message": f"Case status is {case_data['case_status']} (>10), no status change made",
+                    "case_id": case_id,
+                    "case_status": case_data["case_status"]
                 }
             
             # Check if demo_file and note_file are not null
