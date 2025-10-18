@@ -10,7 +10,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.database import get_db_connection, close_db_connection
-from utils.pay_amount_calculator import calculate_case_pay_amount, update_case_pay_amount
+from utils.pay_amount_calculator import calculate_case_pay_amount_v2, update_case_pay_amount_v2
 from decimal import Decimal
 import pymysql.cursors
 
@@ -128,8 +128,8 @@ def test_pay_calculator():
                     print(f"      Code: {pa['procedure_code']}, Pay: ${pa['code_pay_amount']}, Category: {pa['code_category']}, Tier: {pa['tier']}")
         
         # 5. Test the calculator function
-        print("\n5. Testing calculate_case_pay_amount function:")
-        calc_result = calculate_case_pay_amount(case_id, user_id, conn)
+        print("\n5. Testing calculate_case_pay_amount_v2 function:")
+        calc_result = calculate_case_pay_amount_v2(case_id, user_id, conn)
         
         print(f"   Success: {calc_result['success']}")
         print(f"   Calculated Pay Amount: ${calc_result['pay_amount']}")

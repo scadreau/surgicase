@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-10-17 18:01:24
+# Last Modified: 2025-10-18 17:39:40
 # Author: Scott Cadreau
 
 # endpoints/case/create_case.py
@@ -9,7 +9,7 @@ import pymysql.cursors
 from core.database import get_db_connection, close_db_connection, is_connection_valid
 from core.models import CaseCreate
 from utils.case_status import update_case_status
-from utils.pay_amount_calculator import update_case_pay_amount
+from utils.pay_amount_calculator import update_case_pay_amount_v2
 from utils.procedure_code_auto_fix import auto_fix_procedure_codes, format_corrections_for_response
 from utils.monitoring import track_business_operation, business_metrics
 from utils.text_formatting import capitalize_name_field
@@ -117,7 +117,7 @@ def create_case_with_procedures(case: CaseCreate, conn) -> dict:
                 """, (case.case_id, code, code, code))
 
         # Calculate and update pay amount if procedure codes exist
-        pay_amount_result = update_case_pay_amount(case.case_id, case.user_id, conn)
+        pay_amount_result = update_case_pay_amount_v2(case.case_id, case.user_id, conn)
         if not pay_amount_result["success"]:
             logger.error(f"Pay amount calculation failed for case {case.case_id}: {pay_amount_result['message']}")
             # Don't fail the entire operation, but log the error
@@ -189,7 +189,7 @@ def add_case(case: CaseCreate, request: Request):
     Database Operations:
         - Inserts record into 'cases' table with patient and case details
         - Batch inserts procedure codes into 'case_procedure_codes' table
-        - Triggers automatic pay amount calculation via update_case_pay_amount()
+        - Triggers automatic pay amount calculation via update_case_pay_amount_v2()
         - Triggers automatic case status update via update_case_status()
         - All operations wrapped in a database transaction for atomicity
         - Validates uploaded files (demo_file, note_file, misc_file) after successful commit:

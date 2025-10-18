@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-09-26 17:15:53
+# Last Modified: 2025-10-18 17:39:40
 # Author: Scott Cadreau
 
 # endpoints/case/update_case.py
@@ -10,7 +10,7 @@ import time
 from core.database import get_db_connection, close_db_connection, is_connection_valid
 from core.models import CaseUpdate
 from utils.case_status import update_case_status
-from utils.pay_amount_calculator import update_case_pay_amount
+from utils.pay_amount_calculator import update_case_pay_amount_v2
 from utils.procedure_code_auto_fix import auto_fix_procedure_codes, format_corrections_for_response
 from utils.monitoring import track_business_operation, business_metrics
 
@@ -308,7 +308,7 @@ def update_case(request: Request, case: CaseUpdate = Body(...)):
                     user_id = case.user_id
                 
                 if user_id:
-                    pay_amount_result = update_case_pay_amount(case.case_id, user_id, conn)
+                    pay_amount_result = update_case_pay_amount_v2(case.case_id, user_id, conn)
                     if not pay_amount_result["success"]:
                         logger.error(f"Pay amount calculation failed for case {case.case_id}: {pay_amount_result['message']}")
                         # Don't fail the entire operation, but log the error

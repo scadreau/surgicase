@@ -1,5 +1,5 @@
 # Created: 2025-01-08 16:40:00
-# Last Modified: 2025-09-08 11:55:28
+# Last Modified: 2025-10-18 17:39:40
 # Author: Scott Cadreau
 
 import sys
@@ -12,7 +12,7 @@ from decimal import Decimal
 # Add the parent directory to the Python path so we can import from core
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from pay_amount_calculator import calculate_case_pay_amount
+from pay_amount_calculator import calculate_case_pay_amount_v2
 from core.database import get_db_connection, close_db_connection
 
 # Configure logging
@@ -100,7 +100,7 @@ def process_cases(conn, dry_run=False, specific_case_id=None):
         
         try:
             # Calculate what the pay amount should be
-            calc_result = calculate_case_pay_amount(case_id, user_id, conn)
+            calc_result = calculate_case_pay_amount_v2(case_id, user_id, conn)
             
             if not calc_result["success"]:
                 logger.error(f"Failed to calculate pay amount for case {case_id}: {calc_result['message']}")
