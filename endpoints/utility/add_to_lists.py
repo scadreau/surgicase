@@ -1,5 +1,5 @@
 # Created: 2025-08-12 17:16:24
-# Last Modified: 2025-09-18 12:59:34
+# Last Modified: 2025-10-18 17:53:11
 # Author: Scott Cadreau
 
 # endpoints/utility/add_to_lists.py
@@ -745,14 +745,16 @@ def add_faq(request: Request, faq_data: FaqCreate):
 @track_business_operation("create", "pay_tiers")
 def add_pay_tier(request: Request, pay_tier_data: PayTierCreate):
     """
-    Create a new payment tier configuration and update procedure codes with complex multi-step process.
+    Create a new payment tier configuration in the normalized database structure.
     
-    This endpoint performs a complex multi-step operation to add new payment tier configurations:
-    1. Adds records to procedure_code_buckets2 table with tier, bucket, and pay_amount
-    2. Updates procedure_codes_temp table with the new tier for all records
-    3. Updates pay amounts in procedure_codes_temp by joining with procedure_code_buckets2
-    4. Creates a backup table procedure_codes_backup<datetime>
-    5. Inserts updated data from procedure_codes_temp into procedure_codes table
+    This endpoint adds new payment tier configurations to the procedure_code_buckets2 table,
+    which stores pay amounts by code_bucket (specialty) and tier level. The procedure_codes
+    table now only contains procedure code metadata (description, category, status), and pay
+    amounts are dynamically joined from procedure_code_buckets2 based on user tier.
+    
+    This normalized approach eliminates data duplication - instead of creating 13+ duplicate
+    rows per procedure code (one for each tier), we only need 5-6 rows in procedure_code_buckets2
+    (one per specialty bucket) for each new tier.
     
     Only users with administrative privileges (user_type >= 100) can perform this operation.
     
@@ -768,8 +770,7 @@ def add_pay_tier(request: Request, pay_tier_data: PayTierCreate):
             - message (str): Success confirmation message
             - tier (int): Created payment tier level
             - buckets_created (List[dict]): List of created bucket/pay_amount combinations
-            - backup_table (str): Name of the created backup table
-            - records_updated (int): Number of procedure code records updated
+            - records_created (int): Number of procedure_code_buckets2 records created
             - created_by (str): User ID who created the payment tier
     
     Raises:
@@ -785,16 +786,15 @@ def add_pay_tier(request: Request, pay_tier_data: PayTierCreate):
         - Validates creating user exists and is active in user_profile table
     
     Database Operations:
-        - Multi-step transaction with rollback on any failure
-        - Creates backup table before making changes
-        - Updates multiple tables in coordinated fashion
-        - Maintains data consistency throughout complex operation
+        - Inserts records into procedure_code_buckets2 (normalized pay amount table)
+        - Transaction with rollback on any failure
+        - No changes to procedure_codes table (contains only metadata)
     
     Business Logic:
-        - Complex workflow for updating payment tier structures
-        - Joins procedure codes with payment buckets for accurate billing
-        - Creates timestamped backups for data recovery
-        - Updates all related procedure codes with new tier information
+        - Normalized database design: procedure codes stored once with metadata
+        - Pay amounts stored separately by specialty bucket and tier
+        - Pay calculations done via JOIN: procedure_codes.code_category = procedure_code_buckets2.code_bucket
+        - Significantly reduces storage and maintenance overhead
     
     Example Request:
         POST /pay_tiers
@@ -812,7 +812,7 @@ def add_pay_tier(request: Request, pay_tier_data: PayTierCreate):
     
     Example Response (Success):
         {
-            "message": "Payment tier created and procedure codes updated successfully",
+            "message": "Payment tier created successfully",
             "tier": 99,
             "buckets_created": [
                 {"bucket": "OB-Gyn", "pay_amount": 1200.00},
@@ -821,20 +821,15 @@ def add_pay_tier(request: Request, pay_tier_data: PayTierCreate):
                 {"bucket": "Plastic", "pay_amount": 1100.00},
                 {"bucket": "Spine", "pay_amount": 1800.00}
             ],
-            "backup_table": "procedure_codes_backup20250905_223045",
-            "records_updated": 1250,
+            "records_created": 5,
             "created_by": "ADMIN001"
         }
     """
-    import datetime
-    
     conn = None
     start_time = time.time()
     response_status = 201
     response_data = None
     error_message = None
-    backup_table_name = None
-    records_updated = 0
     buckets_created = []
     
     try:
@@ -845,7 +840,7 @@ def add_pay_tier(request: Request, pay_tier_data: PayTierCreate):
         
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-                # Step 1: Check if any payment tier configuration already exists in procedure_code_buckets2
+                # Check if any payment tier configuration already exists in procedure_code_buckets2
                 for bucket_data in pay_tier_data.buckets:
                     cursor.execute(
                         "SELECT code_bucket, tier FROM procedure_code_buckets2 WHERE code_bucket = %s AND tier = %s",
@@ -867,7 +862,7 @@ def add_pay_tier(request: Request, pay_tier_data: PayTierCreate):
                             }
                         )
                 
-                # Step 2: Insert all new payment tiers into procedure_code_buckets2
+                # Insert all new payment tiers into procedure_code_buckets2
                 for bucket_data in pay_tier_data.buckets:
                     cursor.execute(
                         "INSERT INTO procedure_code_buckets2 (code_bucket, tier, pay_amount) VALUES (%s, %s, %s)",
@@ -877,53 +872,6 @@ def add_pay_tier(request: Request, pay_tier_data: PayTierCreate):
                         "bucket": bucket_data.bucket,
                         "pay_amount": bucket_data.pay_amount
                     })
-                
-                # Step 3: Update procedure_codes_temp with new tier for all records
-                cursor.execute(
-                    "UPDATE procedure_codes_temp SET tier = %s WHERE TRUE",
-                    (pay_tier_data.tier,)
-                )
-                
-                # Step 4: Update pay amounts in procedure_codes_temp by joining with procedure_code_buckets2
-                # Join on code_category (from procedure_codes_temp) = code_bucket (from procedure_code_buckets2) and tier = tier
-                cursor.execute("""
-                    UPDATE procedure_codes_temp pct 
-                    JOIN procedure_code_buckets2 pcb2 ON pct.code_category = pcb2.code_bucket AND pct.tier = pcb2.tier 
-                    SET pct.code_pay_amount = pcb2.pay_amount
-                """)
-                
-                # Step 5: Create backup table with datetime stamp
-                current_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                backup_table_name = f"procedure_codes_backup{current_datetime}"
-                
-                cursor.execute(f"""
-                    CREATE TABLE {backup_table_name} AS 
-                    SELECT * FROM procedure_codes
-                """)
-                
-                # Step 6: Delete only the specific tier from procedure_codes and insert updated records
-                cursor.execute("DELETE FROM procedure_codes WHERE tier = %s", (pay_tier_data.tier,))
-                
-                cursor.execute("""
-                    INSERT INTO procedure_codes (procedure_code, procedure_desc, code_category, code_status, code_pay_amount, tier)
-                    SELECT procedure_code, procedure_desc, code_category, code_status, code_pay_amount, tier
-                    FROM procedure_codes_temp
-                    WHERE tier = %s
-                """, (pay_tier_data.tier,))
-                
-                # Get count of records updated
-                records_updated = cursor.rowcount
-                
-                # Step 7: Update asst_surg field from cpt_assist table
-                cursor.execute("""
-                    UPDATE procedure_codes aa 
-                    SET asst_surg = (
-                        SELECT bb.asst_surg 
-                        FROM cpt_assist bb 
-                        WHERE aa.procedure_code = bb.cpt_code
-                    ) 
-                    WHERE asst_surg IS NULL
-                """)
                 
                 # Commit all changes
                 conn.commit()
@@ -935,11 +883,10 @@ def add_pay_tier(request: Request, pay_tier_data: PayTierCreate):
             close_db_connection(conn)
             
         response_data = {
-            "message": "Payment tier created and procedure codes updated successfully",
+            "message": "Payment tier created successfully",
             "tier": pay_tier_data.tier,
             "buckets_created": buckets_created,
-            "backup_table": backup_table_name,
-            "records_updated": records_updated,
+            "records_created": len(buckets_created),
             "created_by": pay_tier_data.user_id
         }
         return response_data
