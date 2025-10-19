@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-10-12 13:46:25
+# Last Modified: 2025-10-19 23:40:46
 # Author: Scott Cadreau
 
 # main.py
@@ -43,6 +43,7 @@ from endpoints.utility.bugs import router as bugs_router
 from endpoints.utility.cache_diagnostics import router as cache_diagnostics_router
 
 from endpoints.admin.cache_management import router as cache_management_router
+from endpoints.admin.encryption_key_management import router as encryption_key_management_router
 
 from endpoints.health import router as health_router
 from endpoints.metrics import router as metrics_router
@@ -239,6 +240,7 @@ app.include_router(build_dashboard_router, tags=["backoffice"])
 
 # Admin endpoints
 app.include_router(cache_management_router, tags=["admin"])
+app.include_router(encryption_key_management_router, tags=["admin"])
 
 # Report endpoints
 app.include_router(provider_payment_report_router, tags=["reports"])
