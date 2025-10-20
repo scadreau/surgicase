@@ -1,5 +1,5 @@
 # Created: 2025-01-27 10:00:00
-# Last Modified: 2025-09-15 15:36:29
+# Last Modified: 2025-10-20 14:21:48
 # Author: Scott Cadreau
 
 # endpoints/reports/provider_payment_report.py
@@ -462,6 +462,7 @@ def generate_provider_payment_report(
                         c.patient_last,
                         c.pay_amount,
                         c.pay_category,
+                        c.phi_encrypted,
                         up.first_name,
                         up.last_name,
                         up.user_npi
@@ -500,6 +501,41 @@ def generate_provider_payment_report(
                         status_code=404, 
                         detail="No cases found matching the criteria"
                     )
+                
+                # Decrypt PHI fields if needed (multi-user report)
+                TEST_USER_ID = '54d8e448-0091-7031-86bb-d66da5e8f7e0'
+                decryption_attempted_users = set()
+                
+                for case in cases:
+                    case_owner_user_id = case.get('user_id')
+                    if case.get('phi_encrypted') == 1 and case_owner_user_id == TEST_USER_ID:
+                        try:
+                            from utils.phi_encryption import PHIEncryption, get_user_dek
+                            
+                            # Get the case owner's DEK for decryption (cached if we've seen this user before)
+                            dek = get_user_dek(case_owner_user_id, conn)
+                            phi_crypto = PHIEncryption()
+                            
+                            # Decrypt patient first and last name for PDF report
+                            for field in ['patient_first', 'patient_last']:
+                                if field in case and case[field] is not None:
+                                    field_value = str(case[field])
+                                    # Skip if too short to be encrypted
+                                    if len(field_value) >= 28:
+                                        try:
+                                            case[field] = phi_crypto.decrypt_field(case[field], dek)
+                                        except Exception as field_error:
+                                            logger.warning(f"[DECRYPT] Could not decrypt {field} for case {case.get('case_id')}, leaving as-is")
+                                            pass
+                            
+                            # Track that we've attempted decryption for this user
+                            if case_owner_user_id not in decryption_attempted_users:
+                                decryption_attempted_users.add(case_owner_user_id)
+                                logger.info(f"[DECRYPT] Decrypting payment report for user: {case_owner_user_id}")
+                                
+                        except Exception as decrypt_error:
+                            logger.error(f"[DECRYPT] Failed to decrypt case {case.get('case_id')} for user {case_owner_user_id}: {str(decrypt_error)}")
+                            # Continue processing - use encrypted names in report rather than failing
                 
                 # Get procedure codes for each case
                 for case in cases:
@@ -995,6 +1031,7 @@ def generate_single_provider_report(
                         c.patient_last,
                         c.pay_amount,
                         c.pay_category,
+                        c.phi_encrypted,
                         up.first_name,
                         up.last_name,
                         up.user_npi
@@ -1029,6 +1066,42 @@ def generate_single_provider_report(
                         "provider": user_id,
                         "email_sent": False
                     }
+                
+                # Decrypt PHI fields if needed (single provider report)
+                TEST_USER_ID = '54d8e448-0091-7031-86bb-d66da5e8f7e0'
+                needs_decryption = (user_id == TEST_USER_ID)
+                
+                if needs_decryption:
+                    # Check if any case has encrypted data
+                    has_encrypted = any(case.get('phi_encrypted') == 1 for case in cases)
+                    
+                    if has_encrypted:
+                        try:
+                            from utils.phi_encryption import PHIEncryption, get_user_dek
+                            
+                            # Get user's DEK for decryption (single provider, so same DEK for all cases)
+                            dek = get_user_dek(user_id, conn)
+                            phi_crypto = PHIEncryption()
+                            
+                            logger.info(f"[DECRYPT] Decrypting individual payment report for user: {user_id}")
+                            
+                            for case in cases:
+                                if case.get('phi_encrypted') == 1:
+                                    # Decrypt patient first and last name for PDF report
+                                    for field in ['patient_first', 'patient_last']:
+                                        if field in case and case[field] is not None:
+                                            field_value = str(case[field])
+                                            # Skip if too short to be encrypted
+                                            if len(field_value) >= 28:
+                                                try:
+                                                    case[field] = phi_crypto.decrypt_field(case[field], dek)
+                                                except Exception as field_error:
+                                                    logger.warning(f"[DECRYPT] Could not decrypt {field} for case {case.get('case_id')}, leaving as-is")
+                                                    pass
+                                
+                        except Exception as decrypt_error:
+                            logger.error(f"[DECRYPT] Failed to decrypt cases for user {user_id}: {str(decrypt_error)}")
+                            # Continue processing - use encrypted names in report rather than failing
                 
                 # Get procedure codes for each case
                 for case in cases:

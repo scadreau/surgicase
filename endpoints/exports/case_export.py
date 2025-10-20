@@ -1,5 +1,5 @@
 # Created: 2025-07-28 19:48:18
-# Last Modified: 2025-10-20 13:41:17
+# Last Modified: 2025-10-20 14:17:28
 # Author: Scott Cadreau
 
 # endpoints/exports/case_export.py
@@ -198,7 +198,7 @@ def _get_cases_with_json_agg(cursor: pymysql.cursors.DictCursor, case_ids: List[
             c.biller_status, c.sent_to_biller_ts, c.received_pmnt_ts, 
             c.sent_to_negotiation_ts, c.settled_ts, c.sent_to_idr_ts, 
             c.idr_decision_ts, c.closed_ts, c.pay_amount, 
-            c.pay_category, c.pending_payment_ts, sl.surgeon_npi,
+            c.pay_category, c.pending_payment_ts, c.phi_encrypted, sl.surgeon_npi,
             fl.facility_npi, fl.facility_state,
             up.first_name as provider_first_name, up.last_name as provider_last_name,
             COALESCE(
@@ -223,7 +223,7 @@ def _get_cases_with_json_agg(cursor: pymysql.cursors.DictCursor, case_ids: List[
                  c.biller_status, c.sent_to_biller_ts, c.received_pmnt_ts, 
                  c.sent_to_negotiation_ts, c.settled_ts, c.sent_to_idr_ts, 
                  c.idr_decision_ts, c.closed_ts, c.pay_amount, 
-                 c.pay_category, c.pending_payment_ts, sl.surgeon_npi,
+                 c.pay_category, c.pending_payment_ts, c.phi_encrypted, sl.surgeon_npi,
                  fl.facility_npi, fl.facility_state,
                  up.first_name, up.last_name
         ORDER BY c.case_id
@@ -232,10 +232,54 @@ def _get_cases_with_json_agg(cursor: pymysql.cursors.DictCursor, case_ids: List[
     cursor.execute(sql, case_ids)
     results = cursor.fetchall()
     
+    # Get database connection for decryption operations
+    conn = cursor.connection
+    
+    # TEST USER DECRYPTION: Only decrypt for test user
+    TEST_USER_ID = '54d8e448-0091-7031-86bb-d66da5e8f7e0'
+    
+    # Cache to track which user DEKs we've already loaded
+    decryption_attempted_users = set()
+    
     # Process results and convert concatenated string to list
     cases = []
     for row in results:
         case_data = {k: v for k, v in row.items() if k != 'procedure_codes_concat'}
+        
+        # Decrypt PHI fields if needed (check each case's owner user_id)
+        case_owner_user_id = case_data.get('user_id')
+        if case_data.get('phi_encrypted') == 1 and case_owner_user_id == TEST_USER_ID:
+            try:
+                from utils.phi_encryption import PHIEncryption, get_user_dek
+                import logging
+                
+                # Get the case owner's DEK for decryption (cached if we've seen this user before)
+                dek = get_user_dek(case_owner_user_id, conn)
+                phi_crypto = PHIEncryption()
+                
+                # Decrypt patient first and last name for export
+                for field in ['patient_first', 'patient_last']:
+                    if field in case_data and case_data[field] is not None:
+                        field_value = str(case_data[field])
+                        # Skip if too short to be encrypted
+                        if len(field_value) >= 28:
+                            try:
+                                case_data[field] = phi_crypto.decrypt_field(case_data[field], dek)
+                            except Exception as field_error:
+                                if logger:
+                                    logger.warning(f"[DECRYPT] Could not decrypt {field} for case {case_data.get('case_id')}, leaving as-is")
+                                pass
+                
+                # Track that we've attempted decryption for this user
+                if case_owner_user_id not in decryption_attempted_users:
+                    decryption_attempted_users.add(case_owner_user_id)
+                    if logger:
+                        logger.info(f"[DECRYPT] Decrypting export cases for user: {case_owner_user_id}")
+                    
+            except Exception as decrypt_error:
+                if logger:
+                    logger.error(f"[DECRYPT] Failed to decrypt case {case_data.get('case_id')} for user {case_owner_user_id}: {str(decrypt_error)}")
+                # Continue processing - return encrypted data rather than failing
         
         # Parse concatenated procedure codes
         procedure_codes_concat = row.get('procedure_codes_concat', '')

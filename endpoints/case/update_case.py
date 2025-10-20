@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-10-18 17:39:40
+# Last Modified: 2025-10-20 14:23:49
 # Author: Scott Cadreau
 
 # endpoints/case/update_case.py
@@ -245,6 +245,45 @@ def update_case(request: Request, case: CaseUpdate = Body(...)):
             updated_fields = []
             # Update cases table if needed
             if update_fields:
+                # TEST USER ENCRYPTION: Only encrypt for test user
+                TEST_USER_ID = '54d8e448-0091-7031-86bb-d66da5e8f7e0'
+                
+                # Get the case owner's user_id to determine if we should encrypt
+                cursor.execute("SELECT user_id FROM cases WHERE case_id = %s", (case.case_id,))
+                case_owner = cursor.fetchone()
+                case_owner_user_id = case_owner['user_id'] if case_owner else None
+                
+                # Check if we're updating any PHI fields
+                phi_fields_being_updated = [f for f in update_fields.keys() if f in ['patient_first', 'patient_last', 'patient_dob', 'ins_provider']]
+                use_encryption = (case_owner_user_id == TEST_USER_ID and len(phi_fields_being_updated) > 0)
+                
+                if use_encryption:
+                    logger.info(f"[ENCRYPTION TEST] Encrypting updated PHI fields for test user case: {case.case_id}")
+                    from utils.phi_encryption import encrypt_patient_data
+                    
+                    # Prepare patient data for encryption (only the fields being updated)
+                    patient_data = {}
+                    if 'patient_first' in update_fields:
+                        patient_data['patient_first'] = update_fields['patient_first']
+                    if 'patient_last' in update_fields:
+                        patient_data['patient_last'] = update_fields['patient_last']
+                    if 'patient_dob' in update_fields:
+                        patient_data['patient_dob'] = update_fields['patient_dob']
+                    if 'ins_provider' in update_fields:
+                        patient_data['ins_provider'] = update_fields['ins_provider']
+                    
+                    # Encrypt the data
+                    encrypt_patient_data(patient_data, case_owner_user_id, conn)
+                    
+                    # Update the update_fields dict with encrypted values
+                    for field, encrypted_value in patient_data.items():
+                        update_fields[field] = encrypted_value
+                    
+                    # Add phi_encrypted flag to update
+                    update_fields['phi_encrypted'] = 1
+                    
+                    logger.info(f"[ENCRYPTION TEST] PHI fields encrypted successfully for case: {case.case_id}")
+                
                 set_clause = ", ".join([f"{field} = %s" for field in update_fields])
                 values = list(update_fields.values())
                 values.append(case.case_id)

@@ -1,5 +1,5 @@
 # Created: 2025-08-26 23:50:11
-# Last Modified: 2025-08-31 00:20:00
+# Last Modified: 2025-10-20 14:13:26
 # Author: Scott Cadreau
 
 # endpoints/case/group_cases.py
@@ -82,7 +82,7 @@ def _get_group_cases_optimized(cursor, requesting_user_id: str, target_user_id: 
             c.user_id, c.case_id, c.case_date, c.patient_first, c.patient_last, 
             c.ins_provider, c.surgeon_id, c.facility_id, c.case_status, 
             csl.case_status_desc,
-            c.demo_file, c.note_file, c.misc_file, c.pay_amount,
+            c.demo_file, c.note_file, c.misc_file, c.pay_amount, c.phi_encrypted,
             CONCAT(COALESCE(up.first_name, ''), ' ', COALESCE(up.last_name, '')) as provider_name,
             COALESCE(
                 JSON_ARRAYAGG(
@@ -132,7 +132,7 @@ def _get_group_cases_optimized(cursor, requesting_user_id: str, target_user_id: 
         GROUP BY 
             c.case_id, c.user_id, c.case_date, c.patient_first, c.patient_last,
             c.ins_provider, c.surgeon_id, c.facility_id, c.case_status,
-            csl.case_status_desc, c.demo_file, c.note_file, c.misc_file, c.pay_amount,
+            csl.case_status_desc, c.demo_file, c.note_file, c.misc_file, c.pay_amount, c.phi_encrypted,
             up.first_name, up.last_name
         ORDER BY c.case_id DESC
     """
@@ -144,8 +144,39 @@ def _get_group_cases_optimized(cursor, requesting_user_id: str, target_user_id: 
     cursor.execute("SELECT case_status, case_status_desc FROM case_status_list")
     status_descriptions = {row["case_status"]: row["case_status_desc"] for row in cursor.fetchall()}
 
+    # Get database connection for decryption operations
+    conn = cursor.connection
+    
+    # TEST USER DECRYPTION: Only decrypt for test user
+    TEST_USER_ID = '54d8e448-0091-7031-86bb-d66da5e8f7e0'
+    needs_decryption = (target_user_id == TEST_USER_ID)
+
     result = []
     for case_data in cases:
+        # Decrypt PHI fields if needed (only patient names for list view)
+        if needs_decryption and case_data.get('phi_encrypted') == 1:
+            try:
+                from utils.phi_encryption import PHIEncryption, get_user_dek
+                
+                # Get user's DEK for decryption
+                dek = get_user_dek(target_user_id, conn)
+                phi_crypto = PHIEncryption()
+                
+                # Only decrypt first and last name for list view
+                for field in ['patient_first', 'patient_last']:
+                    if field in case_data and case_data[field] is not None:
+                        field_value = str(case_data[field])
+                        # Skip if too short to be encrypted
+                        if len(field_value) >= 28:
+                            try:
+                                case_data[field] = phi_crypto.decrypt_field(case_data[field], dek)
+                            except Exception as field_error:
+                                logging.warning(f"[DECRYPT] Could not decrypt {field} for case {case_data.get('case_id')}, leaving as-is")
+                                pass
+            except Exception as decrypt_error:
+                logging.error(f"[DECRYPT] Failed to decrypt case {case_data.get('case_id')}: {str(decrypt_error)}")
+                # Continue processing - return encrypted data rather than failing
+        
         # Apply case status visibility restriction
         original_case_status = case_data["case_status"]
         if original_case_status > max_case_status:
@@ -197,7 +228,7 @@ def _get_all_group_cases_optimized(cursor, requesting_user_id: str, status_list,
             c.user_id, c.case_id, c.case_date, c.patient_first, c.patient_last, 
             c.ins_provider, c.surgeon_id, c.facility_id, c.case_status, 
             csl.case_status_desc,
-            c.demo_file, c.note_file, c.misc_file, c.pay_amount,
+            c.demo_file, c.note_file, c.misc_file, c.pay_amount, c.phi_encrypted,
             CONCAT(COALESCE(up.first_name, ''), ' ', COALESCE(up.last_name, '')) as provider_name,
             COALESCE(
                 JSON_ARRAYAGG(
@@ -248,7 +279,7 @@ def _get_all_group_cases_optimized(cursor, requesting_user_id: str, status_list,
         GROUP BY 
             c.case_id, c.user_id, c.case_date, c.patient_first, c.patient_last,
             c.ins_provider, c.surgeon_id, c.facility_id, c.case_status,
-            csl.case_status_desc, c.demo_file, c.note_file, c.misc_file, c.pay_amount,
+            csl.case_status_desc, c.demo_file, c.note_file, c.misc_file, c.pay_amount, c.phi_encrypted,
             up.first_name, up.last_name
         ORDER BY c.case_id DESC
     """
@@ -260,8 +291,48 @@ def _get_all_group_cases_optimized(cursor, requesting_user_id: str, status_list,
     cursor.execute("SELECT case_status, case_status_desc FROM case_status_list")
     status_descriptions = {row["case_status"]: row["case_status_desc"] for row in cursor.fetchall()}
 
+    # Get database connection for decryption operations
+    conn = cursor.connection
+    
+    # TEST USER DECRYPTION: Only decrypt for test user
+    TEST_USER_ID = '54d8e448-0091-7031-86bb-d66da5e8f7e0'
+    
+    # Cache to track which user DEKs we've already loaded
+    decryption_attempted_users = set()
+
     result = []
     for case_data in cases:
+        # Decrypt PHI fields if needed (check each case's owner user_id)
+        case_owner_user_id = case_data.get('user_id')
+        if case_data.get('phi_encrypted') == 1 and case_owner_user_id == TEST_USER_ID:
+            try:
+                from utils.phi_encryption import PHIEncryption, get_user_dek
+                
+                # Get the case owner's DEK for decryption (cached if we've seen this user before)
+                dek = get_user_dek(case_owner_user_id, conn)
+                phi_crypto = PHIEncryption()
+                
+                # Only decrypt first and last name for group list view
+                for field in ['patient_first', 'patient_last']:
+                    if field in case_data and case_data[field] is not None:
+                        field_value = str(case_data[field])
+                        # Skip if too short to be encrypted
+                        if len(field_value) >= 28:
+                            try:
+                                case_data[field] = phi_crypto.decrypt_field(case_data[field], dek)
+                            except Exception as field_error:
+                                logging.warning(f"[DECRYPT] Could not decrypt {field} for case {case_data.get('case_id')}, leaving as-is")
+                                pass
+                
+                # Track that we've attempted decryption for this user
+                if case_owner_user_id not in decryption_attempted_users:
+                    decryption_attempted_users.add(case_owner_user_id)
+                    logging.info(f"[DECRYPT] Decrypting group cases for user: {case_owner_user_id}")
+                    
+            except Exception as decrypt_error:
+                logging.error(f"[DECRYPT] Failed to decrypt case {case_data.get('case_id')} for user {case_owner_user_id}: {str(decrypt_error)}")
+                # Continue processing - return encrypted data rather than failing
+        
         # Apply case status visibility restriction
         original_case_status = case_data["case_status"]
         if original_case_status > max_case_status:

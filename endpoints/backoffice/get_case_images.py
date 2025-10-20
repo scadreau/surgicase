@@ -1,5 +1,5 @@
 # Created: 2025-07-29 03:41:16
-# Last Modified: 2025-09-07 21:00:30
+# Last Modified: 2025-10-20 14:19:40
 # Author: Scott Cadreau
 
 # endpoints/backoffice/get_case_images.py
@@ -270,7 +270,7 @@ def get_case_images(
             # Get case information with optimized query and better indexing
             placeholders = ",".join(["%s"] * len(case_request.case_ids))
             sql = f"""
-                SELECT case_id, user_id, demo_file, note_file, misc_file,
+                SELECT case_id, user_id, demo_file, note_file, misc_file, phi_encrypted,
                        COALESCE(patient_first, '') as patient_first, 
                        COALESCE(patient_last, '') as patient_last
                 FROM cases 
@@ -280,6 +280,42 @@ def get_case_images(
             
             cursor.execute(sql, case_request.case_ids)
             cases = cursor.fetchall()
+            
+            # Decrypt PHI fields if needed (multi-user admin endpoint)
+            conn = cursor.connection
+            TEST_USER_ID = '54d8e448-0091-7031-86bb-d66da5e8f7e0'
+            decryption_attempted_users = set()
+            
+            for case in cases:
+                case_owner_user_id = case.get('user_id')
+                if case.get('phi_encrypted') == 1 and case_owner_user_id == TEST_USER_ID:
+                    try:
+                        from utils.phi_encryption import PHIEncryption, get_user_dek
+                        
+                        # Get the case owner's DEK for decryption (cached if we've seen this user before)
+                        dek = get_user_dek(case_owner_user_id, conn)
+                        phi_crypto = PHIEncryption()
+                        
+                        # Decrypt patient first and last name for file naming
+                        for field in ['patient_first', 'patient_last']:
+                            if field in case and case[field]:
+                                field_value = str(case[field])
+                                # Skip if too short to be encrypted or empty COALESCE result
+                                if len(field_value) >= 28:
+                                    try:
+                                        case[field] = phi_crypto.decrypt_field(case[field], dek)
+                                    except Exception as field_error:
+                                        logger.warning(f"[DECRYPT] Could not decrypt {field} for case {case.get('case_id')}, leaving as-is")
+                                        pass
+                        
+                        # Track that we've attempted decryption for this user
+                        if case_owner_user_id not in decryption_attempted_users:
+                            decryption_attempted_users.add(case_owner_user_id)
+                            logger.info(f"[DECRYPT] Decrypting case images for user: {case_owner_user_id}")
+                            
+                    except Exception as decrypt_error:
+                        logger.error(f"[DECRYPT] Failed to decrypt case {case.get('case_id')} for user {case_owner_user_id}: {str(decrypt_error)}")
+                        # Continue processing - use encrypted names in file paths rather than failing
             
             # Log query performance for monitoring
             logger.info(f"Retrieved {len(cases)} active cases from {len(case_request.case_ids)} requested case IDs")

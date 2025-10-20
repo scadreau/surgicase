@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-10-20 00:20:22
+# Last Modified: 2025-10-20 14:26:18
 # Author: Scott Cadreau
 
 # endpoints/case/create_case.py
@@ -38,10 +38,12 @@ def check_duplicate_case(user_id: str, case_date: str, patient_first: str, patie
     """
     Check if a case with the same user_id, date and patient name already exists.
     Returns dict with 'is_duplicate' boolean and 'existing_case_id' if found.
+    
+    Note: For encrypted cases, this function decrypts patient names before returning them.
     """
     with conn.cursor(pymysql.cursors.DictCursor) as cursor:
         cursor.execute("""
-            SELECT case_id, patient_first, patient_last, case_date, user_id
+            SELECT case_id, patient_first, patient_last, case_date, user_id, phi_encrypted
             FROM cases 
             WHERE user_id = %s
             AND case_date = %s 
@@ -53,6 +55,31 @@ def check_duplicate_case(user_id: str, case_date: str, patient_first: str, patie
         
         result = cursor.fetchone()
         if result:
+            # Decrypt patient names if needed (for duplicate check response)
+            TEST_USER_ID = '54d8e448-0091-7031-86bb-d66da5e8f7e0'
+            if result.get('phi_encrypted') == 1 and result['user_id'] == TEST_USER_ID:
+                try:
+                    from utils.phi_encryption import PHIEncryption, get_user_dek
+                    
+                    # Get user's DEK for decryption
+                    dek = get_user_dek(result['user_id'], conn)
+                    phi_crypto = PHIEncryption()
+                    
+                    # Decrypt patient names for the duplicate check response
+                    for field in ['patient_first', 'patient_last']:
+                        if field in result and result[field]:
+                            field_value = str(result[field])
+                            # Skip if too short to be encrypted
+                            if len(field_value) >= 28:
+                                try:
+                                    result[field] = phi_crypto.decrypt_field(result[field], dek)
+                                except Exception as field_error:
+                                    logger.warning(f"[DECRYPT] Could not decrypt {field} for duplicate check, leaving as-is")
+                                    pass
+                except Exception as decrypt_error:
+                    logger.error(f"[DECRYPT] Failed to decrypt duplicate case data: {str(decrypt_error)}")
+                    # Continue with encrypted names rather than failing
+            
             return {
                 "is_duplicate": True,
                 "existing_case_id": result["case_id"],
