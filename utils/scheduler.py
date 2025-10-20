@@ -1,5 +1,5 @@
 # Created: 2025-01-15
-# Last Modified: 2025-10-20 12:55:41
+# Last Modified: 2025-10-20 12:59:44
 # Author: Scott Cadreau
 
 import schedule
@@ -559,10 +559,13 @@ def pool_cleanup_job():
     Scheduled function to clean up stale database connections.
     
     This function:
-    1. Removes connections that have been idle > max_idle_time (1 hour)
-    2. Removes connections older than max_lifetime (4 hours)
+    1. Removes connections that have been idle > max_idle_time (1 hour normally, 2h during AWS outages)
+    2. Removes connections older than max_lifetime (4 hours normally, 8h during AWS outages)
     3. Removes invalid/stale connections
     4. Logs cleanup statistics
+    
+    Note: During AWS Secrets Manager outages, connection lifetimes are automatically
+    extended 2x to preserve existing authenticated connections which continue to work.
     """
     logger.info("Starting database connection pool cleanup...")
     
@@ -572,6 +575,10 @@ def pool_cleanup_job():
         result = cleanup_stale_connections()
         
         if result["status"] == "success":
+            # Log degraded mode if active
+            if result.get("secrets_degraded"):
+                logger.warning("🛡️ Pool cleanup running in resilience mode - extended connection lifetimes due to AWS Secrets Manager issues")
+            
             if result["cleaned"] > 0:
                 logger.info(f"✅ Pool cleanup completed: removed {result['cleaned']} stale connections")
                 logger.info(f"📊 Remaining in pool: {result['remaining_in_pool']}, Tracked: {result['tracked_connections']}")

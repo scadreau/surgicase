@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-10-12 13:42:54
+# Last Modified: 2025-10-20 12:59:39
 # Author: Scott Cadreau
 
 # core/database.py
@@ -25,13 +25,32 @@ _connection_pool: Optional[Queue] = None
 _pool_config: Dict[str, Any] = {}
 _pool_lock = threading.Lock()
 _connection_metadata: Dict[int, Dict[str, float]] = {}  # Track connection creation/last_used times
+_secrets_health: Dict[str, Any] = {"last_success": time.time(), "consecutive_failures": 0}  # Track secrets manager health
 
 def get_db_credentials(secret_name: str) -> Dict[str, Any]:
     """
-    Function to fetch database credentials from AWS Secrets Manager using centralized secrets manager
+    Function to fetch database credentials from AWS Secrets Manager using centralized secrets manager.
+    Tracks secrets manager health for connection pool management.
     """
+    global _secrets_health
+    
     from utils.secrets_manager import get_secret
-    return get_secret(secret_name, cache_ttl=14400)  # 4 hours cache (DB secret rotates weekly)
+    
+    try:
+        credentials = get_secret(secret_name, cache_ttl=14400)  # 4 hours cache (DB secret rotates weekly)
+        
+        # Update health tracking on success
+        _secrets_health["last_success"] = time.time()
+        _secrets_health["consecutive_failures"] = 0
+        
+        return credentials
+        
+    except Exception as e:
+        # Track failure but don't block - secrets_manager will use stale cache
+        _secrets_health["consecutive_failures"] = _secrets_health.get("consecutive_failures", 0) + 1
+        if logger:
+            logger.debug(f"Secret fetch issue (will use stale cache): {str(e)}")
+        raise
 
 def drain_connection_pool():
     """
@@ -370,10 +389,14 @@ def cleanup_stale_connections() -> Dict[str, Any]:
     """
     Clean up stale connections from the pool based on TTL settings.
     
+    During AWS Secrets Manager outages, extends connection lifetimes to preserve
+    existing authenticated connections, as they will continue to work even when
+    we can't refresh credentials.
+    
     Returns:
         Dict with cleanup statistics
     """
-    global _connection_pool, _connection_metadata
+    global _connection_pool, _connection_metadata, _secrets_health
     
     if not _connection_pool:
         return {"status": "no_pool", "cleaned": 0}
@@ -381,6 +404,18 @@ def cleanup_stale_connections() -> Dict[str, Any]:
     current_time = time.time()
     max_idle = _pool_config.get("max_idle_time", 3600)
     max_lifetime = _pool_config.get("max_lifetime", 14400)
+    
+    # Check if secrets manager is having issues (stale cache being used)
+    time_since_last_success = current_time - _secrets_health.get("last_success", current_time)
+    secrets_degraded = time_since_last_success > 3600  # No successful refresh in 1+ hour
+    
+    # During secrets issues, extend connection lifetimes 2x
+    # Existing connections are already authenticated and will work fine
+    if secrets_degraded:
+        max_idle = max_idle * 2
+        max_lifetime = max_lifetime * 2
+        if logger:
+            logger.info(f"🛡️ Secrets Manager degraded - extending connection lifetimes (idle: {max_idle/3600:.1f}h, lifetime: {max_lifetime/3600:.1f}h)")
     
     cleaned_connections = 0
     stale_connections = []
@@ -444,7 +479,9 @@ def cleanup_stale_connections() -> Dict[str, Any]:
         "status": "success",
         "cleaned": cleaned_connections,
         "remaining_in_pool": _connection_pool.qsize() if _connection_pool else 0,
-        "tracked_connections": len(_connection_metadata)
+        "tracked_connections": len(_connection_metadata),
+        "secrets_degraded": secrets_degraded,
+        "extended_lifetimes": secrets_degraded
     }
 
 def prewarm_connection_pool(target_connections: int = None) -> Dict[str, Any]:
