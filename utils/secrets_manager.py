@@ -1,5 +1,5 @@
 # Created: 2025-08-08 15:34:05
-# Last Modified: 2025-08-20 08:45:25
+# Last Modified: 2025-10-20 12:55:41
 # Author: Scott Cadreau
 
 # utils/secrets_manager.py
@@ -35,31 +35,35 @@ class SecretsManager:
         self._lock = threading.Lock()
         self._region = region
         
-    def get_secret(self, secret_name: str, cache_ttl: int = 3600) -> Dict[str, Any]:
+    def get_secret(self, secret_name: str, cache_ttl: int = 3600, allow_stale: bool = True) -> Dict[str, Any]:
         """
-        Get complete secret data with intelligent caching.
+        Get complete secret data with intelligent caching and graceful degradation.
         
         Args:
             secret_name: Name or ARN of the secret in AWS Secrets Manager
             cache_ttl: Cache time-to-live in seconds (default: 1 hour)
+            allow_stale: If True, return stale cache on AWS errors (graceful degradation)
             
         Returns:
             Dictionary containing the secret data
             
         Raises:
-            ClientError: If there's an error accessing the secret
+            ClientError: If there's an error accessing the secret and no stale cache available
             json.JSONDecodeError: If the secret value is not valid JSON
         """
         with self._lock:
             cache_key = f"{secret_name}_data"
             time_key = f"{secret_name}_time"
             
-            # Check cache first
+            # Check cache first (within TTL)
             if (cache_key in self._cache and 
                 time_key in self._cache and
                 time.time() - self._cache[time_key] < cache_ttl):
                 logger.debug(f"Returning cached secret: {secret_name}")
                 return self._cache[cache_key]
+            
+            # Check if we have stale cache (for graceful degradation)
+            has_stale_cache = cache_key in self._cache
             
             # Fetch from AWS if not cached or expired
             logger.info(f"Fetching secret from AWS: {secret_name}")
@@ -76,6 +80,14 @@ class SecretsManager:
                 
             except ClientError as e:
                 error_code = e.response['Error']['Code']
+                
+                # Check if this is an AWS service error and we can use stale cache
+                if allow_stale and has_stale_cache and error_code in ['InternalServiceError', 'ServiceUnavailable', 'ThrottlingException']:
+                    cache_age = time.time() - self._cache[time_key]
+                    logger.warning(f"⚠️ AWS Secrets Manager error ({error_code}) for {secret_name} - using stale cache (age: {cache_age:.0f}s)")
+                    return self._cache[cache_key]
+                
+                # Otherwise, log and raise
                 if error_code == 'ResourceNotFoundException':
                     logger.error(f"Secret {secret_name} not found")
                 elif error_code == 'InvalidRequestException':
@@ -85,10 +97,17 @@ class SecretsManager:
                 else:
                     logger.error(f"Error retrieving secret {secret_name}: {e}")
                 raise
+                
             except json.JSONDecodeError as e:
                 logger.error(f"Error parsing secret {secret_name} as JSON: {e}")
                 raise
             except Exception as e:
+                # For unexpected errors, also try stale cache
+                if allow_stale and has_stale_cache:
+                    cache_age = time.time() - self._cache[time_key]
+                    logger.warning(f"⚠️ Unexpected error fetching {secret_name} - using stale cache (age: {cache_age:.0f}s): {str(e)}")
+                    return self._cache[cache_key]
+                    
                 logger.error(f"Unexpected error retrieving secret {secret_name}: {e}")
                 raise
     

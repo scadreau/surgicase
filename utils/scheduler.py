@@ -1,5 +1,5 @@
 # Created: 2025-01-15
-# Last Modified: 2025-09-22 09:40:03
+# Last Modified: 2025-10-20 12:55:41
 # Author: Scott Cadreau
 
 import schedule
@@ -244,15 +244,56 @@ def weekly_provider_payment_report():
             logger.info("Weekly provider payment report job completed successfully")
             
         else:
-            logger.error(f"❌ Provider payment report failed with status {response.status_code}")
+            error_msg = f"Provider payment report failed with HTTP status {response.status_code}"
+            logger.error(f"❌ {error_msg}")
             logger.error(f"Response: {response.text[:500]}")  # Log first 500 chars of error
             
-    except requests.exceptions.Timeout:
-        logger.error("❌ Provider payment report timed out (>5 minutes)")
-    except requests.exceptions.ConnectionError:
-        logger.error("❌ Cannot connect to API server for provider payment report")
+            # Send failure notification
+            from utils.job_failure_notifier import send_job_failure_notification
+            send_job_failure_notification(
+                job_name="Weekly Provider Payment Report",
+                error_message=error_msg,
+                job_details={
+                    "HTTP Status": response.status_code,
+                    "Response": response.text[:500]
+                }
+            )
+            
+    except requests.exceptions.Timeout as e:
+        error_msg = "Provider payment report timed out (>5 minutes)"
+        logger.error(f"❌ {error_msg}")
+        
+        from utils.job_failure_notifier import send_job_failure_notification
+        send_job_failure_notification(
+            job_name="Weekly Provider Payment Report",
+            error_message=error_msg,
+            exception=e
+        )
+        
+    except requests.exceptions.ConnectionError as e:
+        error_msg = "Cannot connect to API server for provider payment report"
+        logger.error(f"❌ {error_msg}")
+        
+        from utils.job_failure_notifier import send_job_failure_notification
+        send_job_failure_notification(
+            job_name="Weekly Provider Payment Report",
+            error_message=error_msg,
+            job_details={
+                "Note": "Check if FastAPI server is running on localhost:8000"
+            },
+            exception=e
+        )
+        
     except Exception as e:
-        logger.error(f"❌ Error in weekly provider payment report job: {str(e)}")
+        error_msg = f"Unexpected error in weekly provider payment report job: {str(e)}"
+        logger.error(f"❌ {error_msg}")
+        
+        from utils.job_failure_notifier import send_job_failure_notification
+        send_job_failure_notification(
+            job_name="Weekly Provider Payment Report",
+            error_message=error_msg,
+            exception=e
+        )
 
 def weekly_provider_payment_summary_report():
     """
@@ -294,15 +335,56 @@ def weekly_provider_payment_summary_report():
             logger.info("Weekly provider payment summary report job completed successfully")
             
         else:
-            logger.error(f"❌ Provider payment summary report failed with status {response.status_code}")
+            error_msg = f"Provider payment summary report failed with HTTP status {response.status_code}"
+            logger.error(f"❌ {error_msg}")
             logger.error(f"Response: {response.text[:500]}")  # Log first 500 chars of error
             
-    except requests.exceptions.Timeout:
-        logger.error("❌ Provider payment summary report timed out (>5 minutes)")
-    except requests.exceptions.ConnectionError:
-        logger.error("❌ Cannot connect to API server for provider payment summary report")
+            # Send failure notification
+            from utils.job_failure_notifier import send_job_failure_notification
+            send_job_failure_notification(
+                job_name="Weekly Provider Payment Summary Report",
+                error_message=error_msg,
+                job_details={
+                    "HTTP Status": response.status_code,
+                    "Response": response.text[:500]
+                }
+            )
+            
+    except requests.exceptions.Timeout as e:
+        error_msg = "Provider payment summary report timed out (>5 minutes)"
+        logger.error(f"❌ {error_msg}")
+        
+        from utils.job_failure_notifier import send_job_failure_notification
+        send_job_failure_notification(
+            job_name="Weekly Provider Payment Summary Report",
+            error_message=error_msg,
+            exception=e
+        )
+        
+    except requests.exceptions.ConnectionError as e:
+        error_msg = "Cannot connect to API server for provider payment summary report"
+        logger.error(f"❌ {error_msg}")
+        
+        from utils.job_failure_notifier import send_job_failure_notification
+        send_job_failure_notification(
+            job_name="Weekly Provider Payment Summary Report",
+            error_message=error_msg,
+            job_details={
+                "Note": "Check if FastAPI server is running on localhost:8000"
+            },
+            exception=e
+        )
+        
     except Exception as e:
-        logger.error(f"❌ Error in weekly provider payment summary report job: {str(e)}")
+        error_msg = f"Unexpected error in weekly provider payment summary report job: {str(e)}"
+        logger.error(f"❌ {error_msg}")
+        
+        from utils.job_failure_notifier import send_job_failure_notification
+        send_job_failure_notification(
+            job_name="Weekly Provider Payment Summary Report",
+            error_message=error_msg,
+            exception=e
+        )
 
 def weekly_individual_provider_reports():
     """
@@ -571,6 +653,9 @@ def secrets_warming_job():
     2. Refreshes secrets before they expire (proactive warming)
     3. Eliminates AWS API call latency during normal operations
     4. Logs warming statistics and any failures
+    
+    Note: This job uses graceful degradation - stale cached secrets will continue
+    to be used if AWS Secrets Manager is experiencing issues.
     """
     logger.info("Starting scheduled secrets cache warming...")
     
@@ -582,16 +667,46 @@ def secrets_warming_job():
         if results["failed"] == 0:
             logger.info(f"✅ Secrets warming completed: {results['successful']} secrets refreshed in {results['duration_seconds']:.2f}s")
         else:
+            failure_rate = results["failed"] / results["total_secrets"]
+            
             logger.warning(f"⚠️ Secrets warming partial: {results['successful']}/{results['total_secrets']} secrets refreshed")
             logger.warning(f"   Duration: {results['duration_seconds']:.2f}s, Failed: {results['failed']}")
             
             # Log failed secrets for monitoring
+            failed_secrets = []
             for detail in results["details"]:
                 if detail["status"] == "failed":
                     logger.error(f"   Failed secret: {detail['secret_name']} - {detail['error']}")
+                    failed_secrets.append(f"{detail['secret_name']}: {detail['error']}")
+            
+            # Send notification if failure rate is high (>50%)
+            # This indicates a likely AWS service issue
+            if failure_rate > 0.5:
+                from utils.job_failure_notifier import send_job_partial_failure_notification
+                send_job_partial_failure_notification(
+                    job_name="Secrets Cache Warming",
+                    warning_message=f"High failure rate detected during secrets cache warming. {results['failed']} out of {results['total_secrets']} secrets failed to refresh. Stale cached values will continue to be used until AWS Secrets Manager recovers.",
+                    stats={
+                        "Total Secrets": results["total_secrets"],
+                        "Successful": results["successful"],
+                        "Failed": results["failed"],
+                        "Duration": f"{results['duration_seconds']:.2f}s",
+                        "Failed Secrets": ", ".join([s.split(":")[0] for s in failed_secrets]),
+                        "Note": "Application will continue using stale cached secrets"
+                    }
+                )
                     
     except Exception as e:
-        logger.error(f"❌ Error in secrets warming job: {str(e)}")
+        error_msg = f"Critical error in secrets warming job: {str(e)}"
+        logger.error(f"❌ {error_msg}")
+        
+        # This is a critical failure - notify immediately
+        from utils.job_failure_notifier import send_job_failure_notification
+        send_job_failure_notification(
+            job_name="Secrets Cache Warming",
+            error_message=error_msg,
+            exception=e
+        )
 
 def user_environment_cache_warming_job():
     """
