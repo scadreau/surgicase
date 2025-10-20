@@ -1,5 +1,5 @@
 # Created: 2025-07-28 19:48:18
-# Last Modified: 2025-09-15 21:21:55
+# Last Modified: 2025-10-20 13:41:17
 # Author: Scott Cadreau
 
 # endpoints/exports/case_export.py
@@ -200,6 +200,7 @@ def _get_cases_with_json_agg(cursor: pymysql.cursors.DictCursor, case_ids: List[
             c.idr_decision_ts, c.closed_ts, c.pay_amount, 
             c.pay_category, c.pending_payment_ts, sl.surgeon_npi,
             fl.facility_npi, fl.facility_state,
+            up.first_name as provider_first_name, up.last_name as provider_last_name,
             COALESCE(
                 JSON_ARRAYAGG(
                     CASE 
@@ -214,6 +215,7 @@ def _get_cases_with_json_agg(cursor: pymysql.cursors.DictCursor, case_ids: List[
         LEFT JOIN case_procedure_codes cpc ON c.case_id = cpc.case_id
         LEFT JOIN surgeon_list sl ON c.surgeon_id = sl.surgeon_id
         LEFT JOIN facility_list fl ON c.facility_id = fl.facility_id
+        LEFT JOIN user_profile up ON c.user_id = up.user_id
         WHERE c.case_id IN ({placeholders})
         GROUP BY c.case_id, c.user_id, c.case_date, c.patient_first, c.patient_last, 
                  c.ins_provider, c.surgeon_id, c.facility_id, c.case_create_ts, 
@@ -222,7 +224,8 @@ def _get_cases_with_json_agg(cursor: pymysql.cursors.DictCursor, case_ids: List[
                  c.sent_to_negotiation_ts, c.settled_ts, c.sent_to_idr_ts, 
                  c.idr_decision_ts, c.closed_ts, c.pay_amount, 
                  c.pay_category, c.pending_payment_ts, sl.surgeon_npi,
-                 fl.facility_npi, fl.facility_state
+                 fl.facility_npi, fl.facility_state,
+                 up.first_name, up.last_name
         ORDER BY c.case_id
     """
     
@@ -279,7 +282,8 @@ def create_cases_csv(cases: List[Dict[str, Any]], filepath: str) -> None:
                 'sent_to_negotiation_ts', 'settled_ts', 'sent_to_idr_ts', 
                 'idr_decision_ts', 'closed_ts', 'pay_amount', 
                 'pay_category', 'pending_payment_ts', 'surgeon_npi',
-                'facility_npi', 'facility_state', 'procedure_codes'
+                'facility_npi', 'facility_state', 'provider_first_name', 
+                'provider_last_name', 'procedure_codes'
             ]
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
