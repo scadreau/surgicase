@@ -1,5 +1,5 @@
 # Created: 2025-10-19
-# Last Modified: 2025-10-19 23:40:46
+# Last Modified: 2025-10-20 01:06:43
 # Author: Scott Cadreau
 
 """
@@ -357,7 +357,21 @@ def decrypt_patient_data(data: Dict[str, Any], user_id: str, conn) -> Dict[str, 
         
         for field in PHI_FIELDS:
             if field in data and data[field] is not None:
-                data[field] = phi_crypto.decrypt_field(data[field], dek)
+                # Check if field looks like encrypted data (should be at least 28 bytes after base64 decode)
+                # Minimum: 12 bytes IV + 16 bytes auth_tag + at least some ciphertext
+                field_value = str(data[field])
+                
+                # Skip fields that are clearly not encrypted (too short or look like plain dates)
+                if len(field_value) < 28:  # Minimum base64 length for encrypted data
+                    logger.info(f"[DECRYPT] Skipping field '{field}' - too short to be encrypted data (length: {len(field_value)})")
+                    continue
+                
+                try:
+                    data[field] = phi_crypto.decrypt_field(data[field], dek)
+                except Exception as field_error:
+                    logger.warning(f"[DECRYPT] Could not decrypt field '{field}', leaving as-is. Error: {str(field_error)}")
+                    # Leave the field as-is if decryption fails
+                    pass
         
         logger.debug(f"Decrypted patient data for user: {user_id}")
         return data
@@ -471,4 +485,112 @@ def get_cache_stats() -> Dict[str, Any]:
             'active_count': total_cached - expired_count,
             'cache_ttl_hours': DEK_CACHE_TTL_HOURS
         }
+
+
+def warm_all_user_deks(conn=None) -> Dict[str, Any]:
+    """
+    Warm DEK cache by pre-loading all user encryption keys on server startup.
+    
+    This eliminates cold start latency for all users and reduces KMS API calls.
+    With 128GB RAM available, pre-loading all DEKs is memory-efficient (<5MB)
+    and provides consistent fast decryption performance for all users.
+    
+    Args:
+        conn: Optional database connection (creates new one if not provided)
+        
+    Returns:
+        Dict with warming results including:
+            - total_users: Total users with encryption keys
+            - successful: Number successfully loaded
+            - failed: Number that failed to load
+            - duration_seconds: Time taken to warm cache
+            - details: List of per-user results
+    """
+    start_time = time.time()
+    logger.info("Starting DEK cache warming for optimal decryption performance")
+    
+    results = {
+        "total_users": 0,
+        "successful": 0,
+        "failed": 0,
+        "details": [],
+        "duration_seconds": 0
+    }
+    
+    # Track whether we need to close connection
+    should_close_conn = False
+    
+    try:
+        # Import here to avoid circular dependency
+        from core.database import get_db_connection, close_db_connection
+        
+        # Use provided connection or create new one
+        if conn is None:
+            conn = get_db_connection()
+            should_close_conn = True
+        
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            # Get all active users with encryption keys
+            cursor.execute("""
+                SELECT user_id, encrypted_dek, is_active 
+                FROM user_encryption_keys 
+                WHERE is_active = 1
+                ORDER BY user_id
+            """)
+            
+            user_keys = cursor.fetchall()
+            results["total_users"] = len(user_keys)
+            
+            logger.info(f"Found {results['total_users']} users with encryption keys to warm")
+            
+            # Pre-load each user's DEK
+            for i, user_key in enumerate(user_keys, 1):
+                user_id = user_key['user_id']
+                
+                try:
+                    user_start = time.time()
+                    
+                    # This will decrypt and cache the DEK
+                    get_user_dek(user_id, conn, cache=True)
+                    
+                    user_duration = time.time() - user_start
+                    results["successful"] += 1
+                    results["details"].append({
+                        "user_id": user_id,
+                        "status": "success",
+                        "duration_ms": round(user_duration * 1000, 2)
+                    })
+                    
+                    # Log progress every 100 users
+                    if i % 100 == 0:
+                        logger.info(f"DEK cache warming progress: {i}/{results['total_users']} users")
+                    
+                except Exception as e:
+                    results["failed"] += 1
+                    results["details"].append({
+                        "user_id": user_id,
+                        "status": "failed",
+                        "error": str(e)
+                    })
+                    logger.error(f"Failed to warm DEK for user {user_id}: {str(e)}")
+        
+    except Exception as e:
+        logger.error(f"Failed to establish database connection for DEK cache warming: {str(e)}")
+        results["failed"] = results.get("total_users", 0)
+        
+    finally:
+        if should_close_conn and conn:
+            close_db_connection(conn)
+    
+    results["duration_seconds"] = round(time.time() - start_time, 2)
+    
+    # Log warming summary
+    if results["failed"] == 0 and results["successful"] > 0:
+        logger.info(f"✅ DEK cache warming successful: {results['successful']} user keys loaded in {results['duration_seconds']}s")
+    elif results["successful"] > 0:
+        logger.warning(f"⚠️ DEK cache warming partial: {results['successful']}/{results['total_users']} keys loaded in {results['duration_seconds']}s")
+    else:
+        logger.error(f"❌ DEK cache warming failed: No keys loaded")
+    
+    return results
 

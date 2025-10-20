@@ -1,5 +1,5 @@
 # Created: 2025-07-15 11:54:13
-# Last Modified: 2025-09-16 02:27:46
+# Last Modified: 2025-10-20 00:59:32
 # Author: Scott Cadreau
 
 # endpoints/backoffice/get_cases_by_status.py
@@ -191,7 +191,7 @@ def _get_cases_optimized(cursor, status_list, parsed_start_date, parsed_end_date
             c.user_id, c.case_id, c.case_date, c.patient_first, c.patient_last, 
             c.ins_provider, c.surgeon_id, c.facility_id, c.case_status, 
             csl.case_status_desc,
-            c.demo_file, c.note_file, c.misc_file, c.pay_amount,
+            c.demo_file, c.note_file, c.misc_file, c.pay_amount, c.phi_encrypted,
             up.first_name as provider_first_name,
             up.last_name as provider_last_name,
             f.facility_state,
@@ -237,16 +237,56 @@ def _get_cases_optimized(cursor, status_list, parsed_start_date, parsed_end_date
         GROUP BY 
             c.case_id, c.user_id, c.case_date, c.patient_first, c.patient_last,
             c.ins_provider, c.surgeon_id, c.facility_id, c.case_status,
-            csl.case_status_desc, c.demo_file, c.note_file, c.misc_file, c.pay_amount,
-            up.first_name, up.last_name
+            csl.case_status_desc, c.demo_file, c.note_file, c.misc_file, c.pay_amount, c.phi_encrypted,
+            up.first_name, up.last_name, f.facility_state
         ORDER BY case_date DESC, up.first_name, up.last_name, c.case_id DESC
     """
     
     cursor.execute(sql, params)
     cases = cursor.fetchall()
 
+    # Get database connection for decryption operations
+    conn = cursor.connection
+    
+    # TEST USER DECRYPTION: Only decrypt for test user
+    TEST_USER_ID = '54d8e448-0091-7031-86bb-d66da5e8f7e0'
+    
+    # Cache to track which user DEKs we've already loaded (in addition to the module-level cache)
+    decryption_attempted_users = set()
+
     result = []
     for case_data in cases:
+        # Decrypt PHI fields if needed (check each case's owner user_id)
+        case_owner_user_id = case_data.get('user_id')
+        if case_data.get('phi_encrypted') == 1 and case_owner_user_id == TEST_USER_ID:
+            try:
+                from utils.phi_encryption import PHIEncryption, get_user_dek
+                
+                # Get the case owner's DEK for decryption (cached if we've seen this user before)
+                dek = get_user_dek(case_owner_user_id, conn)
+                phi_crypto = PHIEncryption()
+                
+                # Only decrypt first and last name for admin list view
+                for field in ['patient_first', 'patient_last']:
+                    if field in case_data and case_data[field] is not None:
+                        field_value = str(case_data[field])
+                        # Skip if too short to be encrypted
+                        if len(field_value) >= 28:
+                            try:
+                                case_data[field] = phi_crypto.decrypt_field(case_data[field], dek)
+                            except Exception as field_error:
+                                logging.warning(f"[DECRYPT] Could not decrypt {field} for case {case_data.get('case_id')}, leaving as-is")
+                                pass
+                
+                # Track that we've attempted decryption for this user
+                if case_owner_user_id not in decryption_attempted_users:
+                    decryption_attempted_users.add(case_owner_user_id)
+                    logging.info(f"[DECRYPT] Decrypting cases for user: {case_owner_user_id}")
+                    
+            except Exception as decrypt_error:
+                logging.error(f"[DECRYPT] Failed to decrypt case {case_data.get('case_id')} for user {case_owner_user_id}: {str(decrypt_error)}")
+                # Continue processing - return encrypted data rather than failing
+        
         # Convert datetime to ISO format if it's a datetime object
         if case_data["case_date"] and hasattr(case_data["case_date"], 'isoformat'):
             case_data["case_date"] = case_data["case_date"].isoformat()

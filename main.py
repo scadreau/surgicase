@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-10-19 23:40:46
+# Last Modified: 2025-10-20 01:06:43
 # Author: Scott Cadreau
 
 # main.py
@@ -300,6 +300,21 @@ try:
 except Exception as e:
     logger.error(f"Failed to warm cases cache: {str(e)}")
     logger.warning("Application will continue with on-demand cache population")
+
+# Warm DEK (Data Encryption Keys) cache on startup for optimal decryption performance
+# Pre-loads all user encryption keys to eliminate cold start latency and reduce KMS API calls
+try:
+    from utils.phi_encryption import warm_all_user_deks
+    dek_results = warm_all_user_deks()
+    if dek_results["failed"] == 0 and dek_results["successful"] > 0:
+        logger.info(f"🔐 DEK cache warming completed: {dek_results['successful']} user keys loaded in {dek_results['duration_seconds']}s")
+    elif dek_results["successful"] > 0:
+        logger.warning(f"⚠️ DEK cache warming partial: {dek_results['successful']}/{dek_results['total_users']} keys loaded in {dek_results['duration_seconds']}s")
+    else:
+        logger.info("ℹ️ No encryption keys found - DEK cache warming skipped")
+except Exception as e:
+    logger.error(f"Failed to warm DEK cache: {str(e)}")
+    logger.warning("Application will continue with on-demand DEK loading")
 
 # Start the scheduler service in background
 # Handles: Case status updates (Mon/Thu), NPI data updates (Tue), Pool/Cache maintenance
