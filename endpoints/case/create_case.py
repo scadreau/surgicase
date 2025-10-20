@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-10-18 17:39:40
+# Last Modified: 2025-10-20 00:20:22
 # Author: Scott Cadreau
 
 # endpoints/case/create_case.py
@@ -79,17 +79,51 @@ def create_case_with_procedures(case: CaseCreate, conn) -> dict:
     # Determine dupe_flag value based on force_duplicate parameter
     dupe_flag = 1 if case.force_duplicate else 0
     
+    # TEST USER ENCRYPTION: Only encrypt for test user 54d8e448-0091-7031-86bb-d66da5e8f7e0
+    # TODO: Remove this check once encryption is validated for all users
+    TEST_USER_ID = '54d8e448-0091-7031-86bb-d66da5e8f7e0'
+    use_encryption = (case.user_id == TEST_USER_ID)
+    
+    if use_encryption:
+        logger.info(f"[ENCRYPTION TEST] Encrypting PHI for test user: {case.user_id}")
+        from utils.phi_encryption import encrypt_patient_data
+        
+        # Prepare patient data for encryption
+        patient_data = {
+            'patient_first': formatted_patient_first,
+            'patient_last': formatted_patient_last,
+            'patient_dob': case.patient_dob,
+            'ins_provider': case.patient.ins_provider
+        }
+        
+        # Encrypt the data
+        encrypt_patient_data(patient_data, case.user_id, conn)
+        
+        # Use encrypted values
+        formatted_patient_first = patient_data['patient_first']
+        formatted_patient_last = patient_data['patient_last']
+        encrypted_patient_dob = patient_data['patient_dob']
+        encrypted_ins_provider = patient_data['ins_provider']
+        phi_encrypted_flag = 1
+        
+        logger.info(f"[ENCRYPTION TEST] PHI encrypted successfully for case: {case.case_id}")
+    else:
+        # Use unencrypted values for non-test users
+        encrypted_patient_dob = case.patient_dob
+        encrypted_ins_provider = case.patient.ins_provider
+        phi_encrypted_flag = 0
+    
     with conn.cursor(pymysql.cursors.DictCursor) as cursor:
         # Insert into cases table
         cursor.execute("""
             INSERT INTO cases (
                 case_id, user_id, case_date, patient_first, patient_last, 
-                ins_provider, surgeon_id, facility_id, demo_file, note_file, misc_file, dupe_flag, patient_dob
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ins_provider, surgeon_id, facility_id, demo_file, note_file, misc_file, dupe_flag, patient_dob, phi_encrypted
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             case.case_id, case.user_id, case.case_date, formatted_patient_first, 
-            formatted_patient_last, case.patient.ins_provider, case.surgeon_id, 
-            case.facility_id, case.demo_file, case.note_file, case.misc_file, dupe_flag, case.patient_dob
+            formatted_patient_last, encrypted_ins_provider, case.surgeon_id, 
+            case.facility_id, case.demo_file, case.note_file, case.misc_file, dupe_flag, encrypted_patient_dob, phi_encrypted_flag
         ))
 
         # Auto-fix variables already initialized at function level

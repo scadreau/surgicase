@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-10-17 18:17:35
+# Last Modified: 2025-10-20 00:25:13
 # Author: Scott Cadreau
 
 # endpoints/case/get_case.py
@@ -12,6 +12,7 @@ import json
 import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 def _get_case_optimized(cursor, case_id, calling_user_id):
     """
@@ -318,6 +319,24 @@ def get_case(
                     )
                 
                 case_data, user_id = result
+                
+                # TEST USER DECRYPTION: Only decrypt for test user 54d8e448-0091-7031-86bb-d66da5e8f7e0
+                # TODO: Remove this check once encryption is validated for all users
+                TEST_USER_ID = '54d8e448-0091-7031-86bb-d66da5e8f7e0'
+                
+                # Check if case is encrypted (phi_encrypted flag)
+                if case_data.get('phi_encrypted') == 1:
+                    if user_id == TEST_USER_ID:
+                        logger.info(f"[ENCRYPTION TEST] Decrypting PHI for test user case: {case_id}")
+                        from utils.phi_encryption import decrypt_patient_data
+                        
+                        # Decrypt the PHI fields in place
+                        decrypt_patient_data(case_data, user_id, conn)
+                        
+                        logger.info(f"[ENCRYPTION TEST] PHI decrypted successfully for case: {case_id}")
+                    else:
+                        # This shouldn't happen (only test user should have encrypted cases)
+                        logger.warning(f"[ENCRYPTION] Encrypted case found for non-test user: {user_id}")
                 
                 # Record successful case read operation
                 business_metrics.record_case_operation("read", "success", case_id)

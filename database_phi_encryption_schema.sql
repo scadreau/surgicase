@@ -1,5 +1,5 @@
 -- Created: 2025-10-19
--- Last Modified: 2025-10-19 23:40:46
+-- Last Modified: 2025-10-19 23:54:20
 -- Author: Scott Cadreau
 --
 -- PHI Field Encryption Database Schema
@@ -21,22 +21,68 @@ COMMENT='Stores encrypted data encryption keys for per-user PHI field encryption
 
 -- Add encryption tracking column to cases table
 -- This helps track migration status and identify encrypted vs unencrypted records
-ALTER TABLE cases 
-ADD COLUMN IF NOT EXISTS phi_encrypted TINYINT DEFAULT 0 
-COMMENT '0 = unencrypted (legacy), 1 = encrypted with user DEK';
+-- Note: IF NOT EXISTS not supported in ALTER TABLE ADD COLUMN, so we ignore errors if column exists
+SET @table_name = 'cases';
+SET @column_name = 'phi_encrypted';
+SET @column_check = (
+    SELECT COUNT(*) FROM information_schema.COLUMNS 
+    WHERE TABLE_SCHEMA = DATABASE() 
+    AND TABLE_NAME = @table_name 
+    AND COLUMN_NAME = @column_name
+);
+
+SET @sql = IF(@column_check = 0,
+    'ALTER TABLE cases ADD COLUMN phi_encrypted TINYINT DEFAULT 0 COMMENT ''0 = unencrypted (legacy), 1 = encrypted with user DEK''',
+    'SELECT ''Column phi_encrypted already exists in cases'' AS message');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- Add index for querying encrypted status
-ALTER TABLE cases
-ADD INDEX IF NOT EXISTS idx_phi_encrypted (phi_encrypted);
+SET @index_check = (
+    SELECT COUNT(*) FROM information_schema.STATISTICS 
+    WHERE TABLE_SCHEMA = DATABASE() 
+    AND TABLE_NAME = 'cases' 
+    AND INDEX_NAME = 'idx_phi_encrypted'
+);
+
+SET @sql = IF(@index_check = 0,
+    'ALTER TABLE cases ADD INDEX idx_phi_encrypted (phi_encrypted)',
+    'SELECT ''Index idx_phi_encrypted already exists on cases'' AS message');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- Add encryption tracking column to deleted_cases table as well
-ALTER TABLE deleted_cases 
-ADD COLUMN IF NOT EXISTS phi_encrypted TINYINT DEFAULT 0 
-COMMENT '0 = unencrypted (legacy), 1 = encrypted with user DEK';
+SET @table_name = 'deleted_cases';
+SET @column_check = (
+    SELECT COUNT(*) FROM information_schema.COLUMNS 
+    WHERE TABLE_SCHEMA = DATABASE() 
+    AND TABLE_NAME = @table_name 
+    AND COLUMN_NAME = 'phi_encrypted'
+);
+
+SET @sql = IF(@column_check = 0,
+    'ALTER TABLE deleted_cases ADD COLUMN phi_encrypted TINYINT DEFAULT 0 COMMENT ''0 = unencrypted (legacy), 1 = encrypted with user DEK''',
+    'SELECT ''Column phi_encrypted already exists in deleted_cases'' AS message');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- Add index for deleted_cases as well
-ALTER TABLE deleted_cases
-ADD INDEX IF NOT EXISTS idx_phi_encrypted (phi_encrypted);
+SET @index_check = (
+    SELECT COUNT(*) FROM information_schema.STATISTICS 
+    WHERE TABLE_SCHEMA = DATABASE() 
+    AND TABLE_NAME = 'deleted_cases' 
+    AND INDEX_NAME = 'idx_phi_encrypted'
+);
+
+SET @sql = IF(@index_check = 0,
+    'ALTER TABLE deleted_cases ADD INDEX idx_phi_encrypted (phi_encrypted)',
+    'SELECT ''Index idx_phi_encrypted already exists on deleted_cases'' AS message');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- Optional: Create audit table for key operations (for HIPAA compliance)
 CREATE TABLE IF NOT EXISTS encryption_key_audit (
