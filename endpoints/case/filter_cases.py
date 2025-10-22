@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-10-20 00:55:49
+# Last Modified: 2025-10-22 15:35:11
 # Author: Scott Cadreau
 
 # endpoints/case/filter_cases.py
@@ -205,6 +205,7 @@ def _get_user_cases_optimized(cursor, user_id, status_list, max_case_status):
     params = [user_id]
     
     # Add status filtering logic (same as original)
+    # Manual override: Always include cases with status >= 400 regardless of filter
     if status_list and status_list != ["all"]:
         # Check if max_case_status is in the filter list
         if max_case_status in status_list:
@@ -212,17 +213,17 @@ def _get_user_cases_optimized(cursor, user_id, status_list, max_case_status):
             other_statuses = [s for s in status_list if s != max_case_status]
             
             if other_statuses:
-                # Query for both specific statuses and >= max_case_status
-                sql += " AND (c.case_status IN (%s) OR c.case_status >= %%s)" % (",".join(["%s"] * len(other_statuses)))
+                # Query for both specific statuses and >= max_case_status, plus always include >= 400
+                sql += " AND (c.case_status IN (%s) OR c.case_status >= %%s OR c.case_status >= 400)" % (",".join(["%s"] * len(other_statuses)))
                 params.extend([str(s) for s in other_statuses])
                 params.append(max_case_status)
             else:
-                # Only max_case_status requested, get all >= max_case_status
-                sql += " AND c.case_status >= %s"
+                # Only max_case_status requested, get all >= max_case_status, plus always include >= 400
+                sql += " AND (c.case_status >= %s OR c.case_status >= 400)"
                 params.append(max_case_status)
         else:
-            # Normal filtering without max_case_status special handling
-            sql += " AND c.case_status IN (%s)" % (",".join(["%s"] * len(status_list)))
+            # Normal filtering without max_case_status special handling, but always include >= 400
+            sql += " AND (c.case_status IN (%s) OR c.case_status >= 400)" % (",".join(["%s"] * len(status_list)))
             params.extend([str(s) for s in status_list])
     
     # Group by and order
@@ -277,8 +278,9 @@ def _get_user_cases_optimized(cursor, user_id, status_list, max_case_status):
                 # Continue processing - return encrypted data rather than failing
         
         # Apply case status visibility restriction
+        # Manual override: If case_status >= 400, display it regardless of max_case_status
         original_case_status = case_data["case_status"]
-        if original_case_status > max_case_status:
+        if original_case_status < 400 and original_case_status > max_case_status:
             case_data["case_status"] = max_case_status
             # Update case_status_desc using pre-fetched lookup (no additional query needed)
             case_data["case_status_desc"] = status_descriptions.get(max_case_status, case_data["case_status_desc"])

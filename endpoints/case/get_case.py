@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-10-20 00:55:49
+# Last Modified: 2025-10-22 14:53:53
 # Author: Scott Cadreau
 
 # endpoints/case/get_case.py
@@ -85,8 +85,9 @@ def _get_case_optimized(cursor, case_id, calling_user_id):
         max_case_status = owner_max or 20
     
     # Apply case status visibility restriction
+    # Manual override: If case_status >= 400, display it regardless of max_case_status
     original_case_status = case_data["case_status"]
-    if original_case_status > max_case_status:
+    if original_case_status < 400 and original_case_status > max_case_status:
         case_data["case_status"] = max_case_status
     
     # Create user_name from owner profile
