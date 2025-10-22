@@ -1,5 +1,5 @@
 # Created: 2025-07-27 02:00:40
-# Last Modified: 2025-10-02 20:31:36
+# Last Modified: 2025-10-22 16:42:23
 # Author: Scott Cadreau
 
 # endpoints/backoffice/bulk_update_case_status.py
@@ -29,7 +29,7 @@ STATUS_TIMESTAMP_MAPPING = {
     40: "received_pmnt_ts",
     50: "sent_to_negotiation_ts",
     60: "settled_ts",
-    70: "send_to_idr_ts",
+    70: "sent_to_idr_ts",
     80: "idr_decision_ts",
     400: "rejected_ts",
     500: "closed_ts",
