@@ -1,10 +1,11 @@
 # Created: 2025-07-16 14:50:43
-# Last Modified: 2025-10-18 17:39:40
+# Last Modified: 2025-10-23 16:11:39
 # Author: Scott Cadreau
 
 # utils/pay_amount_calculator.py
 import pymysql.cursors
 import logging
+import decimal
 from decimal import Decimal
 
 logger = logging.getLogger(__name__)
@@ -221,7 +222,7 @@ def calculate_case_pay_amount_v2(case_id: str, user_id: str, conn) -> dict:
                 SELECT 
                     pcb2.pay_amount as code_pay_amount,
                     pc.code_category,
-                    COUNT(DISTINCT cpc.procedure_code) as total_codes
+                    pc.procedure_code
                 FROM case_procedure_codes cpc
                 JOIN procedure_codes pc ON cpc.procedure_code = pc.procedure_code
                 JOIN user_profile up ON up.user_id = %s AND up.active = 1
@@ -235,6 +236,18 @@ def calculate_case_pay_amount_v2(case_id: str, user_id: str, conn) -> dict:
             """, (user_id, case_id))
             
             result = cursor.fetchone()
+            
+            # Get the count of procedure codes separately
+            if result:
+                cursor.execute("""
+                    SELECT COUNT(DISTINCT procedure_code) as total_codes
+                    FROM case_procedure_codes
+                    WHERE case_id = %s
+                """, (case_id,))
+                count_result = cursor.fetchone()
+                total_codes = count_result['total_codes'] if count_result else 0
+            else:
+                total_codes = 0
             
             if result is None:
                 # Check if user exists and is active
@@ -288,9 +301,33 @@ def calculate_case_pay_amount_v2(case_id: str, user_id: str, conn) -> dict:
                     }
             
             # Convert to Decimal for consistency
-            pay_amount = Decimal(str(result['code_pay_amount']))
+            # Validate that we got a valid pay_amount
+            if result['code_pay_amount'] is None or result['code_pay_amount'] == '':
+                error_msg = f"Invalid pay_amount returned from query for case {case_id}: {result['code_pay_amount']}"
+                logger.error(error_msg)
+                return {
+                    "success": False,
+                    "pay_amount": Decimal('0.00'),
+                    "pay_category": None,
+                    "procedure_codes_found": total_codes,
+                    "message": error_msg
+                }
+            
+            try:
+                pay_amount = Decimal(str(result['code_pay_amount']))
+            except (ValueError, decimal.InvalidOperation) as e:
+                error_msg = f"Error converting pay_amount to Decimal for case {case_id}: {result['code_pay_amount']} - {str(e)}"
+                logger.error(error_msg)
+                return {
+                    "success": False,
+                    "pay_amount": Decimal('0.00'),
+                    "pay_category": None,
+                    "procedure_codes_found": total_codes,
+                    "message": error_msg
+                }
+            
             pay_category = result['code_category']
-            total_codes = result['total_codes']
+            # total_codes was already calculated above
             
             logger.info(f"Calculated maximum non-zero pay amount {pay_amount} with category '{pay_category}' for case {case_id} with {total_codes} procedure codes")
             

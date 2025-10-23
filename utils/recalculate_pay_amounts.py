@@ -1,5 +1,5 @@
 # Created: 2025-01-08 16:40:00
-# Last Modified: 2025-10-18 17:39:40
+# Last Modified: 2025-10-23 16:06:31
 # Author: Scott Cadreau
 
 import sys
@@ -12,7 +12,7 @@ from decimal import Decimal
 # Add the parent directory to the Python path so we can import from core
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from pay_amount_calculator import calculate_case_pay_amount_v2
+from pay_amount_calculator import calculate_case_pay_amount_v2, update_case_pay_amount_v2
 from core.database import get_db_connection, close_db_connection
 
 # Configure logging
@@ -99,48 +99,57 @@ def process_cases(conn, dry_run=False, specific_case_id=None):
         logger.info(f"Processing case {i}/{len(cases)}: {case_id}")
         
         try:
-            # Calculate what the pay amount should be
-            calc_result = calculate_case_pay_amount_v2(case_id, user_id, conn)
-            
-            if not calc_result["success"]:
-                logger.error(f"Failed to calculate pay amount for case {case_id}: {calc_result['message']}")
-                stats["errors"] += 1
-                continue
-            
-            new_pay_amount = calc_result["pay_amount"]
-            new_pay_category = calc_result["pay_category"]
-            
-            # Check if values need to be updated
-            amount_changed = current_pay_amount != new_pay_amount
-            category_changed = current_pay_category != new_pay_category
-            
-            if not amount_changed and not category_changed:
-                logger.info(f"  Skipped - already correct: {current_pay_amount} ({current_pay_category})")
-                stats["skipped"] += 1
-                continue
-            
-            # Log the change
-            change_msg = f"  {'WOULD UPDATE' if dry_run else 'UPDATING'}: {current_pay_amount} ({current_pay_category}) → {new_pay_amount} ({new_pay_category})"
-            logger.info(change_msg)
-            
-            if not dry_run:
-                # Update the database
-                with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-                    cursor.execute("""
-                        UPDATE cases 
-                        SET pay_amount = %s, pay_category = %s
-                        WHERE case_id = %s
-                    """, (new_pay_amount, new_pay_category, case_id))
-                    
-                    if cursor.rowcount == 0:
-                        logger.error(f"  Failed to update case {case_id} - case not found")
-                        stats["errors"] += 1
-                        continue
-                    
-                    conn.commit()
-                    logger.info(f"  Successfully updated case {case_id}")
-            
-            stats["updated"] += 1
+            if dry_run:
+                # For dry-run, only calculate to preview changes
+                calc_result = calculate_case_pay_amount_v2(case_id, user_id, conn)
+                
+                if not calc_result["success"]:
+                    logger.error(f"Failed to calculate pay amount for case {case_id}: {calc_result['message']}")
+                    stats["errors"] += 1
+                    continue
+                
+                new_pay_amount = calc_result["pay_amount"]
+                new_pay_category = calc_result["pay_category"]
+                
+                # Check if values need to be updated
+                amount_changed = current_pay_amount != new_pay_amount
+                category_changed = current_pay_category != new_pay_category
+                
+                if not amount_changed and not category_changed:
+                    logger.info(f"  Skipped - already correct: {current_pay_amount} ({current_pay_category})")
+                    stats["skipped"] += 1
+                    continue
+                
+                # Log the change
+                change_msg = f"  WOULD UPDATE: {current_pay_amount} ({current_pay_category}) → {new_pay_amount} ({new_pay_category})"
+                logger.info(change_msg)
+                stats["updated"] += 1
+            else:
+                # For actual run, use the v2 update function which calculates and updates
+                update_result = update_case_pay_amount_v2(case_id, user_id, conn)
+                
+                if not update_result["success"]:
+                    logger.error(f"Failed to update pay amount for case {case_id}: {update_result['message']}")
+                    stats["errors"] += 1
+                    conn.rollback()
+                    continue
+                
+                new_pay_amount = update_result["pay_amount"]
+                new_pay_category = update_result["pay_category"]
+                
+                # Check if values actually changed
+                amount_changed = current_pay_amount != new_pay_amount
+                category_changed = current_pay_category != new_pay_category
+                
+                if not amount_changed and not category_changed:
+                    logger.info(f"  Skipped - already correct: {current_pay_amount} ({current_pay_category})")
+                    stats["skipped"] += 1
+                    continue
+                
+                # Log the successful update
+                logger.info(f"  UPDATED: {current_pay_amount} ({current_pay_category}) → {new_pay_amount} ({new_pay_category})")
+                conn.commit()
+                stats["updated"] += 1
             
         except Exception as e:
             logger.error(f"Error processing case {case_id}: {str(e)}")
