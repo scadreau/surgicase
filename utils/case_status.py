@@ -1,5 +1,5 @@
 # Created: 2025-07-15 23:02:51
-# Last Modified: 2025-10-18 17:19:45
+# Last Modified: 2025-10-28 14:49:07
 # Author: Scott Cadreau
 
 # utils/case_status.py
@@ -12,12 +12,16 @@ def update_case_status(case_id: str, conn) -> dict:
     
     Important: If case status is already > 10, no changes are made (preserves workflow progress)
     
-    Conditions for status update:
+    Medicare Override: If "medicare" (case-insensitive) is found in ins_provider, status is ALWAYS set to 7,
+    regardless of all other conditions. This override takes precedence over all other logic.
+    
+    Conditions for status update (if not Medicare):
     - demo_file is not null
     - note_file is not null  
     - at least 1 procedure code exists
     
     Status determination:
+    - Status 7: Medicare detected in insurance (ALWAYS overrides other conditions)
     - No change: Case status > 10 (case has progressed beyond initial review)
     - Status 7: All conditions met AND patient is >= 65 years old (needs insurance confirmation)
     - Status 10: All conditions met AND patient < 65 (or DOB is NULL) AND at least one procedure has asst_surg = 2 (billable)
@@ -37,12 +41,13 @@ def update_case_status(case_id: str, conn) -> dict:
             - procedure_count (int): Number of procedure codes found
             - billable_procedures (int): Number of procedures with asst_surg = 2
             - patient_age (int, optional): Patient's age if DOB available
+            - override_reason (str, optional): "medicare" if Medicare override was applied
     """
     try:
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-            # Check if case exists and get current status with patient DOB
+            # Check if case exists and get current status with patient DOB and insurance
             cursor.execute("""
-                SELECT case_id, case_status, demo_file, note_file, patient_dob 
+                SELECT case_id, case_status, demo_file, note_file, patient_dob, ins_provider 
                 FROM cases 
                 WHERE case_id = %s AND active = 1
             """, (case_id,))
@@ -53,6 +58,22 @@ def update_case_status(case_id: str, conn) -> dict:
                     "success": False,
                     "message": "Case not found or inactive",
                     "case_id": case_id
+                }
+            
+            # Check if Medicare is in insurance - if so, always set case_status to 7
+            if case_data.get("ins_provider") and "medicare" in case_data["ins_provider"].lower():
+                cursor.execute("""
+                    UPDATE cases 
+                    SET case_status = 7 
+                    WHERE case_id = %s AND active = 1
+                """, (case_id,))
+                
+                return {
+                    "success": True,
+                    "message": "Case status set to 7 (Medicare insurance detected)",
+                    "case_id": case_id,
+                    "case_status": 7,
+                    "override_reason": "medicare"
                 }
             
             # Check if case status is already greater than 10 (don't revert progress)

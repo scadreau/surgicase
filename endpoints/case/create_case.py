@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-10-20 14:26:18
+# Last Modified: 2025-10-28 14:46:30
 # Author: Scott Cadreau
 
 # endpoints/case/create_case.py
@@ -183,8 +183,23 @@ def create_case_with_procedures(case: CaseCreate, conn) -> dict:
             logger.error(f"Pay amount calculation failed for case {case.case_id}: {pay_amount_result['message']}")
             # Don't fail the entire operation, but log the error
         
-        # Update case status if conditions are met (within the same transaction)
-        status_update_result = update_case_status(case.case_id, conn)
+        # Check if Medicare is in insurance - if so, override case_status to 7
+        if case.patient.ins_provider and "medicare" in case.patient.ins_provider.lower():
+            logger.info(f"Medicare detected in insurance for case {case.case_id}, setting case_status to 7")
+            cursor.execute("""
+                UPDATE cases 
+                SET case_status = 7
+                WHERE case_id = %s
+            """, (case.case_id,))
+            status_update_result = {
+                "success": True,
+                "message": "Case status set to 7 (Medicare)",
+                "new_status": 7,
+                "previous_status": None
+            }
+        else:
+            # Update case status if conditions are met (within the same transaction)
+            status_update_result = update_case_status(case.case_id, conn)
         
         return {
             "status_update": status_update_result,
