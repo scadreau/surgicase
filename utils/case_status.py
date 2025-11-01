@@ -1,11 +1,14 @@
 # Created: 2025-07-15 23:02:51
-# Last Modified: 2025-11-01 01:11:30
+# Last Modified: 2025-11-01 02:36:41
 # Author: Scott Cadreau
 
 # utils/case_status.py
 import pymysql.cursors
-from datetime import date
+import logging
+from datetime import date, datetime
 from utils.status_timestamps import build_status_update_query
+
+logger = logging.getLogger(__name__)
 
 def update_case_status(case_id: str, conn) -> dict:
     """
@@ -45,6 +48,8 @@ def update_case_status(case_id: str, conn) -> dict:
             - override_reason (str, optional): "medicare" or "procedure_codes_rejected" if override was applied
     """
     try:
+        logger.info(f"update_case_status called for case_id: {case_id}")
+        
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
             # Check if case exists and get current status with patient DOB and insurance
             cursor.execute("""
@@ -55,6 +60,7 @@ def update_case_status(case_id: str, conn) -> dict:
             case_data = cursor.fetchone()
             
             if not case_data:
+                logger.warning(f"Case {case_id} not found or inactive")
                 return {
                     "success": False,
                     "message": "Case not found or inactive",
@@ -63,6 +69,7 @@ def update_case_status(case_id: str, conn) -> dict:
             
             # Check if case status is already greater than 10 (don't revert progress)
             if case_data["case_status"] > 10:
+                logger.info(f"Case {case_id} status is {case_data['case_status']} (>10), no change made")
                 return {
                     "success": True,
                     "message": f"Case status is {case_data['case_status']} (>10), no status change made",
@@ -95,6 +102,7 @@ def update_case_status(case_id: str, conn) -> dict:
                 
                 # If all codes are in rejected range, set status to 400
                 if all_in_rejected_range:
+                    logger.info(f"Case {case_id}: All procedure codes in rejected range, setting status to 400")
                     update_query, has_timestamp = build_status_update_query(400)
                     cursor.execute(update_query, (400, case_id))
                     
@@ -109,6 +117,7 @@ def update_case_status(case_id: str, conn) -> dict:
             
             # Check if Medicare is in insurance - if so, set case_status to 7
             if case_data.get("ins_provider") and "medicare" in case_data["ins_provider"].lower():
+                logger.info(f"Case {case_id}: Medicare detected in insurance, setting status to 7")
                 update_query, has_timestamp = build_status_update_query(7)
                 cursor.execute(update_query, (7, case_id))
                 
@@ -122,6 +131,7 @@ def update_case_status(case_id: str, conn) -> dict:
             
             # Check if demo_file and note_file are not null
             if not case_data["demo_file"] or not case_data["note_file"]:
+                logger.info(f"Case {case_id}: Missing required files - demo_file: {case_data['demo_file']}, note_file: {case_data['note_file']}")
                 return {
                     "success": False,
                     "message": "demo_file and note_file must not be null",
@@ -139,6 +149,7 @@ def update_case_status(case_id: str, conn) -> dict:
             procedure_count = cursor.fetchone()["code_count"]
             
             if procedure_count == 0:
+                logger.info(f"Case {case_id}: No procedure codes found, cannot update status")
                 return {
                     "success": False,
                     "message": "At least one procedure code is required",
@@ -146,14 +157,24 @@ def update_case_status(case_id: str, conn) -> dict:
                     "procedure_count": procedure_count
                 }
             
+            logger.debug(f"Case {case_id}: Found {procedure_count} procedure code(s)")
+            
             # Check if patient is 65 or older
             patient_age = None
             is_senior = False
             
-            if case_data["patient_dob"]:
+            if case_data["patient_dob"] == '0000-00-00':
+                logger.debug(f"Case {case_id}: patient_dob is '0000-00-00' (MySQL NULL), treating as no DOB")
+            
+            if case_data["patient_dob"] and case_data["patient_dob"] != '0000-00-00':
                 # Calculate patient age based on DOB
                 today = date.today()
                 birth_date = case_data["patient_dob"]
+                
+                # Handle both date objects and string dates from database
+                if isinstance(birth_date, str):
+                    birth_date = datetime.strptime(birth_date, "%Y-%m-%d").date()
+                
                 patient_age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
                 is_senior = patient_age >= 65
             
@@ -162,6 +183,7 @@ def update_case_status(case_id: str, conn) -> dict:
                 # Patient is 65 or older - needs manual insurance confirmation
                 final_status = 7
                 status_message = f"Case status updated successfully to 7 (patient age {patient_age} >= 65, needs insurance confirmation)"
+                logger.info(f"Case {case_id}: Patient age {patient_age} >= 65, setting status to 7")
             else:
                 # Patient is under 65 or DOB is NULL - use billable procedure logic
                 cursor.execute("""
@@ -171,25 +193,33 @@ def update_case_status(case_id: str, conn) -> dict:
                 """, (case_id,))
                 billable_count = cursor.fetchone()["billable_count"]
                 
+                logger.info(f"Case {case_id}: Patient age {patient_age if patient_age else 'NULL'} (< 65), billable procedures (asst_surg=2): {billable_count}")
+                
                 if billable_count > 0:
                     # At least one billable assistant surgeon procedure - ready for submission
                     final_status = 10
                     status_message = "Case status updated successfully from 0 to 10 (ready for submission)"
+                    logger.info(f"Case {case_id}: {billable_count} billable procedure(s) found, setting status to 10")
                 else:
                     # No billable assistant surgeon procedures - needs review
                     final_status = 7
                     status_message = "Case status updated successfully from 0 to 7 (complete but needs review - no billable assistant surgeon procedures)"
+                    logger.info(f"Case {case_id}: No billable procedures found, setting status to 7")
             
             # All conditions met, update case status
             update_query, has_timestamp = build_status_update_query(final_status)
+            logger.debug(f"Case {case_id}: Executing UPDATE query with status={final_status}, timestamp_update={has_timestamp}")
             cursor.execute(update_query, (final_status, case_id))
             
             if cursor.rowcount == 0:
+                logger.error(f"Case {case_id}: UPDATE query affected 0 rows - case may not exist or be inactive")
                 return {
                     "success": False,
                     "message": "Failed to update case status",
                     "case_id": case_id
                 }
+            
+            logger.info(f"Case {case_id}: Successfully updated to status {final_status} (timestamp_updated: {has_timestamp})")
             
             # Build response with optional fields
             response = {
@@ -213,6 +243,7 @@ def update_case_status(case_id: str, conn) -> dict:
             
     except Exception as e:
         # Don't rollback here - let the calling function handle transaction management
+        logger.error(f"Case {case_id}: Exception in update_case_status: {str(e)}", exc_info=True)
         return {
             "success": False,
             "message": f"Error updating case status: {str(e)}",

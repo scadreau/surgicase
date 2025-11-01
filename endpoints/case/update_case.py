@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-10-20 14:23:49
+# Last Modified: 2025-11-01 02:47:34
 # Author: Scott Cadreau
 
 # endpoints/case/update_case.py
@@ -262,15 +262,15 @@ def update_case(request: Request, case: CaseUpdate = Body(...)):
                     from utils.phi_encryption import encrypt_patient_data
                     
                     # Prepare patient data for encryption (only the fields being updated)
+                    # Note: patient_dob is NOT encrypted (DATE column cannot store encrypted text)
                     patient_data = {}
                     if 'patient_first' in update_fields:
                         patient_data['patient_first'] = update_fields['patient_first']
                     if 'patient_last' in update_fields:
                         patient_data['patient_last'] = update_fields['patient_last']
-                    if 'patient_dob' in update_fields:
-                        patient_data['patient_dob'] = update_fields['patient_dob']
                     if 'ins_provider' in update_fields:
                         patient_data['ins_provider'] = update_fields['ins_provider']
+                    # patient_dob stays in update_fields as-is (not encrypted)
                     
                     # Encrypt the data
                     encrypt_patient_data(patient_data, case_owner_user_id, conn)

@@ -1,5 +1,5 @@
 # Created: 2025-10-19
-# Last Modified: 2025-10-20 01:06:43
+# Last Modified: 2025-11-01 02:47:35
 # Author: Scott Cadreau
 
 """
@@ -45,7 +45,9 @@ _dek_cache: Dict[str, Tuple[bytes, float]] = {}  # {user_id: (decrypted_dek, exp
 _cache_lock = threading.Lock()
 
 # PHI fields to encrypt in cases table
-PHI_FIELDS = ['patient_first', 'patient_last', 'patient_dob', 'ins_provider']
+# Note: patient_dob is NOT encrypted as it's stored in a DATE column (cannot store encrypted text)
+# Names are the primary HIPAA identifiers; dob + insurance alone don't identify individuals
+PHI_FIELDS = ['patient_first', 'patient_last', 'ins_provider']
 
 
 class PHIEncryption:

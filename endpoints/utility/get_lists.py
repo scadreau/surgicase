@@ -1,5 +1,5 @@
 # Created: 2025-08-05 22:15:27
-# Last Modified: 2025-09-08 21:38:19
+# Last Modified: 2025-11-01 02:52:38
 # Author: Scott Cadreau
 
 # endpoints/utility/get_lists.py
@@ -60,6 +60,29 @@ def validate_tiers_summary_access(user_id: str, conn) -> bool:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail={"error": f"Error validating user access: {str(e)}"})
+
+def validate_user_exists(user_id: str, conn) -> bool:
+    """
+    Validate that the user exists and is active.
+    Returns True if user is valid, raises HTTPException if not.
+    No user_type restrictions - all active users are allowed.
+    """
+    try:
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute(
+                "SELECT user_id FROM user_profile WHERE user_id = %s AND active = 1",
+                (user_id,)
+            )
+            user = cursor.fetchone()
+            
+            if not user:
+                raise HTTPException(status_code=404, detail={"error": "User not found or inactive"})
+            
+            return True
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={"error": f"Error validating user: {str(e)}"})
 
 @router.get("/user_types")
 @track_business_operation("get", "user_types")
@@ -353,7 +376,7 @@ def get_user_doc_types(request: Request, user_id: str = Query(..., description="
     Args:
         request (Request): FastAPI request object for logging and monitoring
         user_id (str): User ID for authorization validation.
-                      Must have user_type >= 100 for access to document management data.
+                      All active users can access this endpoint.
     
     Returns:
         dict: Response containing:
@@ -364,12 +387,11 @@ def get_user_doc_types(request: Request, user_id: str = Query(..., description="
     Raises:
         HTTPException:
             - 404 Not Found: User not found or inactive in user_profile table
-            - 403 Forbidden: User has insufficient privileges (user_type < 100)
             - 500 Internal Server Error: Database connection or query execution errors
     
     Authorization:
-        - Requires user_type >= 100 for access to document management data
-        - Uses validate_user_access() helper function for consistent authorization
+        - All active users can access this endpoint
+        - Uses validate_user_exists() helper function for user validation
         - Validates user exists and is active in user_profile table
     
     Database Operations:
@@ -413,8 +435,7 @@ def get_user_doc_types(request: Request, user_id: str = Query(..., description="
         - doc_prefix is used for systematic file naming and organization in document storage
         - Used for populating document type dropdown lists in document upload interfaces
         - Essential for document categorization and retrieval systems
-        - Authorization required to prevent unauthorized access to document type information
-        - Integrates with user document upload and management workflows
+        - Available to all users for document upload and management workflows
     """
     conn = None
     start_time = time.time()
@@ -425,8 +446,8 @@ def get_user_doc_types(request: Request, user_id: str = Query(..., description="
     try:
         conn = get_db_connection()
         
-        # Validate user access
-        validate_user_access(user_id, conn)
+        # Validate user exists
+        validate_user_exists(user_id, conn)
         
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:

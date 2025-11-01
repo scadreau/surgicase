@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-10-28 14:46:30
+# Last Modified: 2025-11-01 02:47:34
 # Author: Scott Cadreau
 
 # endpoints/case/create_case.py
@@ -115,22 +115,21 @@ def create_case_with_procedures(case: CaseCreate, conn) -> dict:
         logger.info(f"[ENCRYPTION TEST] Encrypting PHI for test user: {case.user_id}")
         from utils.phi_encryption import encrypt_patient_data
         
-        # Prepare patient data for encryption
+        # Prepare patient data for encryption (names and insurance only, not DOB)
         patient_data = {
             'patient_first': formatted_patient_first,
             'patient_last': formatted_patient_last,
-            'patient_dob': case.patient_dob,
             'ins_provider': case.patient.ins_provider
         }
         
         # Encrypt the data
         encrypt_patient_data(patient_data, case.user_id, conn)
         
-        # Use encrypted values
+        # Use encrypted values for names/insurance, unencrypted for DOB
         formatted_patient_first = patient_data['patient_first']
         formatted_patient_last = patient_data['patient_last']
-        encrypted_patient_dob = patient_data['patient_dob']
         encrypted_ins_provider = patient_data['ins_provider']
+        encrypted_patient_dob = case.patient_dob  # DOB stays unencrypted (DATE column)
         phi_encrypted_flag = 1
         
         logger.info(f"[ENCRYPTION TEST] PHI encrypted successfully for case: {case.case_id}")
