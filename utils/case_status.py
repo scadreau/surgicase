@@ -1,14 +1,16 @@
 # Created: 2025-07-15 23:02:51
-# Last Modified: 2025-10-28 14:58:37
+# Last Modified: 2025-11-01 01:11:30
 # Author: Scott Cadreau
 
 # utils/case_status.py
 import pymysql.cursors
 from datetime import date
+from utils.status_timestamps import build_status_update_query
 
 def update_case_status(case_id: str, conn) -> dict:
     """
-    Update case status from 0 to 7, 10, or 400 based on completeness, patient age, billing eligibility, and procedure codes:
+    Update case status from 0 to 7, 10, or 400 based on completeness, patient age, billing eligibility, and procedure codes.
+    Automatically updates corresponding timestamp fields when setting status (billable_flag_ts, submitted_ts, rejected_ts).
     
     Status Update Priority (evaluated in this order):
     1. No change: Case status > 10 (case has progressed beyond initial review - preserves workflow progress)
@@ -93,11 +95,8 @@ def update_case_status(case_id: str, conn) -> dict:
                 
                 # If all codes are in rejected range, set status to 400
                 if all_in_rejected_range:
-                    cursor.execute("""
-                        UPDATE cases 
-                        SET case_status = 400 
-                        WHERE case_id = %s AND active = 1
-                    """, (case_id,))
+                    update_query, has_timestamp = build_status_update_query(400)
+                    cursor.execute(update_query, (400, case_id))
                     
                     return {
                         "success": True,
@@ -110,11 +109,8 @@ def update_case_status(case_id: str, conn) -> dict:
             
             # Check if Medicare is in insurance - if so, set case_status to 7
             if case_data.get("ins_provider") and "medicare" in case_data["ins_provider"].lower():
-                cursor.execute("""
-                    UPDATE cases 
-                    SET case_status = 7 
-                    WHERE case_id = %s AND active = 1
-                """, (case_id,))
+                update_query, has_timestamp = build_status_update_query(7)
+                cursor.execute(update_query, (7, case_id))
                 
                 return {
                     "success": True,
@@ -185,11 +181,8 @@ def update_case_status(case_id: str, conn) -> dict:
                     status_message = "Case status updated successfully from 0 to 7 (complete but needs review - no billable assistant surgeon procedures)"
             
             # All conditions met, update case status
-            cursor.execute("""
-                UPDATE cases 
-                SET case_status = %s 
-                WHERE case_id = %s AND active = 1
-            """, (final_status, case_id))
+            update_query, has_timestamp = build_status_update_query(final_status)
+            cursor.execute(update_query, (final_status, case_id))
             
             if cursor.rowcount == 0:
                 return {

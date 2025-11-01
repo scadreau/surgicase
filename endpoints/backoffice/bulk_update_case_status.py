@@ -1,5 +1,5 @@
 # Created: 2025-07-27 02:00:40
-# Last Modified: 2025-10-22 16:42:23
+# Last Modified: 2025-11-01 01:11:27
 # Author: Scott Cadreau
 
 # endpoints/backoffice/bulk_update_case_status.py
@@ -12,64 +12,11 @@ from typing import List, Dict, Any, Tuple
 from core.database import get_db_connection, close_db_connection
 from core.models import BulkCaseStatusUpdate
 from utils.monitoring import track_business_operation, business_metrics
+from utils.status_timestamps import get_timestamp_field, build_status_update_query
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-# Configuration mapping for status codes to timestamp fields
-# Format: status_code: timestamp_field_name
-# Timestamps are updated whenever a case transitions TO the specified status
-STATUS_TIMESTAMP_MAPPING = {
-    7: "billable_flag_ts",
-    8: "docs_needed_ts",
-    15: "pending_payment_ts",
-    20: "paid_to_provider_ts",
-    30: "sent_to_biller_ts",
-    40: "received_pmnt_ts",
-    50: "sent_to_negotiation_ts",
-    60: "settled_ts",
-    70: "sent_to_idr_ts",
-    80: "idr_decision_ts",
-    400: "rejected_ts",
-    500: "closed_ts",
-    # Add future timestamp mappings here as needed
-}
-
-def get_timestamp_field_for_status(to_status: int) -> str:
-    """
-    Get the timestamp field name for a target status.
-    
-    Args:
-        to_status: Target case status
-        
-    Returns:
-        str: Timestamp field name or None if no mapping exists
-    """
-    return STATUS_TIMESTAMP_MAPPING.get(to_status)
-
-def build_update_query_with_timestamps(timestamp_field: str = None) -> str:
-    """
-    Build the UPDATE query with optional timestamp field.
-    
-    Args:
-        timestamp_field: Name of the timestamp field to update, or None for status-only update
-        
-    Returns:
-        str: Complete SQL UPDATE query
-    """
-    if timestamp_field:
-        return f"""
-            UPDATE cases 
-            SET case_status = %s, {timestamp_field} = CURRENT_TIMESTAMP 
-            WHERE case_id = %s AND active = 1
-        """
-    else:
-        return """
-            UPDATE cases 
-            SET case_status = %s 
-            WHERE case_id = %s AND active = 1
-        """
 
 @router.patch("/bulk_update_case_status")
 @track_business_operation("bulk_update", "case_status")
@@ -85,6 +32,7 @@ def bulk_update_case_status(request: Request, update_request: BulkCaseStatusUpda
     Current timestamp mappings (updated when transitioning TO these statuses):
     - Status 7: Updates billable_flag_ts
     - Status 8: Updates docs_needed_ts
+    - Status 10: Updates submitted_ts
     - Status 15: Updates pending_payment_ts
     - Status 20: Updates paid_to_provider_ts
     - Status 30: Updates sent_to_biller_ts
@@ -116,9 +64,9 @@ def bulk_update_case_status(request: Request, update_request: BulkCaseStatusUpda
         - When force=True, allows "undoing" mistakes by moving to lower status
         
     Timestamp Updates:
-        - Automatically updates appropriate timestamp fields based on STATUS_TIMESTAMP_MAPPING
+        - Automatically updates appropriate timestamp fields based on shared status_timestamps mapping
         - Timestamps are updated whenever transitioning TO a mapped status, regardless of previous status
-        - New mappings can be added to STATUS_TIMESTAMP_MAPPING without code changes
+        - New mappings can be added to utils/status_timestamps.py for use across all status update functions
     
     Cache Management:
         - Automatically clears global cases cache (get_cases_by_status) after successful updates
@@ -210,10 +158,10 @@ def bulk_update_case_status(request: Request, update_request: BulkCaseStatusUpda
                             continue
                         
                         # Determine if we need to update timestamps based on target status
-                        timestamp_field = get_timestamp_field_for_status(update_request.new_status)
+                        timestamp_field = get_timestamp_field(update_request.new_status)
                         
                         # Build the UPDATE query dynamically
-                        update_query = build_update_query_with_timestamps(timestamp_field)
+                        update_query, has_timestamp = build_status_update_query(update_request.new_status)
                         
                         # Update the case status (and timestamps if applicable)
                         cursor.execute(update_query, (update_request.new_status, case_id))
