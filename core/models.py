@@ -29,6 +29,7 @@ class UserCreate(BaseModel):
     states_licensed: str
     timezone: Optional[str] = None
     credentials: Optional[str] = None
+    ins_exp_date: Optional[str] = None
     documents: Optional[List[UserDocument]] = None
 
 class UserUpdate(BaseModel):
@@ -49,6 +50,7 @@ class UserUpdate(BaseModel):
     states_licensed: Optional[str] = None
     timezone: Optional[str] = None
     credentials: Optional[str] = None
+    ins_exp_date: Optional[str] = None
     documents: Optional[List[UserDocument]] = None
     last_login_dt: Optional[datetime] = None
     max_case_status: Optional[int] = None

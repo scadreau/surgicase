@@ -54,6 +54,7 @@ def update_user(request: Request, user: UserUpdate = Body(...)):
             - states_licensed (str, optional): Updated licensing state information
             - timezone (str, optional): Updated timezone preference
             - credentials (str, optional): Updated professional credentials (e.g., MD, DO, PA, NP, CSA, PA-C)
+            - ins_exp_date (str, optional): Updated malpractice insurance expiration date in ISO format (YYYY-MM-DD)
             - user_tier (int, optional): Updated user tier level
             - documents (List[UserDocument], optional): Document list for replacement:
                 - document_type (str): Type/category of document
@@ -149,6 +150,7 @@ def update_user(request: Request, user: UserUpdate = Body(...)):
             "user_type": 10,
             "user_tier": 2,
             "credentials": "DO",
+            "ins_exp_date": "2026-06-30",
             "documents": [
                 {
                     "document_type": "medical_license",

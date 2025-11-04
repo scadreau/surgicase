@@ -55,6 +55,7 @@ def get_user(request: Request, user_id: str = Query(..., description="The user I
                 - states_licensed (str): States where user holds professional licenses
                 - user_tier (int): User tier classification for billing/permissions
                 - credentials (str): User's professional credentials (e.g., MD, DO, PA, NP, CSA, PA-C)
+                - ins_exp_date (str): Malpractice insurance expiration date in ISO format (YYYY-MM-DD)
                 - create_ts (timestamp): Timestamp when the user account was created
                 - last_updated_ts (timestamp): Timestamp when the user account was last updated
                 - last_login_dt (timestamp): Date and time of the user's last login
@@ -144,6 +145,8 @@ def get_user(request: Request, user_id: str = Query(..., description="The user I
                 "message_pref": "email",
                 "states_licensed": "CA,NY,TX",
                 "user_tier": 1,
+                "credentials": "MD",
+                "ins_exp_date": "2025-12-31",
                 "create_ts": "2024-01-15T09:30:00",
                 "last_updated_ts": "2024-08-10T14:22:33",
                 "last_login_dt": "2024-08-10T08:45:12",
@@ -197,7 +200,7 @@ def get_user(request: Request, user_id: str = Query(..., description="The user I
                 # fetch from users table with user type description
                 cursor.execute("""select up.user_id, up.user_email, up.first_name, up.last_name, up.addr1, up.addr2, up.city, up.state, up.zipcode, up.telephone, up.user_npi, 
                     up.referred_by_user, up.user_type, utl.user_type_desc, up.message_pref, up.states_licensed, up.user_tier, up.create_ts, up.last_updated_ts, up.last_login_dt, 
-                    up.max_case_status, up.credentials
+                    up.max_case_status, up.credentials, up.ins_exp_date
                     from user_profile up
                     left join user_type_list utl on up.user_type = utl.user_type
                     where up.user_id = %s and up.active = 1""", (user_id))

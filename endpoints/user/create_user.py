@@ -51,6 +51,7 @@ def add_user(request: Request, user: UserCreate):
             - states_licensed (str, optional): States where user holds professional licenses
             - timezone (str, optional): User's timezone preference
             - credentials (str, optional): User's professional credentials (e.g., MD, DO, PA, NP, CSA, PA-C)
+            - ins_exp_date (str, optional): Malpractice insurance expiration date in ISO format (YYYY-MM-DD)
             - documents (List[UserDocument], optional): List of user documents:
                 - document_type (str): Type/category of document
                 - document_name (str): Name/path of the document file
@@ -135,6 +136,7 @@ def add_user(request: Request, user: UserCreate):
             "states_licensed": "CA,NY,TX",
             "timezone": "America/Los_Angeles",
             "credentials": "MD",
+            "ins_exp_date": "2025-12-31",
             "documents": [
                 {
                     "document_type": "medical_license",
@@ -235,11 +237,11 @@ def add_user(request: Request, user: UserCreate):
             # Insert new user
             cursor.execute("""
                 INSERT INTO user_profile (
-                    user_id, user_email, first_name, last_name, addr1, addr2, city, state, zipcode, telephone, user_npi, referred_by_user, message_pref, states_licensed, timezone, credentials, user_tier
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    user_id, user_email, first_name, last_name, addr1, addr2, city, state, zipcode, telephone, user_npi, referred_by_user, message_pref, states_licensed, timezone, credentials, ins_exp_date, user_tier
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 user.user_id, user.user_email, formatted_first_name, formatted_last_name, user.addr1, user.addr2,
-                user.city, user.state, user.zipcode, user.telephone, user.user_npi, user.referred_by_user, user.message_pref, user.states_licensed, user.timezone, user.credentials, user_tier
+                user.city, user.state, user.zipcode, user.telephone, user.user_npi, user.referred_by_user, user.message_pref, user.states_licensed, user.timezone, user.credentials, user.ins_exp_date, user_tier
             ))
             # Insert user documents if provided
             if user.documents:
