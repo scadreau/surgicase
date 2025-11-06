@@ -1,5 +1,5 @@
 # Created: 2025-07-15 23:02:51
-# Last Modified: 2025-11-01 02:36:41
+# Last Modified: 2025-11-04 19:47:00
 # Author: Scott Cadreau
 
 # utils/case_status.py
@@ -12,14 +12,15 @@ logger = logging.getLogger(__name__)
 
 def update_case_status(case_id: str, conn) -> dict:
     """
-    Update case status from 0 to 7, 10, or 400 based on completeness, patient age, billing eligibility, and procedure codes.
+    Update case status from 0 to 7, 10, or 400 based on completeness, patient age, billing eligibility, procedure codes, and insurance provider.
     Automatically updates corresponding timestamp fields when setting status (billable_flag_ts, submitted_ts, rejected_ts).
     
     Status Update Priority (evaluated in this order):
     1. No change: Case status > 10 (case has progressed beyond initial review - preserves workflow progress)
     2. Status 400: ALL procedure codes are in range [10004-11960] (REJECTED - highest priority for active cases)
-    3. Status 7: Medicare detected in insurance (overrides other conditions except rejected codes)
-    4. Normal logic: Status determined by completeness, patient age, and billability
+    3. Status 400: Humana detected in insurance (REJECTED - Humana only covers Medicare/Medicaid)
+    4. Status 7: Medicare detected in insurance (overrides other conditions except rejected codes)
+    5. Normal logic: Status determined by completeness, patient age, and billability
     
     Conditions for normal status update:
     - demo_file is not null
@@ -45,15 +46,15 @@ def update_case_status(case_id: str, conn) -> dict:
             - procedure_count (int): Number of procedure codes found
             - billable_procedures (int): Number of procedures with asst_surg = 2
             - patient_age (int, optional): Patient's age if DOB available
-            - override_reason (str, optional): "medicare" or "procedure_codes_rejected" if override was applied
+            - override_reason (str, optional): "medicare", "procedure_codes_rejected", or "humana_insurance_rejected" if override was applied
     """
     try:
         logger.info(f"update_case_status called for case_id: {case_id}")
         
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-            # Check if case exists and get current status with patient DOB and insurance
+            # Check if case exists and get current status with patient DOB, insurance, and user_id for decryption
             cursor.execute("""
-                SELECT case_id, case_status, demo_file, note_file, patient_dob, ins_provider 
+                SELECT case_id, case_status, demo_file, note_file, patient_dob, ins_provider, user_id, phi_encrypted 
                 FROM cases 
                 WHERE case_id = %s AND active = 1
             """, (case_id,))
@@ -66,6 +67,27 @@ def update_case_status(case_id: str, conn) -> dict:
                     "message": "Case not found or inactive",
                     "case_id": case_id
                 }
+            
+            # Decrypt ins_provider if PHI is encrypted
+            if case_data.get('phi_encrypted') == 1 and case_data.get('ins_provider'):
+                try:
+                    from utils.phi_encryption import PHIEncryption, get_user_dek
+                    
+                    user_id = case_data.get('user_id')
+                    if user_id:
+                        dek = get_user_dek(user_id, conn)
+                        phi_crypto = PHIEncryption()
+                        
+                        # Decrypt ins_provider field if it looks encrypted (>= 28 chars)
+                        ins_provider_value = str(case_data['ins_provider'])
+                        if len(ins_provider_value) >= 28:
+                            try:
+                                case_data['ins_provider'] = phi_crypto.decrypt_field(case_data['ins_provider'], dek)
+                                logger.debug(f"Case {case_id}: Decrypted ins_provider for status check")
+                            except Exception as decrypt_error:
+                                logger.warning(f"Case {case_id}: Could not decrypt ins_provider, using encrypted value: {str(decrypt_error)}")
+                except Exception as e:
+                    logger.warning(f"Case {case_id}: Error during ins_provider decryption setup: {str(e)}")
             
             # Check if case status is already greater than 10 (don't revert progress)
             if case_data["case_status"] > 10:
@@ -114,6 +136,21 @@ def update_case_status(case_id: str, conn) -> dict:
                         "override_reason": "procedure_codes_rejected",
                         "procedure_count": len(procedure_codes)
                     }
+            
+            # Check if Humana is in insurance - if so, set case_status to 400 (rejected)
+            # Humana has moved to only Medicare and Medicaid which client cannot file against
+            if case_data.get("ins_provider") and "humana" in case_data["ins_provider"].lower():
+                logger.info(f"Case {case_id}: Humana detected in insurance, setting status to 400")
+                update_query, has_timestamp = build_status_update_query(400)
+                cursor.execute(update_query, (400, case_id))
+                
+                return {
+                    "success": True,
+                    "message": "Case status set to 400 (Humana insurance detected - only Medicare/Medicaid coverage)",
+                    "case_id": case_id,
+                    "case_status": 400,
+                    "override_reason": "humana_insurance_rejected"
+                }
             
             # Check if Medicare is in insurance - if so, set case_status to 7
             if case_data.get("ins_provider") and "medicare" in case_data["ins_provider"].lower():
