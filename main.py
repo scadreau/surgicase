@@ -1,5 +1,5 @@
 # Created: 2025-07-15 09:20:13
-# Last Modified: 2025-10-20 01:06:43
+# Last Modified: 2025-11-11 14:10:39
 # Author: Scott Cadreau
 
 # main.py
@@ -59,6 +59,7 @@ from endpoints.backoffice.user_dashboard_data import router as user_dashboard_da
 from endpoints.backoffice.bulk_update_case_status import router as bulk_update_case_status_router
 from endpoints.backoffice.get_case_images import router as get_case_images_router
 from endpoints.backoffice.build_dashboard import router as build_dashboard_router
+from endpoints.backoffice.case_submitted_analytics import router as case_submitted_analytics_router
 
 from endpoints.reports import provider_payment_report_router, provider_payment_summary_report_router, referral_report_router
 
@@ -237,6 +238,7 @@ app.include_router(user_dashboard_data_router, tags=["backoffice"])
 app.include_router(bulk_update_case_status_router, tags=["backoffice"])
 app.include_router(get_case_images_router, tags=["backoffice"])
 app.include_router(build_dashboard_router, tags=["backoffice"])
+app.include_router(case_submitted_analytics_router, tags=["backoffice"])
 
 # Admin endpoints
 app.include_router(cache_management_router, tags=["admin"])

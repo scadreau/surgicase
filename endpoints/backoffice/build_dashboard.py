@@ -1,5 +1,5 @@
 # Created: 2025-07-30 22:59:57
-# Last Modified: 2025-08-27 06:09:53
+# Last Modified: 2025-11-11 14:12:54
 # Author: Scott Cadreau
 
 # endpoints/backoffice/build_dashboard.py
@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # Import the individual dashboard functions
 from .case_dashboard_data import case_dashboard_data as get_case_dashboard_data
 from .user_dashboard_data import user_dashboard_data as get_user_dashboard_data
+from .case_submitted_analytics import case_submitted_analytics as get_case_submitted_analytics
 
 
 router = APIRouter()
@@ -53,10 +54,11 @@ def build_dashboard(
     administrators receive complete operational visibility even when individual components experience issues.
     
     Key Features:
-    - Unified dashboard combining health, case, and user analytics
+    - Unified dashboard combining health, case, user, and submission analytics
     - Intelligent error isolation preventing total failure from partial issues
     - Real-time system health monitoring integration
     - Case analytics with optional date filtering for temporal analysis
+    - Case submission analytics based on submitted_ts timestamps
     - User distribution insights across organizational structure
     - Administrative access control with comprehensive permission validation
     - Graceful degradation with partial data availability
@@ -93,6 +95,10 @@ def build_dashboard(
                 - users (dict): User analytics dashboard data:
                     - user_types (List): User type distribution statistics
                     - summary (dict): User base summary statistics
+                - submitted_analytics (dict): Case submission analytics data:
+                    - pay_category_data (List): Pay category distribution by submission date
+                    - summary (dict): Aggregate submission statistics
+                    - filters (dict): Applied date filters
             - summary (dict): High-level dashboard summary:
                 - overall_health (str): System health status
                 - total_cases (int): Total case count from analytics
@@ -100,6 +106,8 @@ def build_dashboard(
                 - case_total_amount (str): Financial total from case analytics
                 - healthy_services (int): Number of healthy system services
                 - total_services (int): Total number of monitored services
+                - submitted_cases (int): Total submitted case count from submission analytics
+                - submitted_total_amount (str): Financial total from submission analytics
             - errors (List, optional): Collection errors if any subsystem failed
             - status (str): Dashboard completion status ("complete" or "partial")
     
@@ -126,6 +134,12 @@ def build_dashboard(
            - Organizational composition analysis
            - Platform adoption metrics
            - Role-based user insights
+           
+        4. Submitted Cases Analytics:
+           - Pay category distribution by submission date
+           - Financial performance by submission timestamp
+           - Time-based filtering using submitted_ts
+           - Submission pattern analysis
     
     Error Isolation & Recovery:
         - Independent data collection from each subsystem
@@ -268,18 +282,19 @@ def build_dashboard(
         finally:
             close_db_connection(conn)
         
-        # Now collect data from all three functions in parallel
+        # Now collect data from all four functions in parallel
         dashboard_data = {}
         collection_errors = []
         
-        # Execute all three functions concurrently using ThreadPoolExecutor
-        with ThreadPoolExecutor(max_workers=3) as executor:
-            # Submit all three functions simultaneously
+        # Execute all four functions concurrently using ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            # Submit all four functions simultaneously
             # Pass validated=True to skip duplicate permission checks and skip_logging=True to prevent duplicate logs
             futures = {
                 'health': executor.submit(get_simplified_health_data),
                 'cases': executor.submit(get_case_dashboard_data, request, user_id, start_date, end_date, True, True),
-                'users': executor.submit(get_user_dashboard_data, request, user_id, True, True)
+                'users': executor.submit(get_user_dashboard_data, request, user_id, True, True),
+                'submitted_analytics': executor.submit(get_case_submitted_analytics, request, user_id, start_date, end_date, True, True)
             }
             
             # Collect results with individual error handling
@@ -315,6 +330,12 @@ def build_dashboard(
                             "user_types": [],
                             "summary": {"total_users": 0}
                         }
+                    elif component_name == 'submitted_analytics':
+                        dashboard_data[component_name] = {
+                            "error": str(e),
+                            "pay_category_data": [],
+                            "summary": {"total_cases": 0, "total_amount": "0.00"}
+                        }
         
         # Calculate execution time
         execution_time_ms = int((time.time() - start_time) * 1000)
@@ -336,7 +357,9 @@ def build_dashboard(
                 "total_users": dashboard_data["users"].get("summary", {}).get("total_users", 0),
                 "case_total_amount": dashboard_data["cases"].get("summary", {}).get("total_amount", "0.00"),
                 "healthy_services": dashboard_data["health"].get("summary", {}).get("healthy", 0),
-                "total_services": dashboard_data["health"].get("summary", {}).get("total_services", 0)
+                "total_services": dashboard_data["health"].get("summary", {}).get("total_services", 0),
+                "submitted_cases": dashboard_data["submitted_analytics"].get("summary", {}).get("total_cases", 0),
+                "submitted_total_amount": dashboard_data["submitted_analytics"].get("summary", {}).get("total_amount", "0.00")
             },
             "errors": collection_errors if collection_errors else None,
             "status": "partial" if collection_errors else "complete"
