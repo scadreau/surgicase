@@ -1,5 +1,5 @@
 # Created: 2025-07-27 02:29:13
-# Last Modified: 2025-10-02 20:44:18
+# Last Modified: 2025-11-11 17:22:36
 # Author: Scott Cadreau
 
 # endpoints/backoffice/case_dashboard_data.py
@@ -227,11 +227,11 @@ def case_dashboard_data(
                 
                 # Add date filtering if provided
                 if start_date:
-                    base_query += " AND c.case_create_ts >= %s"
+                    base_query += " AND DATE(c.case_create_ts) >= %s"
                     params.append(start_date)
                 
                 if end_date:
-                    base_query += " AND c.case_create_ts <= %s"
+                    base_query += " AND DATE(c.case_create_ts) <= %s"
                     params.append(end_date)
                 
                 base_query += " GROUP BY c.case_status, csl.case_status_desc ORDER BY c.case_status"
@@ -252,10 +252,10 @@ def case_dashboard_data(
                 
                 # Add same date filtering as main query
                 if start_date:
-                    pay_category_query += " AND case_create_ts >= %s"
+                    pay_category_query += " AND DATE(case_create_ts) >= %s"
                 
                 if end_date:
-                    pay_category_query += " AND case_create_ts <= %s"
+                    pay_category_query += " AND DATE(case_create_ts) <= %s"
                 
                 pay_category_query += " GROUP BY pay_category ORDER BY pay_category"
                 

@@ -1,5 +1,5 @@
 # Created: 2025-07-30 22:59:57
-# Last Modified: 2025-11-11 15:38:55
+# Last Modified: 2025-11-11 16:39:07
 # Author: Scott Cadreau
 
 # endpoints/backoffice/build_dashboard.py
@@ -108,6 +108,7 @@ def build_dashboard(
                 - total_services (int): Total number of monitored services
                 - submitted_cases (int): Total submitted case count from submission analytics
                 - submitted_total_amount (str): Financial total from submission analytics
+                - total_pay_tiers (int): Maximum pay tier number from procedure_code_buckets2
             - errors (List, optional): Collection errors if any subsystem failed
             - status (str): Dashboard completion status ("complete" or "partial")
     
@@ -221,7 +222,8 @@ def build_dashboard(
                 "total_users": 45,
                 "case_total_amount": "225000.00",
                 "healthy_services": 5,
-                "total_services": 5
+                "total_services": 5,
+                "total_pay_tiers": 4
             },
             "errors": null,
             "status": "complete"
@@ -265,8 +267,9 @@ def build_dashboard(
     error_message = None
     
     try:
-        # First verify user permissions
+        # First verify user permissions and get max pay tier
         conn = get_db_connection()
+        max_pay_tier = 0
         
         try:
             with conn.cursor(pymysql.cursors.DictCursor) as cursor:
@@ -279,6 +282,11 @@ def build_dashboard(
                     response_status = 403
                     error_message = "User does not have permission to access dashboard data"
                     raise HTTPException(status_code=403, detail="User does not have permission to access dashboard data.")
+                
+                # Get the maximum pay tier from procedure_code_buckets2
+                cursor.execute("SELECT MAX(tier) as max_tier FROM procedure_code_buckets2")
+                tier_result = cursor.fetchone()
+                max_pay_tier = tier_result['max_tier'] if tier_result and tier_result['max_tier'] is not None else 0
         finally:
             close_db_connection(conn)
         
@@ -362,7 +370,8 @@ def build_dashboard(
                 "healthy_services": dashboard_data["health"].get("summary", {}).get("healthy", 0),
                 "total_services": dashboard_data["health"].get("summary", {}).get("total_services", 0),
                 "submitted_cases": dashboard_data["submitted_analytics"].get("current_period", {}).get("summary", {}).get("total_cases", 0),
-                "submitted_total_amount": dashboard_data["submitted_analytics"].get("current_period", {}).get("summary", {}).get("total_amount", "0.00")
+                "submitted_total_amount": dashboard_data["submitted_analytics"].get("current_period", {}).get("summary", {}).get("total_amount", "0.00"),
+                "total_pay_tiers": max_pay_tier
             },
             "errors": collection_errors if collection_errors else None,
             "status": "partial" if collection_errors else "complete"

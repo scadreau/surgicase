@@ -1,5 +1,5 @@
 # Created: 2025-11-11 14:09:38
-# Last Modified: 2025-11-11 16:21:57
+# Last Modified: 2025-11-11 17:22:38
 # Author: Scott Cadreau
 
 # endpoints/backoffice/case_submitted_analytics.py
@@ -365,8 +365,8 @@ def case_submitted_analytics(
                     FROM cases 
                     WHERE active = 1
                       AND case_status >= 10
-                      AND submitted_ts >= %s
-                      AND submitted_ts <= %s
+                      AND DATE(submitted_ts) >= %s
+                      AND DATE(submitted_ts) <= %s
                     GROUP BY pay_category 
                     ORDER BY pay_category
                 """
