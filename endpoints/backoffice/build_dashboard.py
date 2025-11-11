@@ -1,5 +1,5 @@
 # Created: 2025-07-30 22:59:57
-# Last Modified: 2025-11-11 14:12:54
+# Last Modified: 2025-11-11 15:38:55
 # Author: Scott Cadreau
 
 # endpoints/backoffice/build_dashboard.py
@@ -333,8 +333,11 @@ def build_dashboard(
                     elif component_name == 'submitted_analytics':
                         dashboard_data[component_name] = {
                             "error": str(e),
-                            "pay_category_data": [],
-                            "summary": {"total_cases": 0, "total_amount": "0.00"}
+                            "current_period": {
+                                "pay_category_data": [],
+                                "summary": {"total_cases": 0, "total_amount": "0.00"}
+                            },
+                            "filters": {"comparison_enabled": False}
                         }
         
         # Calculate execution time
@@ -358,8 +361,8 @@ def build_dashboard(
                 "case_total_amount": dashboard_data["cases"].get("summary", {}).get("total_amount", "0.00"),
                 "healthy_services": dashboard_data["health"].get("summary", {}).get("healthy", 0),
                 "total_services": dashboard_data["health"].get("summary", {}).get("total_services", 0),
-                "submitted_cases": dashboard_data["submitted_analytics"].get("summary", {}).get("total_cases", 0),
-                "submitted_total_amount": dashboard_data["submitted_analytics"].get("summary", {}).get("total_amount", "0.00")
+                "submitted_cases": dashboard_data["submitted_analytics"].get("current_period", {}).get("summary", {}).get("total_cases", 0),
+                "submitted_total_amount": dashboard_data["submitted_analytics"].get("current_period", {}).get("summary", {}).get("total_amount", "0.00")
             },
             "errors": collection_errors if collection_errors else None,
             "status": "partial" if collection_errors else "complete"
