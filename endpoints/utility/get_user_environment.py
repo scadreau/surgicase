@@ -1,5 +1,5 @@
 # Created: 2025-07-24 17:54:30
-# Last Modified: 2025-09-04 17:52:52
+# Last Modified: 2025-11-14 17:21:44
 # Author: Scott Cadreau
 
 # endpoints/utility/get_user_environment.py
@@ -29,21 +29,21 @@ def _generate_user_environment_cache_key(user_id: str) -> str:
 
 def _check_user_group_admin(user_id: str, conn) -> bool:
     """
-    Check if user is a group admin by querying the user_groups table.
+    Check if user is a group admin by querying the provider_groups table.
     
     Args:
         user_id (str): The user ID to check
         conn: Database connection
         
     Returns:
-        bool: True if user is a group admin (group_admin = 1), False otherwise
+        bool: True if user is a group admin (admin_user_id in provider_groups), False otherwise
     """
     try:
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
             cursor.execute("""
-                SELECT group_admin 
-                FROM user_groups 
-                WHERE user_id = %s AND group_admin = 1
+                SELECT id 
+                FROM provider_groups 
+                WHERE admin_user_id = %s AND active = 1
                 LIMIT 1
             """, (user_id,))
             result = cursor.fetchone()
@@ -65,30 +65,30 @@ def _get_group_users_for_admin(user_id: str, conn) -> list:
     """
     try:
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-            # Find the single group the admin manages
+            # Find the group the admin manages
             cursor.execute(
                 """
-                SELECT ug.group_id
-                FROM user_groups ug
-                WHERE ug.user_id = %s AND ug.group_admin = 1
+                SELECT id
+                FROM provider_groups
+                WHERE admin_user_id = %s AND active = 1
                 LIMIT 1
                 """,
                 (user_id,)
             )
             row = cursor.fetchone()
-            if not row or row.get("group_id") is None:
+            if not row or row.get("id") is None:
                 return []
 
-            group_id = row["group_id"]
+            group_id = row["id"]
 
-            # Get other active users in that group joined to active profiles, excluding admin
+            # Get active users in that group joined to active profiles, excluding admin
             cursor.execute(
                 """
                 SELECT up.user_id, up.first_name, up.last_name
-                FROM user_groups ug
-                JOIN user_profile up ON ug.user_id = up.user_id AND up.active = 1
-                WHERE ug.group_id = %s
-                  AND ug.user_id <> %s
+                FROM provider_group_members pgm
+                JOIN user_profile up ON pgm.user_id = up.user_id AND up.active = 1
+                WHERE pgm.group_id = %s
+                  AND pgm.user_id <> %s
                 ORDER BY up.last_name, up.first_name
                 """,
                 (group_id, user_id)

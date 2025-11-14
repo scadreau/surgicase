@@ -1,5 +1,5 @@
 # Created: 2025-07-28 19:48:18
-# Last Modified: 2025-10-20 14:17:28
+# Last Modified: 2025-11-14 15:32:19
 # Author: Scott Cadreau
 
 # endpoints/exports/case_export.py
@@ -201,6 +201,7 @@ def _get_cases_with_json_agg(cursor: pymysql.cursors.DictCursor, case_ids: List[
             c.pay_category, c.pending_payment_ts, c.phi_encrypted, sl.surgeon_npi,
             fl.facility_npi, fl.facility_state,
             up.first_name as provider_first_name, up.last_name as provider_last_name,
+            up.email as provider_email, up.telephone as provider_telephone, up.user_npi as provider_npi,
             COALESCE(
                 JSON_ARRAYAGG(
                     CASE 
@@ -225,7 +226,7 @@ def _get_cases_with_json_agg(cursor: pymysql.cursors.DictCursor, case_ids: List[
                  c.idr_decision_ts, c.closed_ts, c.pay_amount, 
                  c.pay_category, c.pending_payment_ts, c.phi_encrypted, sl.surgeon_npi,
                  fl.facility_npi, fl.facility_state,
-                 up.first_name, up.last_name
+                 up.first_name, up.last_name, up.email, up.telephone, up.user_npi
         ORDER BY c.case_id
     """
     

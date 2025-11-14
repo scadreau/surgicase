@@ -1,5 +1,5 @@
 # Created: 2025-08-26 23:50:11
-# Last Modified: 2025-10-20 14:13:26
+# Last Modified: 2025-11-14 17:21:44
 # Author: Scott Cadreau
 
 # endpoints/case/group_cases.py
@@ -31,10 +31,12 @@ def _validate_group_admin_access(requesting_user_id: str, target_user_id: str, c
     
     # Check if requesting user is a group admin for any group containing target user
     cursor.execute("""
-        SELECT 1 FROM user_groups ug1
-        JOIN user_groups ug2 ON ug1.group_id = ug2.group_id
-        WHERE ug1.user_id = %s AND ug1.group_admin = 1
-        AND ug2.user_id = %s
+        SELECT 1 
+        FROM provider_groups pg
+        JOIN provider_group_members pgm ON pg.id = pgm.group_id
+        WHERE pg.admin_user_id = %s 
+        AND pg.active = 1
+        AND pgm.user_id = %s
         LIMIT 1
     """, (requesting_user_id, target_user_id))
     
@@ -53,10 +55,10 @@ def _get_group_users(requesting_user_id: str, cursor) -> list:
     """
     # Get all users in groups where requesting user is an admin
     cursor.execute("""
-        SELECT DISTINCT ug2.user_id
-        FROM user_groups ug1
-        JOIN user_groups ug2 ON ug1.group_id = ug2.group_id
-        WHERE ug1.user_id = %s AND ug1.group_admin = 1
+        SELECT DISTINCT pgm.user_id
+        FROM provider_groups pg
+        JOIN provider_group_members pgm ON pg.id = pgm.group_id
+        WHERE pg.admin_user_id = %s AND pg.active = 1
     """, (requesting_user_id,))
     
     group_users = [row["user_id"] for row in cursor.fetchall()]
@@ -397,7 +399,7 @@ def get_group_cases(
     Access Control:
     - Users can always access their own cases
     - Group admins can access cases for users in their managed groups
-    - Access validation performed via user_groups table lookup
+    - Access validation performed via provider_groups and provider_group_members tables
     - 403 Forbidden returned for unauthorized access attempts
     
     Args:
@@ -448,7 +450,7 @@ def get_group_cases(
             - 500 Internal Server Error: Database connection or query errors
     
     Database Operations:
-        1. Validates group admin permissions via user_groups table joins
+        1. Validates group admin permissions via provider_groups and provider_group_members tables
         2. Retrieves requesting user's max_case_status from user_profile table
         3. Executes optimized single query with JSON aggregation for procedure codes
         4. Joins with case_status_list for status descriptions in single operation
@@ -457,10 +459,10 @@ def get_group_cases(
         7. Eliminates N+1 queries through JSON_ARRAYAGG for procedure codes
     
     Group Admin Logic:
-        - Requesting user must have group_admin = 1 in user_groups table
-        - Access granted to users sharing any group with the requesting admin
+        - Requesting user must be admin_user_id in provider_groups table
+        - Access granted to users in provider_group_members for groups the requesting user administers
         - Self-access always permitted regardless of group admin status
-        - Multiple group memberships supported (user can admin multiple groups)
+        - Single group per admin enforced by unique constraint
     
     User Permission Logic:
         - Each user has a max_case_status value in their profile (default: 20)
@@ -539,9 +541,10 @@ def get_group_cases(
     Security Considerations:
         - All access is validated through database-backed group membership
         - No case data returned without explicit permission validation
-        - Group admin privileges are checked on every request
+        - Group admin privileges are checked on every request via provider_groups table
         - Audit trail maintained through comprehensive logging
         - Case status visibility restricted based on user profile permissions
+        - Foreign key constraints ensure data integrity
     
     Note:
         - Only active cases (active=1) are returned
